@@ -8,15 +8,15 @@ import json
 import re
 
 st.set_page_config(page_title="Psihosocialni Barometer", layout="wide")
-st.title("📊 Psihosocialni Barometer")
+st.title("📊 Psihosocialni Barometer (Petrič, 2025)")
 
 with st.sidebar:
     st.header("Nastavitve")
     api_key = st.text_input("Vnesite Gemini API ključ:", type="password")
+    st.info("Sistem bo samodejno izbral najboljši dostopen model.")
 
 def clean_ai_json(raw_text):
     try:
-        # Odstranimo vse, kar ni del JSON seznama
         text = re.sub(r'```json|```', '', raw_text).strip()
         match = re.search(r'\[.*\]', text, re.DOTALL)
         if match:
@@ -27,11 +27,21 @@ def clean_ai_json(raw_text):
 
 def run_multi_factor_analysis(text_list, api_key):
     genai.configure(api_key=api_key)
-    # Poskusimo z najnovejšim stabilnim imenom modela
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-    except:
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
+    
+    # DIAGNOSTIKA: Preverimo dostopne modele
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # Izbira najboljšega modela
+    selected_model = "gemini-1.5-flash" # Privzeto
+    if "models/gemini-1.5-flash" not in available_models:
+        if "models/gemini-pro" in available_models:
+            selected_model = "gemini-pro"
+        else:
+            # Če nič ne najde, vzame prvega na seznamu
+            selected_model = available_models[0].replace("models/", "") if available_models else "gemini-1.5-flash"
+
+    st.write(f"Uporabljam model: `{selected_model}`")
+    model = genai.GenerativeModel(selected_model)
     
     extracted_data = []
     debug_logs = []
@@ -42,14 +52,12 @@ def run_multi_factor_analysis(text_list, api_key):
     
     for i, text in enumerate(clean_list):
         prompt = f"""
-        Instructions: Extract all stress factors, positive factors, and suggestions.
-        Model: Petrič (2025). 
-        Format: JSON list only. 
-        Items: [ {{"tip": "SF/PF/PR", "enota": "At/St/So/PS/IP/HB", "opis": "label"}} ]
+        Extract psychosocial factors based on Petrič (2025). 
+        Return ONLY a JSON list.
+        Format: [ {{"tip": "SF/PF/PR", "enota": "At/St/So/PS/IP/HB", "opis": "label"}} ]
         Text: "{text}"
         """
         try:
-            # Uporabimo stabilen klic
             response = model.generate_content(prompt)
             factors = clean_ai_json(response.text)
             if factors:
@@ -57,13 +65,13 @@ def run_multi_factor_analysis(text_list, api_key):
                     if all(k in f for k in ('tip', 'enota', 'opis')):
                         extracted_data.append(f)
             else:
-                debug_logs.append(f"Napaka pri respondentu {i+1}: AI ni vrnil JSON-a. Odgovor: {response.text[:100]}")
+                debug_logs.append(f"Respondent {i+1}: Ni JSON-a. AI odgovor: {response.text[:50]}")
         except Exception as e:
-            debug_logs.append(f"Napaka pri respondentu {i+1}: {str(e)}")
+            debug_logs.append(f"Respondent {i+1}: {str(e)}")
         
         progress_bar.progress((i + 1) / len(clean_list))
         status_text.text(f"Analiza: {i+1} / {len(clean_list)}")
-        time.sleep(1.2) # Rate limit protection
+        time.sleep(1.5) # Varnostni premor za brezplačni ključ
             
     return pd.DataFrame(extracted_data), debug_logs
 
@@ -108,13 +116,13 @@ if uploaded_file:
                 st.header(f"Analiza zaključena: {len(factors_df)} dejavnikov")
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
-                m2.metric("Učinkovitost (η)", f"{( (2500 - (2500*sigma_m/90)) / 2500)*100:.1f} %")
-                m3.metric("Zaznanih stresorjev", fv_sf)
+                m2.metric("Učinkovitost (η)", f"{((2500 - (2500*sigma_m/90)) / 2500)*100:.1f} %")
+                m3.metric("Zaznanih stresorjev (fv)", fv_sf)
 
                 st.plotly_chart(px.histogram(factors_df, x='enota', color='tip', barmode='group'))
-                st.write("### Vsi izluščeni dejavniki:")
+                st.write("### Podrobna tabela izluščenih dejavnikov:")
                 st.dataframe(factors_df)
             
             if logs:
-                with st.expander("Debug Log (Diagnostika)"):
+                with st.expander("Diagnostika (Debug Log)"):
                     for log in logs: st.text(log)
