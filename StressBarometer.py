@@ -8,7 +8,7 @@ import time
 # Nastavitve strani
 st.set_page_config(page_title="Psihosocialni Barometer", layout="wide")
 
-st.title("📊 Psihosocialni Barometer (Petrič, 2025)")
+st.title("📊 Psihosocialni Barometer")
 
 # --- STRANSKA VRSTICA ---
 with st.sidebar:
@@ -18,61 +18,43 @@ with st.sidebar:
     st.markdown("---")
     st.write("Avtor modela: Karl Petrič, 2025")
 
-# --- MATEMATIČNE FUNKCIJE (Enačbe iz članka 1-39) ---
-def calc_metrics(all_responses, category_list, No):
-    # fv: frekvenca vseh mnenj v kategoriji
-    fv = len(category_list)
-    # frv: frekvenca različnih mnenj (unikatnih)
-    frv = len(set(category_list))
-    
-    if fv == 0: return 0, 0, 0
-    
-    rho = fv / No # Gostota (Enačba 12)
-    Co = fv / frv if frv > 0 else 1 # Kompleksnost (Enačba 18)
-    
-    # Realni faktor (Enačba 24, 25, 26) - Ct=1, rhot=10
-    Fo = (Co * rho) / (1 * 10)
-    return Fo, fv, frv
+# --- MATEMATIČNE FUNKCIJE ---
+def calc_Fo(df_subset, No):
+    fv = len(df_subset)
+    frv = df_subset['Odgovor'].nunique()
+    if fv == 0: return 0.1 # Default minimalna vrednost, da ne delimo z 0
+    rho = fv / No
+    Co = fv / frv if frv > 0 else 1
+    return (Co * rho) / 10
 
-def run_classification(text_list, api_key):
+def run_smart_classification(text_list, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    results = []
+    types, categories = [], []
     progress_bar = st.progress(0)
-    status_text = st.empty()
     
     for i, text in enumerate(text_list):
-        if not text or len(str(text)) < 3: continue
-        
         prompt = f"""
-        Analiziraj izjavo respondenta in jo razvrsti v eno od 6 kategorij po Petrič (2025):
-        - AtSF (Attentive physical): svetloba, hrup, klima, ergonomija.
-        - StSF (Performance): pomanjkanje informacij, preveč truda, roki.
-        - SoSF (Social): odnosi, mobing, konflikti.
-        - PSSF (Partial social): kazni, pomanjkanje nagrad.
-        - IPSF (Individual Psychological): strah, tesnoba, stres.
-        - HBSF (Health biological): bolezni, higiena.
+        Analiziraj izjavo respondenta po modelu Petrič (2025).
+        1. Določi TIP: SF (stresor), PF (pozitiven dejavnik), PR (predlog).
+        2. Določi ENOTO: At, St, So, PS, IP, HB.
         
         Izjava: "{text}"
-        Vrni samo kratico kategorije.
+        Vrni samo v formatu: TIP, ENOTA (npr: SF, So)
         """
         try:
-            response = model.generate_content(prompt)
-            results.append(response.text.strip())
+            res = model.generate_content(prompt).text.strip().split(',')
+            types.append(res[0].strip())
+            categories.append(res[1].strip())
         except:
-            results.append("Neuvrščeno")
+            types.append("SF")
+            categories.append("IP")
         
-        # Posodobitev napredka
-        prog = (i + 1) / len(text_list)
-        progress_bar.progress(prog)
-        status_text.text(f"Obdelava odgovora {i+1} od {len(text_list)}...")
-        
-        # Premor zaradi API omejitev (Free tier)
-        if (i+1) % 10 == 0:
-            time.sleep(1)
+        progress_bar.progress((i + 1) / len(text_list))
+        if (i+1) % 15 == 0: time.sleep(1)
             
-    return results
+    return types, categories
 
 # --- NALAGANJE DATOTEKE ---
 uploaded_file = st.file_uploader("Naložite datoteko z odgovori", type=['xlsx', 'csv', 'txt'])
@@ -87,57 +69,43 @@ if uploaded_file:
         df = pd.DataFrame(content.splitlines(), columns=["Odgovor"])
 
     No = len(df)
-    st.write(f"Naloženih odgovorov ($N_o$): {No}")
-
     if st.button("ZAŽENI PRAVO ANALIZO"):
         if not api_key:
-            st.error("Prosim vnesite API ključ v stransko vrstico!")
+            st.error("Manjka API ključ!")
         else:
-            # 1. Klasifikacija
-            with st.spinner("AI razvršča odgovore..."):
-                classifications = run_classification(df.iloc[:, 0].tolist(), api_key)
-                df['Klasifikacija'] = classifications
+            with st.spinner("AI analizira vsebino in tipe dejavnikov..."):
+                types, cats = run_smart_classification(df["Odgovor"].tolist(), api_key)
+                df['Tip'], df['Enota'] = types, cats
             
-            # 2. Izračuni
-            # Za ta primer predvidevamo, da so vsi odgovori 'Stressors' (SF)
-            # V realni aplikaciji bi ločili SF, PF in PR
-            Fo_SF, fv_sf, frv_sf = calc_metrics(df.iloc[:, 0].tolist(), classifications, No)
+            # Izračun realnih faktorjev iz podatkov
+            Fo_SF = calc_Fo(df[df['Tip'] == 'SF'], No)
+            Fo_PF = calc_Fo(df[df['Tip'] == 'PF'], No)
+            Fo_PR = calc_Fo(df[df['Tip'] == 'PR'], No)
             
-            # Za demonstracijo vzemimo PF in PR faktorje kot konstante, če jih datoteka nima
-            # V idealnem primeru bi AI klasificiral tudi te.
-            Fo_PF = 0.32 # Table 25 v članku
-            Fo_PR = 0.25 # Table 26 v članku
-            
-            # --- POPRAVLJEN DEL ZA IZRAČUN STRESNE MOČI (Enačba 27) ---
-            inside_sqrt = (Fo_SF * Fo_PR) / Fo_PF if Fo_PF > 0 else 0
-            val_for_asin = math.sqrt(inside_sqrt)
-            
-            if val_for_asin > 1:
-                sigma_m = 90.0
-            else:
-                sigma_m = math.degrees(math.asin(val_for_asin))
-            
-            # Energetska bilanca (Enačba 38)
-            W_I = 2500
-            w_ls = (W_I * sigma_m) / 90
-            w_eu = W_I - w_ls
-            eta = (w_eu / W_I) * 100
+            # Varovalka: če ni podatkov, vzamemo povprečje iz članka
+            if Fo_PF < 0.05: Fo_PF = 0.32
+            if Fo_PR < 0.05: Fo_PR = 0.25
 
-            # --- PRIKAZ REZULTATOV ---
-            st.header("Dejanski rezultati na podlagi vaših podatkov")
+            # Enačba 27
+            val = (Fo_SF * Fo_PR) / Fo_PF
+            sigma_m = math.degrees(math.asin(min(1.0, math.sqrt(val))))
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("Stresna moč po klasifikaciji AI")
-                counts = df['Klasifikacija'].value_counts().reset_index()
-                fig = px.bar(counts, x='Klasifikacija', y='count', color='Klasifikacija')
-                st.plotly_chart(fig)
-            
-            with col2:
-                st.metric("Izračunana stresna moč (σ)", f"{sigma_m:.2f} °S")
-                st.metric("Dejanska poraba (W_EU)", f"{int(w_eu)} kcal")
-                st.metric("Izguba energije (W_LS)", f"{int(w_ls)} kcal")
+            # Energija (Enačba 38)
+            w_ls = (2500 * sigma_m) / 90
+            w_eu = 2500 - w_ls
+            eta = (w_eu / 2500) * 100
+
+            # PRIKAZ
+            st.header("Rezultati realne klasifikacije")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.write("### Porazdelitev po Enotah")
+                st.plotly_chart(px.pie(df, names='Enota', hole=0.4))
+                st.write("### Porazdelitev po Tipu (SF, PF, PR)")
+                st.plotly_chart(px.bar(df['Tip'].value_counts()))
+            with c2:
+                st.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
                 st.metric("Učinkovitost (η)", f"{eta:.2f} %")
+                st.metric("Izguba (W_LS)", f"{int(w_ls)} kcal")
             
-            st.write("### Razvrstitev vaših odgovorov:")
             st.dataframe(df)
