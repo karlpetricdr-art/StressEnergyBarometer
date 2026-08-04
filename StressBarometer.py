@@ -8,12 +8,12 @@ import json
 import re
 
 st.set_page_config(page_title="Psihosocialni Barometer", layout="wide")
-st.title("📊 Psihosocialni Barometer (Petrič, 2025) - Optimizirana Analiza")
+st.title("📊 Psihosocialni Barometer (Petrič, 2025)")
 
 with st.sidebar:
     st.header("Nastavitve")
     api_key = st.text_input("Vnesite Gemini API ključ:", type="password")
-    st.warning("Uporabljamo paketno obdelavo (10 respondentov naenkrat) za hitrejše rezultate.")
+    st.info("Sistem bo samodejno poiskal delujoč model na vašem računu.")
 
 def clean_ai_json(raw_text):
     try:
@@ -25,16 +25,32 @@ def clean_ai_json(raw_text):
         pass
     return []
 
-def run_batch_analysis(text_list, api_key):
+def get_working_model(api_key):
+    """Poišče prvi model, ki dejansko deluje za vaš ključ."""
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    try:
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # Prednost dajemo flash modelu
+        for m in models:
+            if 'flash' in m.lower():
+                return genai.GenerativeModel(m)
+        return genai.GenerativeModel(models[0]) if models else None
+    except Exception as e:
+        st.error(f"Ni mogoče dobiti seznama modelov: {e}")
+        return None
+
+def run_batch_analysis(text_list, api_key):
+    model = get_working_model(api_key)
+    if not model:
+        st.error("Model ni na voljo. Preverite API ključ.")
+        return pd.DataFrame()
+    
+    st.success(f"Uporabljam model: {model.model_name}")
     
     extracted_data = []
-    batch_size = 10  # Obdelamo 10 respondentov hkrati
-    
+    batch_size = 10 
     progress_bar = st.progress(0)
     status_text = st.empty()
-    log_text = st.empty()
     
     clean_list = [str(t).strip() for t in text_list if len(str(t).strip()) > 2]
     total_batches = math.ceil(len(clean_list) / batch_size)
@@ -44,16 +60,11 @@ def run_batch_analysis(text_list, api_key):
         batch_str = "\n---\n".join([f"Respondent {idx+1}: {txt}" for idx, txt in enumerate(batch)])
         
         prompt = f"""
-        Instructions: Extract all psychosocial factors (Stressors SF, Positive PF, Suggestions PR) 
-        based on the Petrič (2025) model.
-        Analyze each respondent separately.
-        Categories: At, St, So, PS, IP, HB.
-        
-        Data to analyze:
-        {batch_str}
-
-        Return ONLY a flat JSON list of objects for all respondents combined.
-        Format: [ {{"tip": "SF/PF/PR", "enota": "At/St/So/PS/IP/HB", "opis": "short label"}} ]
+        Extract all psychosocial factors (SF, PF, PR) based on Petrič (2025) model.
+        Analyze each respondent separately. Units: At, St, So, PS, IP, HB.
+        Data: {batch_str}
+        Return ONLY a JSON list of objects. No text before or after.
+        Format: [ {{"tip": "SF/PF/PR", "enota": "At/St/So/PS/IP/HB", "opis": "label"}} ]
         """
         
         try:
@@ -61,16 +72,12 @@ def run_batch_analysis(text_list, api_key):
             factors = clean_ai_json(response.text)
             if factors:
                 extracted_data.extend(factors)
-                log_text.info(f"Trenutno zaznanih dejavnikov: {len(extracted_data)}")
         except Exception as e:
-            st.warning(f"Napaka pri paketu {i//batch_size + 1}: {e}")
+            st.warning(f"Težava pri paketu {i//batch_size + 1}: {e}")
         
-        # Posodobitev napredka
-        current_batch = (i // batch_size) + 1
-        progress_bar.progress(current_batch / total_batches)
-        status_text.text(f"Obdelava paketa {current_batch} od {total_batches}...")
-        
-        time.sleep(5) # Premor med paketi za Free Tier (15 RPM)
+        progress_bar.progress(((i // batch_size) + 1) / total_batches)
+        status_text.text(f"Analiza paketa {(i // batch_size) + 1} od {total_batches}...")
+        time.sleep(4) # Premor za stabilnost
             
     return pd.DataFrame(extracted_data)
 
@@ -85,12 +92,11 @@ if uploaded_file:
         content = uploaded_file.read().decode("utf-8")
         text_data = content.splitlines()
 
-    if st.button("ZAŽENI ANALIZO 215 RESPONDENTOV"):
+    if st.button("ZAŽENI ANALIZO"):
         if not api_key:
-            st.error("Prosim vnesite API ključ.")
+            st.error("Vnesite API ključ.")
         else:
-            with st.spinner("AI analizira podatke v paketih..."):
-                factors_df = run_batch_analysis(text_data, api_key)
+            factors_df = run_batch_analysis(text_data, api_key)
             
             if not factors_df.empty:
                 No = len(text_data)
@@ -108,25 +114,19 @@ if uploaded_file:
                 if Fo_PF <= 0: Fo_PF = 0.32
                 if Fo_PR <= 0: Fo_PR = 0.25
 
-                # Izračun stresne moči
                 val = (Fo_SF * Fo_PR) / Fo_PF
                 sigma_m = math.degrees(math.asin(min(1.0, math.sqrt(val))))
                 
-                # Energija
                 w_ls = (2500 * sigma_m) / 90
                 w_eu = 2500 - w_ls
 
-                # PRIKAZ
                 st.balloons()
-                st.header(f"Analiza končana! Zaznanih {len(factors_df)} dejavnikov.")
+                st.header(f"Zaznanih dejavnikov: {len(factors_df)}")
                 
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
-                c2.metric("Učinkovitost (η)", f"{((w_eu/2500)*100):.1f} %")
-                c3.metric("Izguba (W_LS)", f"{int(w_ls)} kcal")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
+                m2.metric("Učinkovitost (η)", f"{((w_eu/2500)*100):.1f} %")
+                m3.metric("Stresorjev (fv_sf)", fv_sf)
 
-                st.plotly_chart(px.histogram(factors_df, x='enota', color='tip', barmode='group', title="Analiza po enotah Petrič (2025)"))
-                st.write("### Podatki izluščeni iz besedil:")
+                st.plotly_chart(px.histogram(factors_df, x='enota', color='tip', barmode='group'))
                 st.dataframe(factors_df)
-            else:
-                st.error("AI ni vrnil nobenih podatkov. Preverite API ključ ali vsebino datoteke.")
