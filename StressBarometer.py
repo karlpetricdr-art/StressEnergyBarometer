@@ -108,9 +108,14 @@ if uploaded_file:
             Fo_PF = 0.32 # Table 25 v članku
             Fo_PR = 0.25 # Table 26 v članku
             
-            # Izračun celotne stresne moči (Enačba 27)
-            inside_sqrt = (Fo_SF * Fo_PR) / Fo_PF
-            sigma_m = math.degrees(math.asin(math.sqrt(inside_sqrt)))
+            # --- POPRAVLJEN DEL ZA IZRAČUN STRESNE MOČI (Enačba 27) ---
+            inside_sqrt = (Fo_SF * Fo_PR) / Fo_PF if Fo_PF > 0 else 0
+            val_for_asin = math.sqrt(inside_sqrt)
+            
+            if val_for_asin > 1:
+                sigma_m = 90.0
+            else:
+                sigma_m = math.degrees(math.asin(val_for_asin))
             
             # Energetska bilanca (Enačba 38)
             W_I = 2500
