@@ -7,15 +7,18 @@ import time
 import json
 import re
 
+# 1. Osnovne nastavitve
 st.set_page_config(page_title="Psihosocialni Barometer", layout="wide")
 st.title("📊 Psihosocialni Barometer (Petrič, 2025)")
 
+# --- STRANSKA VRSTICA ---
 with st.sidebar:
     st.header("Nastavitve")
     api_key = st.text_input("Vnesite Gemini API ključ:", type="password")
-    st.info("Sistem bo samodejno izbral najboljši dostopen model.")
+    st.info("Uporabljamo model: gemini-1.5-flash")
 
 def clean_ai_json(raw_text):
+    """Izlušči JSON iz odgovora AI."""
     try:
         text = re.sub(r'```json|```', '', raw_text).strip()
         match = re.search(r'\[.*\]', text, re.DOTALL)
@@ -26,56 +29,59 @@ def clean_ai_json(raw_text):
     return None
 
 def run_multi_factor_analysis(text_list, api_key):
+    # Konfiguracija API-ja
     genai.configure(api_key=api_key)
     
-    # DIAGNOSTIKA: Preverimo dostopne modele
-    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
-    # Izbira najboljšega modela
-    selected_model = "gemini-1.5-flash" # Privzeto
-    if "models/gemini-1.5-flash" not in available_models:
-        if "models/gemini-pro" in available_models:
-            selected_model = "gemini-pro"
-        else:
-            # Če nič ne najde, vzame prvega na seznamu
-            selected_model = available_models[0].replace("models/", "") if available_models else "gemini-1.5-flash"
-
-    st.write(f"Uporabljam model: `{selected_model}`")
-    model = genai.GenerativeModel(selected_model)
+    # Ročna določitev modela - gemini-1.5-flash je trenutno najbolj stabilen
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        st.error(f"Napaka pri povezavi z modelom: {e}")
+        return pd.DataFrame(), [str(e)]
     
     extracted_data = []
     debug_logs = []
     
     progress_bar = st.progress(0)
     status_text = st.empty()
+    
+    # Filtriramo samo uporabno besedilo
     clean_list = [t for t in text_list if len(str(t).strip()) > 2]
     
     for i, text in enumerate(clean_list):
         prompt = f"""
-        Extract psychosocial factors based on Petrič (2025). 
-        Return ONLY a JSON list.
+        Instructions: Extract all psychosocial factors based on Petrič (2025).
+        Return ONLY a JSON list. 
         Format: [ {{"tip": "SF/PF/PR", "enota": "At/St/So/PS/IP/HB", "opis": "label"}} ]
         Text: "{text}"
         """
+        
         try:
+            # Klic modela
             response = model.generate_content(prompt)
             factors = clean_ai_json(response.text)
+            
             if factors:
                 for f in factors:
                     if all(k in f for k in ('tip', 'enota', 'opis')):
                         extracted_data.append(f)
             else:
-                debug_logs.append(f"Respondent {i+1}: Ni JSON-a. AI odgovor: {response.text[:50]}")
+                debug_logs.append(f"Respondent {i+1}: AI ni vrnil JSON-a. Odgovor: {response.text[:50]}")
+                
         except Exception as e:
             debug_logs.append(f"Respondent {i+1}: {str(e)}")
         
+        # Posodobitev vmesnika
         progress_bar.progress((i + 1) / len(clean_list))
-        status_text.text(f"Analiza: {i+1} / {len(clean_list)}")
-        time.sleep(1.5) # Varnostni premor za brezplačni ključ
+        status_text.text(f"Analiziram respondenta {i+1} od {len(clean_list)}...")
+        
+        # Rate limit za free ključ (15 RPM)
+        time.sleep(4.1) # Povečan premor za varnost
             
     return pd.DataFrame(extracted_data), debug_logs
 
-uploaded_file = st.file_uploader("Naložite datoteko", type=['xlsx', 'csv', 'txt'])
+# --- NALAGANJE DATOTEKE ---
+uploaded_file = st.file_uploader("Naložite datoteko z odgovori (.xlsx, .csv, .txt)", type=['xlsx', 'csv', 'txt'])
 
 if uploaded_file:
     if uploaded_file.name.endswith('.xlsx'):
@@ -86,43 +92,59 @@ if uploaded_file:
         content = uploaded_file.read().decode("utf-8")
         text_data = [line.strip() for line in content.splitlines() if line.strip()]
 
-    if st.button("ZAŽENI ANALIZO"):
+    st.write(f"Zaznanih vrstic: {len(text_data)}")
+
+    if st.button("ZAŽENI GLOBOKO ANALIZO"):
         if not api_key:
-            st.error("Vnesite API ključ.")
+            st.error("Prosim, vnesite API ključ.")
         else:
-            factors_df, logs = run_multi_factor_analysis(text_data, api_key)
+            with st.spinner("AI razčlenjuje stavke... to bo trajalo nekaj minut."):
+                factors_df, logs = run_multi_factor_analysis(text_data, api_key)
             
             if not factors_df.empty:
                 No = len(text_data)
+                
                 def get_metrics(type_code):
                     subset = factors_df[factors_df['tip'].str.contains(type_code, na=False)]
-                    fv, frv = len(subset), subset['opis'].nunique()
-                    rho, Co = fv/No, (fv/frv if frv > 0 else 1)
+                    fv = len(subset)
+                    frv = subset['opis'].nunique()
+                    rho = fv / No
+                    Co = fv / frv if frv > 0 else 1
                     return (Co * rho) / 10, fv, frv
 
                 Fo_SF, fv_sf, frv_sf = get_metrics('SF')
                 Fo_PF, fv_pf, frv_pf = get_metrics('PF')
                 Fo_PR, fv_pr, frv_pr = get_metrics('PR')
 
+                # Default vrednosti po modelu (če ni podatkov v datoteki)
                 if Fo_PF <= 0: Fo_PF = 0.32
                 if Fo_PR <= 0: Fo_PR = 0.25
 
+                # Izračun stresne moči
                 try:
                     val = (Fo_SF * Fo_PR) / Fo_PF
                     sigma_m = math.degrees(math.asin(min(1.0, math.sqrt(val))))
-                except: sigma_m = 0
+                except:
+                    sigma_m = 0
 
+                # Energija
+                w_ls = (2500 * sigma_m) / 90
+                w_eu = 2500 - w_ls
+
+                # PRIKAZ
                 st.balloons()
                 st.header(f"Analiza zaključena: {len(factors_df)} dejavnikov")
+                
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
-                m2.metric("Učinkovitost (η)", f"{((2500 - (2500*sigma_m/90)) / 2500)*100:.1f} %")
+                m2.metric("Učinkovitost (η)", f"{((w_eu/2500)*100):.1f} %")
                 m3.metric("Zaznanih stresorjev (fv)", fv_sf)
 
                 st.plotly_chart(px.histogram(factors_df, x='enota', color='tip', barmode='group'))
-                st.write("### Podrobna tabela izluščenih dejavnikov:")
+                st.write("### Seznam vseh izluščenih dejavnikov:")
                 st.dataframe(factors_df)
             
             if logs:
                 with st.expander("Diagnostika (Debug Log)"):
-                    for log in logs: st.text(log)
+                    for log in logs:
+                        st.text(log)
