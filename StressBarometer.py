@@ -4,108 +4,122 @@ import google.generativeai as genai
 import plotly.express as px
 import math
 import time
+import json
 
-# Nastavitve strani
 st.set_page_config(page_title="Psihosocialni Barometer", layout="wide")
+st.title("📊 Psihosocialni Barometer (Petrič, 2025) - Multi-faktor Analiza")
 
-st.title("📊 Psihosocialni Barometer")
-
-# --- STRANSKA VRSTICA ---
 with st.sidebar:
     st.header("Nastavitve")
     api_key = st.text_input("Vnesite Gemini API ključ:", type="password")
-    st.info("Pridobite ključ na [Google AI Studio](https://aistudio.google.com/app/apikey)")
-    st.markdown("---")
-    st.write("Avtor modela: Karl Petrič, 2025")
+    st.info("Model zdaj podpira ekstrakcijo več dejavnikov iz enega stavka.")
 
-# --- MATEMATIČNE FUNKCIJE ---
-def calc_Fo(df_subset, No):
-    fv = len(df_subset)
-    frv = df_subset['Odgovor'].nunique()
-    if fv == 0: return 0.1 # Default minimalna vrednost, da ne delimo z 0
-    rho = fv / No
-    Co = fv / frv if frv > 0 else 1
-    return (Co * rho) / 10
-
-def run_smart_classification(text_list, api_key):
+def run_multi_factor_analysis(text_list, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    types, categories = [], []
+    extracted_data = []
     progress_bar = st.progress(0)
+    status_text = st.empty()
     
     for i, text in enumerate(text_list):
+        # Prompt, ki zahteva ekstrakcijo vseh dejavnikov
         prompt = f"""
-        Analiziraj izjavo respondenta po modelu Petrič (2025).
-        1. Določi TIP: SF (stresor), PF (pozitiven dejavnik), PR (predlog).
-        2. Določi ENOTO: At, St, So, PS, IP, HB.
-        
+        Analiziraj izjavo respondenta po modelu Petrič (2025). 
+        Iz besedila izlušči VSE omenjene dejavnike.
+        Za vsak dejavnik določi:
+        - TIP: SF (stresor), PF (pozitiven), PR (predlog).
+        - ENOTO: At, St, So, PS, IP, HB.
+        - POVZETEK: kratek opis dejavnika.
+
         Izjava: "{text}"
-        Vrni samo v formatu: TIP, ENOTA (npr: SF, So)
+
+        Vrni izključno JSON seznam objektov, primer:
+        [
+          {{"tip": "SF", "enota": "At", "opis": "hrup"}},
+          {{"tip": "SF", "enota": "So", "opis": "slab odnos"}}
+        ]
         """
         try:
-            res = model.generate_content(prompt).text.strip().split(',')
-            types.append(res[0].strip())
-            categories.append(res[1].strip())
+            response = model.generate_content(prompt)
+            # Očistimo morebitne markdown oznake iz JSON-a
+            clean_json = response.text.replace('```json', '').replace('```', '').strip()
+            factors = json.loads(clean_json)
+            for f in factors:
+                f['respondent_id'] = i
+                extracted_data.append(f)
         except:
-            types.append("SF")
-            categories.append("IP")
+            continue
         
         progress_bar.progress((i + 1) / len(text_list))
-        if (i+1) % 15 == 0: time.sleep(1)
+        status_text.text(f"Analiziram respondenta {i+1} od {len(text_list)}...")
+        if (i+1) % 10 == 0: time.sleep(1)
             
-    return types, categories
+    return pd.DataFrame(extracted_data)
 
-# --- NALAGANJE DATOTEKE ---
 uploaded_file = st.file_uploader("Naložite datoteko z odgovori", type=['xlsx', 'csv', 'txt'])
 
 if uploaded_file:
-    if uploaded_file.name.endswith('.xlsx'):
-        df = pd.read_excel(uploaded_file)
-    elif uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
+    if uploaded_file.name.endswith('.xlsx'): df = pd.read_excel(uploaded_file)
+    elif uploaded_file.name.endswith('.csv'): df = pd.read_csv(uploaded_file)
     else:
         content = uploaded_file.read().decode("utf-8")
         df = pd.DataFrame(content.splitlines(), columns=["Odgovor"])
 
     No = len(df)
-    if st.button("ZAŽENI PRAVO ANALIZO"):
+    if st.button("ZAŽENI GLOBOKO ANALIzo"):
         if not api_key:
-            st.error("Manjka API ključ!")
+            st.error("Vnesite API ključ!")
         else:
-            with st.spinner("AI analizira vsebino in tipe dejavnikov..."):
-                types, cats = run_smart_classification(df["Odgovor"].tolist(), api_key)
-                df['Tip'], df['Enota'] = types, cats
+            with st.spinner("AI razčlenjuje stavke na posamezne dejavnike..."):
+                factors_df = run_multi_factor_analysis(df["Odgovor"].tolist(), api_key)
             
-            # Izračun realnih faktorjev iz podatkov
-            Fo_SF = calc_Fo(df[df['Tip'] == 'SF'], No)
-            Fo_PF = calc_Fo(df[df['Tip'] == 'PF'], No)
-            Fo_PR = calc_Fo(df[df['Tip'] == 'PR'], No)
-            
-            # Varovalka: če ni podatkov, vzamemo povprečje iz članka
-            if Fo_PF < 0.05: Fo_PF = 0.32
-            if Fo_PR < 0.05: Fo_PR = 0.25
+            # Izračun frekvenc po vašem modelu
+            def get_metrics(type_code):
+                subset = factors_df[factors_df['tip'] == type_code]
+                fv = len(subset)
+                frv = subset['opis'].nunique()
+                # Enačba 12 & 18: rho in Co
+                rho = fv / No
+                Co = fv / frv if frv > 0 else 1
+                return (Co * rho) / 10, fv, frv
 
-            # Enačba 27
+            Fo_SF, fv_sf, frv_sf = get_metrics('SF')
+            Fo_PF, fv_pf, frv_pf = get_metrics('PF')
+            Fo_PR, fv_pr, frv_pr = get_metrics('PR')
+
+            # Varovalke za minimalne vrednosti (Table 25, 26)
+            if Fo_PF < 0.01: Fo_PF = 0.32
+            if Fo_PR < 0.01: Fo_PR = 0.25
+
+            # Izračun stresne moči (Enačba 27)
             val = (Fo_SF * Fo_PR) / Fo_PF
             sigma_m = math.degrees(math.asin(min(1.0, math.sqrt(val))))
             
-            # Energija (Enačba 38)
+            # Energija
             w_ls = (2500 * sigma_m) / 90
             w_eu = 2500 - w_ls
-            eta = (w_eu / 2500) * 100
 
             # PRIKAZ
-            st.header("Rezultati realne klasifikacije")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.write("### Porazdelitev po Enotah")
-                st.plotly_chart(px.pie(df, names='Enota', hole=0.4))
-                st.write("### Porazdelitev po Tipu (SF, PF, PR)")
-                st.plotly_chart(px.bar(df['Tip'].value_counts()))
-            with c2:
-                st.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
-                st.metric("Učinkovitost (η)", f"{eta:.2f} %")
-                st.metric("Izguba (W_LS)", f"{int(w_ls)} kcal")
+            st.header(f"Rezultati analize ({len(factors_df)} zaznanih dejavnikov)")
             
-            st.dataframe(df)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Zaznanih Stresorjev (fv_sf)", fv_sf)
+            c2.metric("Zaznanih Pozitivnih (fv_pf)", fv_pf)
+            c3.metric("Zaznanih Predlogov (fv_pr)", fv_pr)
+
+            st.markdown("---")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.subheader("Moč stresa: " + f"{sigma_m:.2f} °S")
+                # Vizualizacija Slope modela (Figure 1)
+                fig_slope = px.line(x=[0, 90], y=[0, sigma_m], labels={'x':'Teoretični okvir', 'y':'Intenzivnost'})
+                st.plotly_chart(fig_slope)
+            
+            with col_b:
+                st.subheader("Energetska učinkovitost: " + f"{(w_eu/2500)*100:.1f}%")
+                st.write(f"Izguba energije: **{int(w_ls)} kcal**")
+                st.plotly_chart(px.pie(factors_df, names='enota', title="Porazdelitev po enotah"))
+
+            st.write("### Seznam vseh izluščenih dejavnikov:")
+            st.dataframe(factors_df)
