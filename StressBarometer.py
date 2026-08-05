@@ -1342,9 +1342,7 @@ if "dataset" in st.session_state:
     df = st.session_state["dataset"]
 
 
-
     st.divider()
-
 
 
     st.header(
@@ -1354,8 +1352,7 @@ if "dataset" in st.session_state:
     )
 
 
-
-        if st.button(
+    if st.button(
 
         "🚀 ZAŽENI AI ANALIZO"
 
