@@ -218,37 +218,48 @@ def load_dataset(
 
     try:
 
+    if filename.endswith(".xlsx"):
 
-        if filename.endswith(".xlsx"):
-
-
-            df = pd.read_excel(
-
-                uploaded_file
-
-            )
+        df = pd.read_excel(
+            uploaded_file
+        )
 
 
+    elif filename.endswith(".csv"):
 
-        elif filename.endswith(".csv"):
-
-
-            df = pd.read_csv(
-
-                uploaded_file
-
-            )
+        df = pd.read_csv(
+            uploaded_file
+        )
 
 
+    elif filename.endswith(".txt"):
 
-        elif filename.endswith(".txt"):
+        df = pd.read_csv(
+            uploaded_file,
+            sep="\t",
+            encoding="utf-8"
+        )
 
 
-            text = uploaded_file.read().decode(
+    else:
 
-                "utf-8"
+        st.error(
+            "Nepodprt format datoteke."
+        )
 
-            )
+        return None
+
+
+    return df
+
+
+except Exception as e:
+
+    st.error(
+        f"Napaka pri uvozu: {e}"
+    )
+
+    return None
 
 
             df = pd.DataFrame(
