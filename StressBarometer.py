@@ -299,27 +299,31 @@ def prepare_dataframe(df):
 
 def clean_json_response(text):
 
-    """
-    Čiščenje Gemini odgovora,
-    ker včasih doda markdown.
-    """
-
-
     text = text.strip()
 
-
+    # odstrani markdown
     text = re.sub(
         r"```json",
         "",
         text
     )
 
-
     text = re.sub(
         r"```",
         "",
         text
     )
+
+
+    # poišči prvi JSON objekt
+
+    start = text.find("{")
+    end = text.rfind("}")
+
+
+    if start >= 0 and end >= 0:
+
+        text = text[start:end+1]
 
 
     return text.strip()
@@ -549,8 +553,18 @@ def analyze_single_response(model, answer):
 
     except Exception as e:
 
+    st.warning(
+        f"AI napaka: {e}"
+    )
 
-        return default
+    st.write(
+        "Originalni odgovor AI:"
+    )
+
+    st.code(raw if 'raw' in locals() else "NI ODGOVORA")
+
+
+    return default
 
 
 
@@ -626,72 +640,69 @@ def aggregate_factors(results):
 
     data = {
 
+        "SF_count": 0,
+        "PF_count": 0,
+        "PR_count": 0,
 
-        "SF_count":0,
+        "SF_weight": 0,
+        "PF_weight": 0,
+        "PR_weight": 0,
 
-        "PF_count":0,
-
-        "PR_count":0,
-
-
-        "SF_weight":0,
-
-        "PF_weight":0,
-
-        "PR_weight":0,
-
-
-        "SF_list":[],
-
-        "PF_list":[],
-
-        "PR_list":[]
+        "SF_list": [],
+        "PF_list": [],
+        "PR_list": []
 
     }
-
 
 
 
     for item in results:
 
 
-
-        # -------------------
+        # ====================================================
         # STRESORJI
-        # -------------------
+        # ====================================================
 
         for sf in item.get(
             "stresorji",
             []
         ):
 
+            try:
 
-            intensity = sf.get(
-                "intenzivnost",
-                1
-            )
+                intensity = int(
+                    sf.get(
+                        "intenzivnost",
+                        1
+                    )
+                )
+
+            except:
+
+                intensity = 1
+
 
 
             data["SF_count"] += 1
-
 
             data["SF_weight"] += intensity
 
 
             data["SF_list"].append(
                 (
-                    sf.get("faktor"),
+                    sf.get(
+                        "faktor",
+                        "neznan stresor"
+                    ),
                     intensity
                 )
             )
 
 
 
-
-
-        # -------------------
-        # POZITIVNI
-        # -------------------
+        # ====================================================
+        # POZITIVNI DEJAVNIKI
+        # ====================================================
 
         for pf in item.get(
             "pozitivni_dejavniki",
@@ -699,14 +710,22 @@ def aggregate_factors(results):
         ):
 
 
-            intensity = pf.get(
-                "intenzivnost",
-                1
-            )
+            try:
+
+                intensity = int(
+                    pf.get(
+                        "intenzivnost",
+                        1
+                    )
+                )
+
+            except:
+
+                intensity = 1
+
 
 
             data["PF_count"] += 1
-
 
             data["PF_weight"] += intensity
 
@@ -714,18 +733,19 @@ def aggregate_factors(results):
 
             data["PF_list"].append(
                 (
-                    pf.get("faktor"),
+                    pf.get(
+                        "faktor",
+                        "neznan pozitivni dejavnik"
+                    ),
                     intensity
                 )
             )
 
 
 
-
-
-        # -------------------
+        # ====================================================
         # PREDLOGI
-        # -------------------
+        # ====================================================
 
         for pr in item.get(
             "predlogi",
@@ -733,14 +753,23 @@ def aggregate_factors(results):
         ):
 
 
-            effect = pr.get(
-                "ucinek",
-                1
-            )
+            try:
+
+                effect = int(
+                    pr.get(
+                        "ucinek",
+                        1
+                    )
+                )
+
+
+            except:
+
+                effect = 1
+
 
 
             data["PR_count"] += 1
-
 
             data["PR_weight"] += effect
 
@@ -748,7 +777,10 @@ def aggregate_factors(results):
 
             data["PR_list"].append(
                 (
-                    pr.get("faktor"),
+                    pr.get(
+                        "faktor",
+                        "neznan predlog"
+                    ),
                     effect
                 )
             )
@@ -1073,17 +1105,19 @@ if "dataset" in st.session_state:
             if model:
 
 
+    with st.spinner(
+        "AI razgrajuje odgovore na več dejavnikov..."
+    ):
 
-                with st.spinner(
-                    "AI razgrajuje odgovore na več dejavnikov..."
-                ):
+
+        results = run_multifactor_analysis(
+            df,
+            model
+        )
 
 
-                    results = run_multifactor_analysis(
-                        df,
-                        model
-                    )
-
+        st.write("DEBUG AI REZULTATI")
+        st.json(results[:3])
 
 
                     aggregated = aggregate_factors(
