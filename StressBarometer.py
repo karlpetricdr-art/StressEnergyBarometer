@@ -202,64 +202,68 @@ def test_gemini(client, model_name):
 # ============================================================
 
 
-def load_dataset(
-        uploaded_file):
-
+def load_dataset(uploaded_file):
 
     if uploaded_file is None:
-
         return None
-
 
 
     filename = uploaded_file.name.lower()
 
 
-
     try:
 
-    if filename.endswith(".xlsx"):
+        if filename.endswith(".xlsx"):
 
-        df = pd.read_excel(
-            uploaded_file
-        )
-
-
-    elif filename.endswith(".csv"):
-
-        df = pd.read_csv(
-            uploaded_file
-        )
+            df = pd.read_excel(
+                uploaded_file
+            )
 
 
-    elif filename.endswith(".txt"):
+        elif filename.endswith(".csv"):
 
-        df = pd.read_csv(
-            uploaded_file,
-            sep="\t",
-            encoding="utf-8"
-        )
+            df = pd.read_csv(
+                uploaded_file
+            )
 
 
-    else:
+        elif filename.endswith(".tsv"):
+
+            df = pd.read_csv(
+                uploaded_file,
+                sep="\t",
+                encoding="utf-8"
+            )
+
+
+        elif filename.endswith(".txt"):
+
+            df = pd.read_csv(
+                uploaded_file,
+                sep="\t",
+                encoding="utf-8"
+            )
+
+
+        else:
+
+            st.error(
+                "Nepodprt format datoteke."
+            )
+
+            return None
+
+
+        return df
+
+
+    except Exception as e:
 
         st.error(
-            "Nepodprt format datoteke."
+            f"Napaka pri uvozu: {e}"
         )
 
         return None
-
-
-    return df
-
-
-except Exception as e:
-
-    st.error(
-        f"Napaka pri uvozu: {e}"
-    )
-
-    return None
 
 
             df = pd.DataFrame(
