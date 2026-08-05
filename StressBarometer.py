@@ -1386,16 +1386,14 @@ if "dataset" in st.session_state:
 
 
 
-            if client:
+                        if client:
 
 
-
-                                with st.spinner(
+                with st.spinner(
 
                     f"{model_name} analizira odgovore..."
 
                 ):
-
 
 
                     results = run_multifactor_analysis(
@@ -1409,7 +1407,6 @@ if "dataset" in st.session_state:
                     )
 
 
-
                     aggregated = aggregate_factors(
 
                         results
@@ -1417,13 +1414,11 @@ if "dataset" in st.session_state:
                     )
 
 
-
                     factor_df = factors_to_dataframe(
 
                         aggregated
 
                     )
-
 
 
                     sigma = calculate_stress_power(
