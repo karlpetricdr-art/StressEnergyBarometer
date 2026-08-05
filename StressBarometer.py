@@ -92,12 +92,12 @@ with st.sidebar:
 
 
     model_name = st.selectbox(
-        "AI model:",
-        [
-            "gemini-1.5-flash",
-            "gemini-1.5-pro"
-        ]
-    )
+    "AI model:",
+    [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite"
+    ]
+)
 
 
     st.write(
@@ -116,13 +116,8 @@ with st.sidebar:
 
 def initialize_gemini(api_key, model_name):
 
-    """
-    Inicializacija Gemini modela.
-    """
-
     if not api_key:
         return None
-
 
     try:
 
@@ -130,11 +125,9 @@ def initialize_gemini(api_key, model_name):
             api_key=api_key
         )
 
-
         model = genai.GenerativeModel(
-            model_name
+            model_name=model_name
         )
-
 
         return model
 
