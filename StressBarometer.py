@@ -1360,157 +1360,67 @@ def factors_to_dataframe(aggregated):
 
 
 # ============================================================
-# 16. MODEL STRESNE MOČI
+# 16. MODEL STRESNE MOČI (Petrič, 2025 - Enačbe 12, 18, 24, 27)
 # ============================================================
 
+def calculate_stress_power(data, No):
+    # No = število respondentov
+    
+    def get_Fo(fv, frv):
+        if fv == 0 or No == 0: return 0.05 # Osnovna vrednost, če ni podatkov
+        rho = fv / No                         # Enačba 12
+        Co = fv / frv if frv > 0 else 1       # Enačba 18
+        return (Co * rho) / 10                # Enačba 24 (rhot=10, Ct=1)
 
-def calculate_stress_power(data):
+    # Pridobivanje frekvenc (fv) in unikatnih mnenj (frv) iz agregiranih podatkov
+    # SF_list vsebuje npr. [("hrup", 3), ("konflikt", 4)] -> fv je število vseh, frv število unikatnih
+    f_sf = data.get("SF_count", 0)
+    frv_sf = len(set([x[0] for x in data.get("SF_list", [])]))
+    
+    f_pf = data.get("PF_count", 0)
+    frv_pf = len(set([x[0] for x in data.get("PF_list", [])]))
+    
+    f_pr = data.get("PR_count", 0)
+    frv_pr = len(set([x[0] for x in data.get("PR_list", [])]))
 
+    # Izračun realnih faktorjev Fo
+    Fo_SF = get_Fo(f_sf, frv_sf)
+    Fo_PF = get_Fo(f_pf, frv_pf)
+    Fo_PR = get_Fo(f_pr, frv_pr)
 
-    SF = data.get(
+    # Varovalka po članku: Fo_PF ne sme biti 0 (Enačba 27)
+    if Fo_PF <= 0: Fo_PF = 0.32
+    if Fo_PR <= 0: Fo_PR = 0.25
 
-        "SF_weight",
-
-        0
-
-    )
-
-
-    PF = data.get(
-
-        "PF_weight",
-
-        0
-
-    )
-
-
-    PR = data.get(
-
-        "PR_weight",
-
-        0
-
-    )
-
-
-
-    stress_ratio = SF / (PF + 1)
-
-
-
-    recovery_factor = 1 + (PR / 10)
-
-
-
-    adjusted = stress_ratio / recovery_factor
-
-
-
-    sigma = (
-
-        math.log(
-
-            adjusted + 1
-
-        )
-
-        /
-
-        math.log(10)
-
-    ) * 50
-
-
-
-    sigma = max(
-
-        0,
-
-        min(
-
-            50,
-
-            sigma
-
-        )
-
-    )
-
-
-    return sigma
-
-
-
-
+    # Enačba 27: sigma = arcsin(sqrt((Fo_SF * Fo_PR) / Fo_PF))
+    try:
+        val = (Fo_SF * Fo_PR) / Fo_PF
+        sigma = math.degrees(math.asin(min(1.0, math.sqrt(val))))
+    except:
+        sigma = 0
+        
+    return sigma, Fo_SF, Fo_PF, Fo_PR
 
 # ============================================================
-# 17. ENERGETSKI MODEL (v kcal in kJ)
+# 17. ENERGETSKI MODEL (Petrič, 2025 - Enačba 38)
 # ============================================================
-
-
-KCAL_TO_KJ = 4.184  # standardna pretvorba: 1 kcal = 4.184 kJ
-
 
 def calculate_energy(sigma, W_I_kcal=2500):
-    """
-    sigma       : stresna moč / nagib, 0-50 °S
-    W_I_kcal    : izhodiščna dnevna energijska vrednost (privzeto 2500 kcal)
-
-    Vrne slovar z izgubljeno in uporabno energijo v kcal IN kJ,
-    ter učinkovitost v %.
-    """
-
-
-    # izguba energije zaradi stresa, sorazmerna s sigmo (0-50 °S -> 0-100% W_I)
-    loss_kcal = (
-
-        W_I_kcal *
-
-        sigma /
-
-        50
-
-    )
-
-
-
+    # Enačba 38: W_EU = W_I - (W_I * sigma / 90)
+    # Pozor: V vašem modelu je maksimalna moč 90 stopinj
+    loss_kcal = (W_I_kcal * sigma) / 90
     useful_kcal = W_I_kcal - loss_kcal
+    efficiency = (useful_kcal / W_I_kcal) * 100
 
-
-
-    efficiency = (
-
-        useful_kcal /
-
-        W_I_kcal
-
-    ) * 100
-
-
-
+    KCAL_TO_KJ = 4.184
     return {
-
         "W_I_kcal": W_I_kcal,
-
-        "W_I_kJ": W_I_kcal * KCAL_TO_KJ,
-
         "loss_kcal": loss_kcal,
-
-        "loss_kJ": loss_kcal * KCAL_TO_KJ,
-
         "useful_kcal": useful_kcal,
-
-        "useful_kJ": useful_kcal * KCAL_TO_KJ,
-
-        "efficiency": efficiency
-
+        "efficiency": efficiency,
+        "loss_kJ": loss_kcal * KCAL_TO_KJ,
+        "useful_kJ": useful_kcal * KCAL_TO_KJ
     }
-
-
-
-
-
 # ============================================================
 # 18. TOP FAKTORJI
 # ============================================================
@@ -1667,41 +1577,23 @@ if "dataset" in st.session_state:
 
 
 
-                    aggregated = aggregate_factors(
+                    # --- POSODOBLJEN DEL ZA REALNI IZRAČUN ---
+                    aggregated = aggregate_factors(results)
+                    factor_df = factors_to_dataframe(aggregated)
 
-                        results
+                    # Novo: Funkciji podamo število vseh respondentov 'len(df)'
+                    # Funkcija zdaj vrne 4 vrednosti namesto ene
+                    sigma, fsf, fpf, fpr = calculate_stress_power(aggregated, len(df))
 
-                    )
-
-
-
-                    factor_df = factors_to_dataframe(
-
-                        aggregated
-
-                    )
-
-
-
-                    sigma = calculate_stress_power(
-
-                        aggregated
-
-                    )
-
-
-
+                    # Shranjevanje v sejo (session_state), da ostane vidno ob osvežitvi
                     st.session_state["results"] = results
-
                     st.session_state["aggregated"] = aggregated
-
                     st.session_state["factor_df"] = factor_df
-
                     st.session_state["sigma"] = sigma
-
+                    st.session_state["f_factors"] = (fsf, fpf, fpr) # Shranimo realne faktorje Fo
                     st.session_state["status_counts"] = status_counts
-
                     st.session_state["total_processed"] = total
+                    # --- KONEC POSODOBLJENEGA DELA ---
 
 
 
@@ -1742,145 +1634,52 @@ if "dataset" in st.session_state:
 
 
 # ============================================================
-# 20. PRIKAZ REZULTATOV
+# 20. PRIKAZ REZULTATOV (Popravljeno v2.4)
 # ============================================================
 
-
 if "sigma" in st.session_state:
-
-
     aggregated = st.session_state["aggregated"]
-
-
     factor_df = st.session_state["factor_df"]
-
-
     sigma = st.session_state["sigma"]
-
-
     status_counts = st.session_state.get("status_counts")
-
     total_processed = st.session_state.get("total_processed")
 
-
-
-    energy = calculate_energy(
-
-        sigma,
-
-        W_I_kcal=W_I_kcal
-
-    )
-
-
+    # Izračun energije po novem modelu
+    energy = calculate_energy(sigma, W_I_kcal=W_I_kcal)
 
     st.divider()
-
-
-
-    st.header(
-
-        "📊 Rezultati Psihosocialnega Barometra"
-
-    )
-
-
-    if status_counts is not None:
-
-        st.caption(
-
-            f"Osnova izračuna: {status_counts['ok']} od {total_processed} "
-            f"obdelanih odgovorov je bilo uspešno analiziranih."
-
-        )
-
-
+    st.header("📊 Rezultati Psihosocialnega Barometra")
 
     col1, col2, col3, col4 = st.columns(4)
 
-
-
     with col1:
-
-
-        st.metric(
-
-            "Stresna moč (nagib)",
-
-            f"{sigma:.1f} °S"
-
-        )
-
-
+        st.metric("Stresna moč (nagib)", f"{sigma:.2f} °S")
 
     with col2:
-
-
-        st.metric(
-
-            "Izguba energije",
-
-            f"{energy['loss_kcal']:.0f} kcal",
-
-            help=f"{energy['loss_kJ']:.0f} kJ"
-
-        )
-
-
-        st.caption(
-
-            f"= {energy['loss_kJ']:.0f} kJ"
-
-        )
-
-
+        st.metric("Izguba energije", f"{energy['loss_kcal']:.0f} kcal")
+        st.caption(f"= {energy['loss_kJ']:.0f} kJ")
 
     with col3:
-
-
-        st.metric(
-
-            "Uporabna energija",
-
-            f"{energy['useful_kcal']:.0f} kcal",
-
-            help=f"{energy['useful_kJ']:.0f} kJ"
-
-        )
-
-
-        st.caption(
-
-            f"= {energy['useful_kJ']:.0f} kJ"
-
-        )
-
-
+        st.metric("Uporabna energija", f"{energy['useful_kcal']:.0f} kcal")
+        st.caption(f"= {energy['useful_kJ']:.0f} kJ")
 
     with col4:
+        st.metric("Učinkovitost (η)", f"{energy['efficiency']:.1f}%")
 
-
-        st.metric(
-
-            "Učinkovitost",
-
-            f"{energy['efficiency']:.1f}%"
-
-        )
-
-
-    st.caption(
-
-        f"Izhodiščna dnevna energijska vrednost: "
-        f"{energy['W_I_kcal']:.0f} kcal ({energy['W_I_kJ']:.0f} kJ)"
-
-    )
-
-
-
-
+    # --- TUKAJ VSTAVITE TRETJI KORAK ---
+    st.divider()
+    st.subheader("Vrednosti realnih faktorjev ($F_o$)")
+    st.info("Te vrednosti predstavljajo realni vpliv posamezne skupine dejavnikov na celotno stresno moč po modelu Petrič (2025).")
+    
+    fs, fp, fpr = st.session_state.get("f_factors", (0,0,0))
+    cf1, cf2, cf3 = st.columns(3)
+    cf1.write(f"**$F_{{oSF}}$ (Stresorji):** {fs:.4f}")
+    cf2.write(f"**$F_{{oPF}}$ (Pozitivni):** {fp:.4f}")
+    cf3.write(f"**$F_{{oPR}}$ (Predlogi):** {fpr:.4f}")
+    # --- KONEC TRETJEGA KORAKA ---
 
     st.divider()
+    # ... naprej ostane koda za Pie chart in grafe ista ...
 
 
 
@@ -2122,5 +1921,6 @@ if "sigma" in st.session_state:
 # ============================================================
 # KONEC APLIKACIJE
 # ============================================================
+
 
 
