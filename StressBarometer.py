@@ -551,20 +551,28 @@ def analyze_single_response(model, answer):
 
 
 
-    except Exception as e:
+        except Exception as e:
 
-    st.warning(
-        f"AI napaka: {e}"
-    )
+        st.warning(
+            f"AI napaka: {e}"
+        )
 
-    st.write(
-        "Originalni odgovor AI:"
-    )
+        st.write(
+            "Originalni odgovor AI:"
+        )
 
-    st.code(raw if 'raw' in locals() else "NI ODGOVORA")
+        if 'raw' in locals():
+
+            st.code(raw)
+
+        else:
+
+            st.code(
+                "NI ODGOVORA"
+            )
 
 
-    return default
+        return default
 
 
 
