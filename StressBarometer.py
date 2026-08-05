@@ -39,7 +39,6 @@ def run_smart_classification(text_list, api_key):
     progress_bar = st.progress(0)
     
     for i, text in enumerate(text_list):
-        # Prompt za določitev tipa in enote za celotno vrstico
         prompt = f"""
         Analiziraj izjavo respondenta po modelu Petrič (2025).
         1. Določi TIP: SF (stresor), PF (pozitiven dejavnik), PR (predlog).
@@ -57,7 +56,6 @@ def run_smart_classification(text_list, api_key):
             categories.append("IP")
         
         progress_bar.progress((i + 1) / len(text_list))
-        # Rate limit za brezplačni ključ
         if (i+1) % 15 == 0: 
             time.sleep(1)
             
@@ -77,4 +75,54 @@ if uploaded_file:
 
     # Zagotovimo, da imamo stolpec z imenom 'Odgovor'
     if df.columns[0] != "Odgovor":
-        df.columns
+        df.rename(columns={df.columns[0]: "Odgovor"}, inplace=True)
+
+    No = len(df)
+    st.write(f"Naloženih vrstic: {No}")
+
+    # --- GUMB ZA ANALIZO ---
+    if st.button("ZAŽENI PRAVO ANALIZO"):
+        if not api_key:
+            st.error("Manjka API ključ!")
+        else:
+            with st.spinner("AI analizira vsebino in tipe dejavnikov..."):
+                types, cats = run_smart_classification(df["Odgovor"].tolist(), api_key)
+                df['Tip'], df['Enota'] = types, cats
+            
+            # Izračun realnih faktorjev iz podatkov
+            Fo_SF = calc_Fo(df[df['Tip'] == 'SF'], No)
+            Fo_PF = calc_Fo(df[df['Tip'] == 'PF'], No)
+            Fo_PR = calc_Fo(df[df['Tip'] == 'PR'], No)
+            
+            # Varovalka: če ni podatkov, vzamemo povprečje iz članka
+            if Fo_PF < 0.05: Fo_PF = 0.32
+            if Fo_PR < 0.05: Fo_PR = 0.25
+
+            # Enačba 27 (Stresna moč sigma)
+            val = (Fo_SF * Fo_PR) / Fo_PF
+            sigma_m = math.degrees(math.asin(min(1.0, math.sqrt(val))))
+            
+            # Energija (Enačba 38-39)
+            W_I = 2500
+            w_ls = (W_I * sigma_m) / 90
+            w_eu = W_I - w_ls
+            eta = (w_eu / W_I) * 100
+
+            # --- PRIKAZ REZULTATOV ---
+            st.header("Rezultati realne klasifikacije")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### Porazdelitev po Enotah")
+                st.plotly_chart(px.pie(df, names='Enota', hole=0.4))
+                st.write("### Porazdelitev po Tipu (SF, PF, PR)")
+                st.plotly_chart(px.bar(df['Tip'].value_counts()))
+            
+            with col2:
+                st.metric("Stresna moč (σ)", f"{sigma_m:.2f} °S")
+                st.metric("Učinkovitost (η)", f"{eta:.2f} %")
+                st.metric("Izguba (W_LS)", f"{int(w_ls)} kcal")
+                st.write(f"**Dejanska poraba (W_EU):** {int(w_eu)} kcal")
+            
+            st.write("### Razvrstitev vaših odgovorov:")
+            st.dataframe(df)
