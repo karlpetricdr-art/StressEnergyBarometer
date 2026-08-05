@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import json
 import math
 import re
@@ -8,166 +9,197 @@ import time
 from google import genai
 
 # ============================================================
-# 1. NASTAVITVE IN UPORABNIŠKI VMESNIK
+# 1. KONFIGURACIJA IN VMESNIK
 # ============================================================
-st.set_page_config(page_title="Psihosocialni Barometer v3.1", layout="wide")
+st.set_page_config(page_title="Psihosocialni Barometer v4.0", layout="wide")
 
-st.title("📊 Psihosocialni Barometer v3.1")
-st.subheader("Model Petrič (2025/2026) - Multi-Model Agregirana Analiza")
+st.title("📊 Psihosocialni Barometer v4.0")
+st.markdown("### Znanstveni model Petrič (2025/2026)")
 
 with st.sidebar:
     st.header("⚙️ Nastavitve")
     api_key = st.text_input("Google API ključ:", type="password")
-    
-    # IZBIRA MODELA (Vključno z Gemmo)
-    model_choice = st.selectbox(
-        "Izberite AI model:", 
-        [
-            "gemini-1.5-flash", 
-            "gemini-1.5-pro", 
-            "gemini-2.0-flash-exp",
-            "gemma-2-9b-it",
-            "gemma-2-27b-it"
-        ]
-    )
+    model_choice = st.selectbox("Izberite model:", 
+                                ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemma-2-9b-it"])
     
     st.divider()
-    No_input = st.number_input("Število respondentov (No):", min_value=1, value=200)
-    W_I_kcal = st.number_input("Izhodiščna energija W_I (kcal):", value=2500)
-    
+    W_I_kcal = st.number_input("Vhodna energija W_I (kcal):", value=2500)
     st.divider()
-    st.info("Ta različica analizira celotno besedilo hkrati (Single-Shot), kar omogoča uporabo modelov Gemini in Gemma v realnem času.")
+    st.write("**Metodologija:**")
+    st.write("- Batch extraction (50/call)")
+    st.write("- Python frequency counting")
+    st.write("- Equation 27 & 38 compliance")
 
 # ============================================================
-# 2. MATEMATIČNI MODEL PETRIČ (2025)
+# 2. MATEMATIČNE FUNKCIJE (Enačbe 12-39)
 # ============================================================
-def calculate_petric_math(stats, No, WI):
-    # fv: frekvenca vseh, frv: unikatna mnenja
-    def get_F_factor(fv, frv):
-        if fv == 0 or No == 0 or frv == 0: return 0.05
-        rho = fv / No                         # Enačba 12 (Gostota)
-        Co = fv / frv                         # Enačba 18 (Kompleksnost)
-        return (Co * rho) / 10                # Enačba 24 (Realni faktor Fo)
+def calculate_petric_final(df_extracted, No, WI):
+    # Priprava tabel za tipe
+    def get_Fo(type_code):
+        subset = df_extracted[df_extracted['tip'].str.contains(type_code, na=False, case=False)]
+        fv = len(subset)
+        frv = subset['opis'].nunique()
+        
+        if fv == 0 or No == 0: return 0.05, 0, 1
+        
+        rho = fv / No                         # Enačba 12
+        Co = fv / frv if frv > 0 else 1       # Enačba 18
+        Fo = (Co * rho) / 10                  # Enačba 24
+        return Fo, fv, frv
 
-    F_sf = get_F_factor(stats['fv_sf'], stats['frv_sf'])
-    F_pf = get_F_factor(stats['fv_pf'], stats['frv_pf'])
-    F_pr = get_F_factor(stats['fv_pr'], stats['frv_pr'])
+    F_sf, fv_sf, frv_sf = get_Fo('SF')
+    F_pf, fv_pf, frv_pf = get_F_pf_custom(df_extracted, No) # Posebna obravnava za zaščito
+    F_pr, fv_pr, frv_pr = get_Fo('PR')
 
-    # Varovalke po članku (stran 40)
+    # Varovalka po članku
     if F_pf <= 0: F_pf = 0.32
     if F_pr <= 0: F_pr = 0.25
 
-    # Enačba 27: Stresna moč (sigma) v stopinjah
+    # Enačba 27: Stresna moč (sigma)
     try:
         val = (F_sf * F_pr) / F_pf
         sigma = math.degrees(math.asin(min(1.0, math.sqrt(val))))
     except:
         sigma = 0
 
-    # Enačba 38: Energetski model
-    # Izguba energije glede na 90 stopinj maksimalne moči
+    # Enačba 38: Energetski model (90 stopinj = 100% izguba)
     loss_kcal = (WI * sigma) / 90
     w_eu = WI - loss_kcal
     efficiency = (w_eu / WI) * 100
 
     return {
         "sigma": sigma, "w_eu": w_eu, "loss": loss_kcal, "eff": efficiency,
-        "F_sf": F_sf, "F_pf": F_pf, "F_pr": F_pr
+        "F_sf": F_sf, "F_pf": F_pf, "F_pr": F_pr,
+        "fv_sf": fv_sf, "frv_sf": frv_sf,
+        "fv_pf": fv_pf, "frv_pf": frv_pf,
+        "fv_pr": fv_pr, "frv_pr": frv_pr
     }
 
+def get_F_pf_custom(df, No):
+    # Pozitivni dejavniki pogosto zahtevajo minimalno vrednost 0.32 po vašem članku
+    subset = df[df['tip'].str.contains('PF', na=False, case=False)]
+    fv = len(subset)
+    frv = subset['opis'].nunique()
+    if fv == 0: return 0.32, 0, 1
+    rho = fv / No
+    Co = fv / frv if frv > 0 else 1
+    return (Co * rho) / 10, fv, frv
+
 # ============================================================
-# 3. SINGLE-SHOT ANALIZA (Gemini/Gemma)
+# 3. PROCESIRANJE (Batch Extraction)
 # ============================================================
-def run_aggregate_analysis(text_content, No, api_key, model_name):
+def run_intelligent_analysis(data_list, api_key, model_name):
     client = genai.Client(api_key=api_key)
+    all_extracted = []
     
-    prompt = f"""
-    Kot ekspertni analitik po modelu Psihosocialni Barometer Petrič (2025) analiziraj odgovore {No} respondentov.
+    # Razdelimo na pakete po 50 za natančnost
+    batch_size = 50
+    pb = st.progress(0)
+    status = st.empty()
     
-    Tvoja naloga:
-    Preberi celotno besedilo in oceni agregatne statistike. 
-    Upoštevaj, da respondenti v enem stavku pogosto navedejo VEČ dejavnikov hkrati.
-    
-    Vrni IZKLJUČNO JSON objekt:
-    {{
-      "fv_sf": int, "frv_sf": int, (Stresorji: vsi / unikatni)
-      "fv_pf": int, "frv_pf": int, (Pozitivni: vsi / unikatni)
-      "fv_pr": int, "frv_pr": int, (Predlogi: vsi / unikatni)
-      "porazdelitev": {{"At": int, "St": int, "So": int, "PS": int, "IP": int, "HB": int}}, (Število zaznav po enotah)
-      "kljucne_ugotovitve": ["seznam 3 glavnih ugotovitev"]
-    }}
-
-    Besedilo za analizo:
-    {text_content}
-    """
-
-    response = client.models.generate_content(model=model_name, contents=prompt)
-    
-    # Čiščenje in ekstrahiranje JSON-a iz odgovora AI
-    clean_text = re.sub(r'```json|```', '', response.text).strip()
-    match = re.search(r'\{.*\}', clean_text, re.DOTALL)
-    return json.loads(match.group()) if match else None
+    for i in range(0, len(data_list), batch_size):
+        batch = data_list[i : i + batch_size]
+        batch_text = "\n".join([f"- {t}" for t in batch])
+        
+        prompt = f"""
+        Extract ALL psychosocial factors based on Petrič (2025) model from the text below.
+        For each response, identify multiple factors if present.
+        Format: Return ONLY a JSON list of objects. 
+        Structure: [{{ "tip": "SF/PF/PR", "enota": "At/St/So/PS/IP/HB", "opis": "standardized short label" }}]
+        
+        Text:
+        {batch_text}
+        """
+        
+        try:
+            response = client.models.generate_content(model=model_name, contents=prompt)
+            clean_text = re.sub(r'```json|```', '', response.text).strip()
+            match = re.search(r'\[.*\]', clean_text, re.DOTALL)
+            if match:
+                all_extracted.extend(json.loads(match.group()))
+        except Exception as e:
+            st.warning(f"Paket {i//batch_size + 1} ni uspel: {e}")
+        
+        pb.progress(min(1.0, (i + batch_size) / len(data_list)))
+        status.text(f"Analiziram: {min(len(data_list), i+batch_size)} / {len(data_list)}")
+        time.sleep(1) # Varnostni premor
+        
+    return pd.DataFrame(all_extracted)
 
 # ============================================================
 # 4. GLAVNI PROGRAM
 # ============================================================
-uploaded_file = st.file_uploader("📂 Naložite tekstovno datoteko (.txt)", type=["txt"])
+uploaded_file = st.file_uploader("📂 Naložite odgovore (.txt, .xlsx, .csv)", type=["txt", "xlsx", "csv"])
 
 if uploaded_file:
-    raw_text = uploaded_file.read().decode("utf-8")
-    st.success(f"Datoteka uspešno naložena ({len(raw_text)} znakov).")
+    if uploaded_file.name.endswith(".xlsx"):
+        df_in = pd.read_excel(uploaded_file)
+        text_data = df_in.iloc[:, 0].dropna().astype(str).tolist()
+    elif uploaded_file.name.endswith(".csv"):
+        df_in = pd.read_csv(uploaded_file)
+        text_data = df_in.iloc[:, 0].dropna().astype(str).tolist()
+    else:
+        text_data = uploaded_file.read().decode("utf-8").splitlines()
+        text_data = [l.strip() for l in text_data if len(l) > 5]
 
-    if st.button(f"🚀 ZAŽENI ANALIZO Z MODELOM {model_choice}"):
+    No = len(text_data)
+    st.success(f"Zaznanih {No} respondentov.")
+
+    if st.button("🚀 ZAŽENI KOMPLETNO ANALIZO"):
         if not api_key:
-            st.error("Prosim, vnesite API ključ!")
+            st.error("Manjka API ključ!")
         else:
-            with st.spinner(f"{model_choice} analizira celotno množico podatkov..."):
-                try:
-                    # 1. AI oceni statistiko frekvenc
-                    stats = run_aggregate_analysis(raw_text, No_input, api_key, model_choice)
-                    
-                    if stats:
-                        # 2. Python izvede matematične izračune po enačbah iz članka
-                        res = calculate_petric_math(stats, No_input, W_I_kcal)
-                        
-                        # 3. PRIKAZ REZULTATOV
-                        st.divider()
-                        st.balloons()
-                        st.header(f"Končni rezultati (N={No_input}, Model={model_choice})")
-                        
-                        m1, m2, m3, m4 = st.columns(4)
-                        m1.metric("Stresna moč (σ)", f"{res['sigma']:.2f} °S")
-                        m2.metric("Učinkovitost (η)", f"{res['eff']:.1f}%")
-                        m3.metric("Uporabna energija", f"{int(res['w_eu'])} kcal")
-                        m4.metric("Izguba energije", f"{int(res['loss'])} kcal")
+            with st.spinner("AI ekstrahira dejavnike (to bo trajalo ~20-30s)..."):
+                extracted_df = run_intelligent_analysis(text_data, api_key, model_choice)
+            
+            if not extracted_df.empty:
+                # Izračun
+                res = calculate_petric_final(extracted_df, No, W_I_kcal)
+                
+                # --- PRIKAZ REZULTATOV ---
+                st.divider()
+                st.balloons()
+                
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                col_m1.metric("Stresna moč (σ)", f"{res['sigma']:.2f} °S")
+                col_m2.metric("Učinkovitost (η)", f"{res['eff']:.1f} %")
+                col_m3.metric("Uporabna energija", f"{int(res['w_eu'])} kcal")
+                col_m4.metric("Izguba energije", f"{int(res['loss'])} kcal")
 
-                        st.divider()
-                        c1, c2 = st.columns(2)
-                        
-                        with c1:
-                            st.subheader("Porazdelitev po enotah")
-                            enote_df = pd.DataFrame(stats['porazdelitev'].items(), columns=['Enota', 'Zaznave'])
-                            fig = px.bar(enote_df, x='Enota', y='Zaznave', color='Enota', title="Število zaznanih dejavnikov (At, St, So...)")
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        with c2:
-                            st.subheader("Parametri modela Petrič (2025)")
-                            st.write(f"**Realni faktorji ($F_o$):**")
-                            st.write(f"- $F_{{oSF}}$ (Stresorji): `{res['F_sf']:.4f}`")
-                            st.write(f"- $F_{{oPF}}$ (Pozitivni): `{res['F_pf']:.4f}`")
-                            st.write(f"- $F_{{oPR}}$ (Predlogi): `{res['F_pr']:.4f}`")
-                            st.write("---")
-                            st.write(f"**Vhodne frekvence ($f_v$ / $f_{{rv}}$):**")
-                            st.write(f"- SF: {stats['fv_sf']} / {stats['frv_sf']}")
-                            st.write(f"- PF: {stats['fv_pf']} / {stats['frv_pf']}")
-                            st.write(f"- PR: {stats['fv_pr']} / {stats['frv_pr']}")
+                st.divider()
+                c1, c2 = st.columns([2, 1])
+                
+                with c1:
+                    st.subheader("Slope Model (Slikovni prikaz vašega modela)")
+                    # Izris nagiba stresa (Figure 1 v članku)
+                    fig_slope = go.Figure()
+                    fig_slope.add_trace(go.Scatter(x=[0, 90], y=[0, res['sigma']], mode='lines+markers', 
+                                                 name='Izmerjen nagib', line=dict(color='red', width=4)))
+                    fig_slope.update_layout(xaxis_title="Teoretični okvir (°S)", yaxis_title="Intenzivnost stresa",
+                                          xaxis=dict(range=[0, 90]), yaxis=dict(range=[0, 90]))
+                    st.plotly_chart(fig_slope, use_container_width=True)
+                
+                with c2:
+                    st.subheader("Statistika frekvenc")
+                    st.write(f"- Stresorji ($f_v$): {res['fv_sf']}")
+                    st.write(f"- Pozitivni ($f_v$): {res['fv_pf']}")
+                    st.write(f"- Predlogi ($f_v$): {res['fv_pr']}")
+                    st.write("---")
+                    st.write(f"**Realni faktorji ($F_o$):**")
+                    st.write(f"SF: `{res['F_sf']:.4f}`")
+                    st.write(f"PF: `{res['F_pf']:.4f}`")
+                    st.write(f"PR: `{res['F_pr']:.4f}`")
 
-                        st.subheader("💡 Ključne ugotovitve analize")
-                        for ugotovitev in stats['kljucne_ugotovitve']:
-                            st.write(f"- {ugotovitev}")
+                st.subheader("Struktura dejavnikov po enotah")
+                fig_bar = px.histogram(extracted_df, x='enota', color='tip', barmode='group',
+                                      category_orders={"enota": ["At", "St", "So", "PS", "IP", "HB"]},
+                                      color_discrete_map={'SF':'#EF553B', 'PF':'#00CC96', 'PR':'#636EFA'})
+                st.plotly_chart(fig_bar, use_container_width=True)
 
-                except Exception as e:
-                    st.error(f"Prišlo je do napake: {e}")
+                with st.expander("Poglej vse izluščene dejavnike"):
+                    st.dataframe(extracted_df)
+            else:
+                st.error("AI ni uspel izluščiti dejavnikov. Preverite API ključ ali format datoteke.")
 
 
 
