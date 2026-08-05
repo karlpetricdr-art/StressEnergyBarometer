@@ -505,13 +505,10 @@ Odgovor respondenta:
 
 def analyze_single_response(model, answer):
 
-
     default = empty_analysis()
 
 
-
     try:
-
 
         response = model.generate_content(
             build_analysis_prompt(answer)
@@ -531,44 +528,50 @@ def analyze_single_response(model, answer):
         )
 
 
-
-        # preverjanje ključev
+        # preverjanje strukture JSON
 
         if "stresorji" not in data:
+
             data["stresorji"] = []
 
 
         if "pozitivni_dejavniki" not in data:
+
             data["pozitivni_dejavniki"] = []
 
 
         if "predlogi" not in data:
-            data["predlogi"] = []
 
+            data["predlogi"] = []
 
 
         return data
 
 
 
-        except Exception as e:
+    except Exception as e:
+
 
         st.warning(
             f"AI napaka: {e}"
         )
 
+
         st.write(
             "Originalni odgovor AI:"
         )
 
-        if 'raw' in locals():
 
-            st.code(raw)
+        if "raw" in locals():
+
+            st.code(
+                raw
+            )
 
         else:
 
             st.code(
-                "NI ODGOVORA"
+                "Gemini ni vrnil odgovora"
             )
 
 
