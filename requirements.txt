@@ -1,5 +1,6 @@
-google-genai
-pandas
-streamlit
-plotly
-openpyxl
+streamlit==1.45.1
+google-genai==1.16.0
+pandas==2.2.3
+plotly==6.1.2
+openpyxl==3.1.5
+starlette==0.46.2
