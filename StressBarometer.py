@@ -207,9 +207,7 @@ def load_dataset(uploaded_file):
     if uploaded_file is None:
         return None
 
-
     filename = uploaded_file.name.lower()
-
 
     try:
 
@@ -266,17 +264,16 @@ def load_dataset(uploaded_file):
         return None
 
 
-            df = pd.DataFrame(
+        return df
 
-                {
 
-                    "Odgovor":
+    except Exception as e:
 
-                    text.splitlines()
+        st.error(
+            f"Napaka pri uvozu: {e}"
+        )
 
-                }
-
-            )
+        return None
 
 
 
