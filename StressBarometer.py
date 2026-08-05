@@ -1355,12 +1355,11 @@ if "dataset" in st.session_state:
 
 
 
-    if st.button(
+        if st.button(
 
         "🚀 ZAŽENI AI ANALIZO"
 
     ):
-
 
 
         if not api_key:
@@ -1373,9 +1372,7 @@ if "dataset" in st.session_state:
             )
 
 
-
         else:
-
 
 
             client = initialize_gemini(
@@ -1385,8 +1382,7 @@ if "dataset" in st.session_state:
             )
 
 
-
-                        if client:
+            if client:
 
 
                 with st.spinner(
@@ -1428,15 +1424,11 @@ if "dataset" in st.session_state:
                     )
 
 
-
                     st.session_state["results"] = results
-
 
                     st.session_state["aggregated"] = aggregated
 
-
                     st.session_state["factor_df"] = factor_df
-
 
                     st.session_state["sigma"] = sigma
 
