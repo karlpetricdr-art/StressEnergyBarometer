@@ -207,7 +207,9 @@ def load_dataset(uploaded_file):
     if uploaded_file is None:
         return None
 
+
     filename = uploaded_file.name.lower()
+
 
     try:
 
@@ -246,50 +248,12 @@ def load_dataset(uploaded_file):
         else:
 
             st.error(
-                "Nepodprt format datoteke."
+                "Nepodprt format datoteke. Uporabite XLSX, CSV, TSV ali TXT."
             )
 
             return None
 
 
-        return df
-
-
-    except Exception as e:
-
-        st.error(
-            f"Napaka pri uvozu: {e}"
-        )
-
-        return None
-
-
-        return df
-
-
-    except Exception as e:
-
-        st.error(
-            f"Napaka pri uvozu: {e}"
-        )
-
-        return None
-
-
-
-        else:
-
-
-            st.error(
-
-                "Nepodprt format."
-
-            )
-
-
-            return None
-
-
 
         return df
 
@@ -297,20 +261,11 @@ def load_dataset(uploaded_file):
 
     except Exception as e:
 
-
         st.error(
-
-            f"Napaka uvoza: {e}"
-
+            f"Napaka pri uvozu podatkov: {e}"
         )
 
-
         return None
-
-
-
-
-
 
 # ============================================================
 # 6. PRIPRAVA DATAFRAME
