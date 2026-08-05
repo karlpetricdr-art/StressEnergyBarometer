@@ -1115,7 +1115,6 @@ if "dataset" in st.session_state:
 
             if model:
 
-
     with st.spinner(
         "AI razgrajuje odgovore na več dejavnikov..."
     ):
@@ -1127,8 +1126,13 @@ if "dataset" in st.session_state:
         )
 
 
-        st.write("DEBUG AI REZULTATI")
-        st.json(results[:3])
+        st.write(
+            "DEBUG AI REZULTATI"
+        )
+
+        st.json(
+            results[:3]
+        )
 
 
                     aggregated = aggregate_factors(
