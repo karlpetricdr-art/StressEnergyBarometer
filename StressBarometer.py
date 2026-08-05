@@ -1,11 +1,17 @@
 # ============================================================
-# PSIHOSOCIALNI BAROMETER v2.2
+# PSIHOSOCIALNI BAROMETER v2.3
 # Karl Petrič, 2025/2026
 #
 # Gemini + Gemma kompatibilna verzija
 # google-genai SDK
 #
-# DEL 1/3
+# SPREMEMBE GLEDE NA v2.2:
+# - retry logika ob napaki 429 / RESOURCE_EXHAUSTED (exponential backoff)
+# - sledenje uspešnim / neuspešnim AI klicem (ne le tiho "prazen rezultat")
+# - jasno opozorilo v UI, če je testni način vklopljen
+# - prikaz dejanskega števila obdelanih odgovorov (ne le naloženih)
+# - ocena preostalega časa med analizo
+# - manjši, a še vedno varen premor med klici
 # ============================================================
 
 
@@ -27,13 +33,13 @@ from google import genai
 
 
 st.set_page_config(
-    page_title="Psihosocialni Barometer v2.2",
+    page_title="Psihosocialni Barometer v2.3",
     layout="wide"
 )
 
 
 st.title(
-    "📊 Psihosocialni Barometer v2.2"
+    "📊 Psihosocialni Barometer v2.3"
 )
 
 
@@ -50,7 +56,8 @@ Aplikacija omogoča:
 ✅ predloge izboljšav  
 ✅ JSON ekstrakcijo  
 ✅ agregacijo respondentov  
-✅ energijski model stresa
+✅ energijski model stresa  
+✅ retry ob napaki + sledenje uspešnosti analize (novo v v2.3)
 """
 )
 
@@ -111,13 +118,60 @@ with st.sidebar:
     st.divider()
 
 
+    # POMEMBNO: privzeto NASTAVLJENO NA False, da uporabnik
+    # po nesreči ne analizira le 3 odgovorov namesto vseh 200.
     test_mode = st.checkbox(
 
-        "Testni način (prvi 3 odgovori)",
+        "Testni način (analizira samo prve 3 odgovore)",
 
-        value=True
+        value=False
 
     )
+
+
+    if test_mode:
+
+        st.warning(
+            "⚠️ Testni način je VKLOPLJEN. "
+            "Analizirani bodo samo prvi 3 odgovori, ne celoten nabor."
+        )
+
+
+    st.divider()
+
+
+    st.subheader("Robustnost klicev")
+
+
+    max_retries = st.slider(
+
+        "Največ ponovitev ob napaki (429):",
+
+        min_value=0,
+
+        max_value=5,
+
+        value=3
+
+    )
+
+
+    request_delay = st.slider(
+
+        "Premor med klici (sekunde):",
+
+        min_value=0.0,
+
+        max_value=3.0,
+
+        value=0.5,
+
+        step=0.1
+
+    )
+
+
+    st.divider()
 
 
     st.write(
@@ -537,11 +591,11 @@ if uploaded_file:
 
 
 # ============================================================
-# KONEC DELA 1/3
+# KONEC DELA 1
 # ============================================================
 
 # ============================================================
-# DEL 2/3
+# DEL 2
 # AI ANALIZA + AGREGACIJA FAKTORJEV
 # ============================================================
 
@@ -649,130 +703,172 @@ Odgovor respondenta:
 
 
 # ============================================================
-# 10. ANALIZA ENEGA ODGOVORA
+# 10. ANALIZA ENEGA ODGOVORA (z retry logiko)
 # ============================================================
 
 
 def analyze_single_response(
         client,
         model_name,
-        answer):
+        answer,
+        max_retries=3):
+    """
+    Vrne (rezultat, status) kjer je status eden od:
+    "ok"            - analiza uspešna
+    "prazen_json"   - AI je odgovoril, a JSON ni bil veljaven / uporaben
+    "napaka_kvote"  - po vseh ponovitvah še vedno 429 / RESOURCE_EXHAUSTED
+    "napaka"        - druga napaka po vseh ponovitvah
+    """
 
 
     default = empty_analysis()
 
 
+    attempt = 0
 
-    try:
-
-
-        response = client.models.generate_content(
-
-            model=model_name,
-
-            contents=build_analysis_prompt(
-
-                answer
-
-            )
-
-        )
+    wait_time = 2  # sekunde, se podvoji ob vsakem retry-u
 
 
-
-        raw = response.text
-
+    while attempt <= max_retries:
 
 
-        cleaned = clean_json_response(
-
-            raw
-
-        )
+        try:
 
 
+            response = client.models.generate_content(
 
-        data = json.loads(
+                model=model_name,
 
-            cleaned
+                contents=build_analysis_prompt(
 
-        )
+                    answer
 
-
-
-        if not isinstance(data, dict):
-
-            return default
-
-
-
-        data.setdefault(
-
-            "stresorji",
-
-            []
-
-        )
-
-
-        data.setdefault(
-
-            "pozitivni_dejavniki",
-
-            []
-
-        )
-
-
-        data.setdefault(
-
-            "predlogi",
-
-            []
-
-        )
-
-
-        return data
-
-
-
-    except Exception as e:
-
-
-        error_text = str(e)
-
-
-
-        if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
-
-
-            st.warning(
-
-                "AI kvota je trenutno presežena. Poskus čez nekaj časa."
-
-            )
-
-
-        else:
-
-
-            st.warning(
-
-                f"AI analiza neuspešna: {e}"
+                )
 
             )
 
 
 
-        return default
+            raw = response.text
+
+
+
+            cleaned = clean_json_response(
+
+                raw
+
+            )
+
+
+
+            data = json.loads(
+
+                cleaned
+
+            )
+
+
+
+            if not isinstance(data, dict):
+
+                return default, "prazen_json"
+
+
+
+            data.setdefault(
+
+                "stresorji",
+
+                []
+
+            )
+
+
+            data.setdefault(
+
+                "pozitivni_dejavniki",
+
+                []
+
+            )
+
+
+            data.setdefault(
+
+                "predlogi",
+
+                []
+
+            )
+
+
+            return data, "ok"
+
+
+
+        except json.JSONDecodeError:
+
+            # AI ni vrnil veljavnega JSON - ponovitev ne bo verjetno pomagala,
+            # a poskusimo enkrat vseeno, ker so LLM odgovori nedeterministični
+            attempt += 1
+
+            if attempt > max_retries:
+
+                return default, "prazen_json"
+
+            time.sleep(wait_time)
+
+            wait_time *= 2
+
+
+
+        except Exception as e:
+
+
+            error_text = str(e)
+
+
+            is_quota_error = (
+
+                "429" in error_text
+
+                or "RESOURCE_EXHAUSTED" in error_text
+
+            )
+
+
+            attempt += 1
+
+
+            if attempt > max_retries:
+
+                if is_quota_error:
+
+                    return default, "napaka_kvote"
+
+                else:
+
+                    return default, "napaka"
+
+
+            # počakaj dlje ob napaki kvote kot ob drugih napakah
+            time.sleep(
+
+                wait_time * (2 if is_quota_error else 1)
+
+            )
+
+            wait_time *= 2
+
+
+    return default, "napaka"
 
 
 
 
 
 # ============================================================
-# 11. ANALIZA CELOTNEGA DATASETA
+# 11. ANALIZA CELOTNEGA DATASETA (s sledenjem uspešnosti)
 # ============================================================
 
 
@@ -780,14 +876,30 @@ def run_multifactor_analysis(
         df,
         client,
         model_name,
-        test_mode=False):
+        test_mode=False,
+        max_retries=3,
+        request_delay=0.5):
 
 
     results = []
 
 
+    status_counts = {
+
+        "ok": 0,
+
+        "prazen_json": 0,
+
+        "napaka_kvote": 0,
+
+        "napaka": 0
+
+    }
+
 
     progress = st.progress(0)
+
+    status_text = st.empty()
 
 
 
@@ -801,6 +913,9 @@ def run_multifactor_analysis(
     total = len(df)
 
 
+    start_time = time.time()
+
+
 
     for i, row in df.iterrows():
 
@@ -810,13 +925,15 @@ def run_multifactor_analysis(
 
 
 
-        result = analyze_single_response(
+        result, status = analyze_single_response(
 
             client,
 
             model_name,
 
-            answer
+            answer,
+
+            max_retries=max_retries
 
         )
 
@@ -829,24 +946,54 @@ def run_multifactor_analysis(
         )
 
 
+        status_counts[status] += 1
+
+
+
+        done = i + 1
+
+
+        elapsed = time.time() - start_time
+
+        avg_per_item = elapsed / done
+
+        remaining = (total - done) * avg_per_item
+
 
         progress.progress(
 
             int(
 
-                ((i + 1) / total) * 100
+                (done / total) * 100
 
             )
 
         )
 
 
+        status_text.text(
 
-        time.sleep(1)
+            f"Obdelano {done}/{total} "
+            f"(✅ {status_counts['ok']}  ⚠️ {status_counts['prazen_json']}  "
+            f"🚫 {status_counts['napaka_kvote']}  ❌ {status_counts['napaka']})  "
+            f"— ocena preostalega časa: {remaining:.0f}s"
+
+        )
 
 
 
-    return results
+        if request_delay > 0:
+
+            time.sleep(request_delay)
+
+
+
+    status_text.empty()
+
+    progress.empty()
+
+
+    return results, status_counts, total
 
 
 
@@ -1179,11 +1326,11 @@ def factors_to_dataframe(aggregated):
 
 
 # ============================================================
-# KONEC DELA 2/3
+# KONEC DELA 2
 # ============================================================
 
 # ============================================================
-# DEL 3/3
+# DEL 3
 # MATEMATIČNI MODEL + GLAVNI PROGRAM + REZULTATI
 # ============================================================
 
@@ -1405,6 +1552,18 @@ if "dataset" in st.session_state:
     )
 
 
+    st.caption(
+
+        f"Naloženih odgovorov skupaj: {len(df)}. "
+        + (
+            "⚠️ Testni način je vklopljen - obdelanih bo le prvih 3."
+            if test_mode
+            else "Analizirani bodo vsi zgornji odgovori."
+        )
+
+    )
+
+
 
     if st.button(
 
@@ -1454,7 +1613,7 @@ if "dataset" in st.session_state:
                 ):
 
 
-                    results = run_multifactor_analysis(
+                    results, status_counts, total = run_multifactor_analysis(
 
                         df,
 
@@ -1462,7 +1621,11 @@ if "dataset" in st.session_state:
 
                         model_name,
 
-                        test_mode
+                        test_mode=test_mode,
+
+                        max_retries=max_retries,
+
+                        request_delay=request_delay
 
                     )
 
@@ -1500,13 +1663,43 @@ if "dataset" in st.session_state:
 
                     st.session_state["sigma"] = sigma
 
+                    st.session_state["status_counts"] = status_counts
+
+                    st.session_state["total_processed"] = total
 
 
-                st.success(
 
-                    "AI analiza uspešno zaključena."
+                # Jasno povzetje uspešnosti - ne le "uspešno zaključeno"
+                ok = status_counts["ok"]
 
-                )
+                problematic = total - ok
+
+
+                if problematic == 0:
+
+
+                    st.success(
+
+                        f"AI analiza uspešno zaključena. "
+                        f"Vseh {total} odgovorov je bilo uspešno analiziranih."
+
+                    )
+
+
+                else:
+
+
+                    st.warning(
+
+                        f"AI analiza zaključena: {ok}/{total} odgovorov uspešno analiziranih. "
+                        f"{problematic} odgovorov ni bilo mogoče v celoti obdelati "
+                        f"(prazen/neveljaven JSON: {status_counts['prazen_json']}, "
+                        f"presežena kvota: {status_counts['napaka_kvote']}, "
+                        f"druge napake: {status_counts['napaka']}). "
+                        f"To lahko vpliva na spodnje agregirane rezultate - razmisli o "
+                        f"povečanju 'Premor med klici' ali ponovnem zagonu."
+
+                    )
 
 
 
@@ -1529,6 +1722,11 @@ if "sigma" in st.session_state:
     sigma = st.session_state["sigma"]
 
 
+    status_counts = st.session_state.get("status_counts")
+
+    total_processed = st.session_state.get("total_processed")
+
+
 
     W_I, W_LS, W_EU, eta = calculate_energy(
 
@@ -1547,6 +1745,16 @@ if "sigma" in st.session_state:
         "📊 Rezultati Psihosocialnega Barometra"
 
     )
+
+
+    if status_counts is not None:
+
+        st.caption(
+
+            f"Osnova izračuna: {status_counts['ok']} od {total_processed} "
+            f"obdelanih odgovorov je bilo uspešno analiziranih."
+
+        )
 
 
 
