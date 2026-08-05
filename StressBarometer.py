@@ -12,6 +12,7 @@ st.title("📊 Psihosocialni Barometer (Petrič, 2025)")
 with st.sidebar:
     st.header("Nastavitve")
     api_key = st.text_input("Vnesite Gemini API ključ:", type="password")
+    st.info("Prisilno nastavljen model: gemini-1.5-flash")
 
 def extract_json(text):
     try:
@@ -22,18 +23,22 @@ def extract_json(text):
 
 # --- MATEMATIČNI MODEL ---
 def calculate_petric_model(fv_sf, frv_sf, fv_pf, frv_pf, fv_pr, frv_pr, No):
-    def get_rho_co(fv, frv):
+    def get_F(fv, frv):
         rho = fv / No
         co = fv / frv if frv > 0 else 1
         return (co * rho) / 10
     
-    F_sf = get_rho_co(fv_sf, frv_sf)
-    F_pf = get_rho_co(fv_pf, frv_pf)
-    F_pr = get_rho_co(fv_pr, frv_pr)
+    F_sf = get_F(fv_sf, frv_sf)
+    F_pf = get_F(fv_pf, frv_pf)
+    F_pr = get_F(fv_pr, frv_pr)
     
-    if F_pf <= 0: F_pf = 0.32
-    sigma = math.degrees(math.asin(min(1.0, math.sqrt((F_sf * F_pr) / F_pf))))
+    if F_pf <= 0: F_pf = 0.32 # Default konstanta
     
+    # Izračun stresne moči
+    val = (F_sf * F_pr) / F_pf
+    sigma = math.degrees(math.asin(min(1.0, math.sqrt(val))))
+    
+    # Energija (2500 kcal je vhod)
     w_ls = (2500 * sigma) / 90
     w_eu = 2500 - w_ls
     return sigma, w_eu, (w_eu / 2500) * 100
@@ -44,30 +49,34 @@ if uploaded_file:
     if uploaded_file.name.endswith('.xlsx'):
         data = pd.read_excel(uploaded_file).iloc[:, 0].dropna().astype(str).tolist()
     else:
-        data = [l.strip() for l in uploaded_file.read().decode("utf-8").splitlines() if len(l.strip()) > 2]
+        content = uploaded_file.read().decode("utf-8")
+        data = [l.strip() for l in content.splitlines() if len(l.strip()) > 2]
+
+    st.success(f"Naloženo {len(data)} vrstic.")
 
     if st.button("🚀 ZAŽENI ANALIZO"):
         if not api_key:
             st.error("Manjka API ključ!")
         else:
             try:
+                # 1. Konfiguracija
                 genai.configure(api_key=api_key)
                 
-                # DINAMIČNA IZBIRA MODELA (Rešitev za 404)
-                available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                # Izberemo prvi flash model, če obstaja, sicer prvega na seznamu
-                model_name = next((m for m in available if 'flash' in m), available[0])
-                st.info(f"Povezava vzpostavljena preko: `{model_name}`")
+                # 2. PRISILNA IZBIRA STABILNEGA MODELA
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                model = genai.GenerativeModel(model_name)
-                all_text = "\n".join([f"R{i+1}: {txt}" for i, txt in enumerate(data)])
+                # 3. Priprava vseh podatkov v enem bloku (Single-Shot)
+                all_text = "\n".join([f"Vnos {i+1}: {txt}" for i, txt in enumerate(data)])
                 
-                prompt = f"""Extract ALL psychosocial factors (SF/PF/PR) for these {len(data)} responses as a JSON list. 
+                prompt = f"""
+                Extract ALL psychosocial factors (SF, PF, PR) as JSON list. 
                 Categories: At, St, So, PS, IP, HB. 
                 Format: [{{ "tip": "SF/PF/PR", "enota": "...", "opis": "..." }}]
-                Data: {all_text}"""
+                Data:
+                {all_text}
+                """
                 
-                with st.spinner("AI analizira..."):
+                with st.spinner("AI analizira vseh 215 odgovorov hkrati..."):
                     response = model.generate_content(prompt)
                     factors = extract_json(response.text)
                 
@@ -80,12 +89,17 @@ if uploaded_file:
                     s, we, et = calculate_petric_model(*(get_f('SF') + get_f('PF') + get_f('PR')), len(data))
 
                     st.balloons()
-                    col1, col2 = st.columns(2)
-                    col1.metric("Moč stresa (σ)", f"{s:.2f} °S")
-                    col2.metric("Učinkovitost (η)", f"{et:.2f} %")
-                    st.plotly_chart(px.histogram(f_df, x='enota', color='tip', barmode='group'))
+                    c1, c2 = st.columns(2)
+                    c1.metric("Moč stresa (σ)", f"{s:.2f} °S")
+                    c2.metric("Učinkovitost (η)", f"{et:.2f} %")
+                    
+                    st.plotly_chart(px.histogram(f_df, x='enota', color='tip', barmode='group', title="Analiza po enotah"))
+                    st.write("### Zaznani dejavniki vseh respondentov:")
+                    st.dataframe(f_df)
                 else:
-                    st.error("AI ni vrnil JSON-a. Poskusite ponovno.")
+                    st.error("AI ni vrnil podatkov. Poskusite še enkrat.")
+                    st.text("AI odgovor (za debug):")
+                    st.write(response.text[:300])
                     
             except Exception as e:
                 st.error(f"Sistemska napaka: {e}")
