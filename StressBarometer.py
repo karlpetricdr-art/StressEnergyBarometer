@@ -553,69 +553,58 @@ Identificiraj:
 
 
 1. STRESORJE
-
-Dejavniki, ki povečujejo stres.
+Kaj povzroča stres.
 
 
 2. POZITIVNE DEJAVNIKE
-
-Dejavniki, ki zmanjšujejo stres.
+Kaj zmanjšuje stres.
 
 
 3. PREDLOGE
-
-Možne izboljšave.
-
+Kaj bi izboljšalo stanje.
 
 
-Ocena:
-
+Ocena intenzivnosti:
 
 0 = ni prisotno
-
 1 = zelo nizko
-
 2 = nizko
-
 3 = srednje
-
 4 = visoko
-
 5 = zelo visoko
 
 
+Vrni IZKLJUČNO JSON.
 
-Vrni IZKLJUČNO veljaven JSON:
+
+Uporabi naslednjo strukturo:
 
 
-{
+{{
 "stresorji":[
-    {
+    {{
     "faktor":"",
     "intenzivnost":0
-    }
+    }}
 ],
 
 "pozitivni_dejavniki":[
-    {
+    {{
     "faktor":"",
     "intenzivnost":0
-    }
+    }}
 ],
 
 "predlogi":[
-    {
+    {{
     "faktor":"",
     "ucinek":0
-    }
+    }}
 ]
-
-}
-
+}}
 
 
-Odgovor:
-
+Odgovor respondenta:
 
 {answer}
 
