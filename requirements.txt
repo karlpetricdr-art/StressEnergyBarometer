@@ -1,6 +1,8 @@
 streamlit==1.37.1
-starlette==0.36.3
 google-generativeai==0.8.3
-pandas
-plotly
-openpyxl
+
+pandas>=2.0.0
+plotly>=5.18.0
+openpyxl>=3.1.0
+
+numpy>=1.26.0
