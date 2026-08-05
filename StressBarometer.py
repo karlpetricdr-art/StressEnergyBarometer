@@ -1390,9 +1390,9 @@ if "dataset" in st.session_state:
 
 
 
-                with st.spinner(
+                                with st.spinner(
 
-                    "Gemini analizira odgovore..."
+                    f"{model_name} analizira odgovore..."
 
                 ):
 
