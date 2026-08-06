@@ -1,7 +1,12 @@
 # ============================================================
 # DEL 1/6
 # PSIHOSOCIALNI BAROMETER v2.4
-# OSNOVNA STRUKTURA + KONFIGURACIJA + KLASIFIKACIJSKE ENOTE
+#
+# OSNOVNA STRUKTURA
+# STREAMLIT VMESNIK
+# AI NASTAVITVE
+# NALAGANJE DATOTEK
+# PRIPRAVA PODATKOV
 # ============================================================
 
 
@@ -37,26 +42,20 @@ UNIT_CODES = [
 
 UNIT_LABELS = {
 
-
     "AT":
     "Pozorna (fizična)",
-
 
     "ST":
     "Storilnostna",
 
-
     "IP":
     "Individualna psihološka",
-
 
     "PS":
     "Delna socialna",
 
-
     "SO":
     "Socialna",
-
 
     "HB":
     "Zdravstveno-biološka"
@@ -67,26 +66,20 @@ UNIT_LABELS = {
 
 UNIT_DESCRIPTIONS = {
 
-
     "AT":
     "fizično okolje, čuti, hrup, svetloba, temperatura, ergonomija",
 
-
     "ST":
-    "delovne naloge, informacije, postopki, obremenitve, čas",
-
+    "naloge, informacije, postopki, delovna obremenitev",
 
     "IP":
     "notranje psihično stanje, občutki, motivacija, samozavest",
 
-
     "PS":
-    "družbena pričakovanja, nagrajevanje, status, priznanje",
-
+    "pričakovanja, priznanje, nagrajevanje, status",
 
     "SO":
-    "medosebni odnosi, konflikti, podpora, sodelovanje",
-
+    "odnosi, konflikti, sodelovanje, podpora",
 
     "HB":
     "zdravje, bolezni, prehrana, telesno stanje"
@@ -97,14 +90,11 @@ UNIT_DESCRIPTIONS = {
 
 def build_unit_legend():
 
-
-    text = []
-
+    output = []
 
     for code in UNIT_CODES:
 
-
-        text.append(
+        output.append(
 
             f"{code}: "
             f"{UNIT_LABELS[code]} - "
@@ -112,32 +102,27 @@ def build_unit_legend():
 
         )
 
-
-    return "\n".join(text)
+    return "\n".join(output)
 
 
 
 # ============================================================
-# 1. STREAMLIT NASTAVITVE
+# 1. STREAMLIT KONFIGURACIJA
 # ============================================================
 
 
 st.set_page_config(
 
-    page_title=
-    "Psihosocialni Barometer v2.4",
+    page_title="Psihosocialni Barometer v2.4",
 
-    layout=
-    "wide"
+    layout="wide"
 
 )
 
 
 
 st.title(
-
     "📊 Psihosocialni Barometer v2.4"
-
 )
 
 
@@ -145,33 +130,29 @@ st.title(
 st.markdown(
 
 """
-
 ### Model Petrič (2025/2026)
-
 
 AI večfaktorska analiza psihosocialnih dejavnikov.
 
 
-Funkcije:
+Aplikacija omogoča:
 
 
-✅ analiza več stresorjev
+✅ nalaganje velikih podatkovnih datotek
 
-✅ pozitivni dejavniki
+✅ AI analizo odgovorov respondentov
 
-✅ predlogi izboljšav
+✅ več stresorjev iz enega odgovora
 
-✅ AI klasifikacija v 6 enot
+✅ pozitivne dejavnike
 
-✅ JSON ekstrakcija
+✅ predloge izboljšav
+
+✅ klasifikacijo v 6 enot
 
 ✅ izračun stresne moči °S
 
 ✅ energijski model kcal/kJ
-
-✅ analiza po kategorijah
-
-✅ AI pomoč pri spornih primerih
 
 
 """
@@ -188,13 +169,9 @@ Funkcije:
 with st.sidebar:
 
 
-
     st.header(
-
-        "⚙️ AI Nastavitve"
-
+        "⚙️ AI nastavitve"
     )
-
 
 
     api_key = st.text_input(
@@ -215,7 +192,6 @@ with st.sidebar:
 
         "AI model:",
 
-
         [
 
             "gemini-2.0-flash",
@@ -232,21 +208,9 @@ with st.sidebar:
 
 
 
-    st.info(
-
-        "Priporočilo: gemini-2.0-flash"
-
-    )
-
-
-
-    st.divider()
-
-
-
     test_mode = st.checkbox(
 
-        "Testni način (3 odgovori)",
+        "Testni način (prvi 3 odgovori)",
 
         value=False
 
@@ -254,13 +218,9 @@ with st.sidebar:
 
 
 
-    st.divider()
-
-
-
     max_retries = st.slider(
 
-        "Ponovitve ob napaki:",
+        "Število ponovitev ob napaki:",
 
         0,
 
@@ -274,11 +234,11 @@ with st.sidebar:
 
     request_delay = st.slider(
 
-        "Premor med AI klici (s):",
+        "Premor med AI klici (sek):",
 
         0.0,
 
-        3.0,
+        5.0,
 
         0.5
 
@@ -286,13 +246,9 @@ with st.sidebar:
 
 
 
-    st.divider()
-
-
-
     W_I_kcal = st.number_input(
 
-        "Izhodiščna energija (kcal):",
+        "Referenčna energija (kcal):",
 
         500,
 
@@ -319,44 +275,12 @@ with st.sidebar:
     ):
 
 
-
-        reset_keys = [
-
-            "dataset",
-
-            "results",
-
-            "aggregated",
-
-            "units_data",
-
-            "factor_df",
-
-            "sigma",
-
-            "unit_results",
-
-            "manual_help_result"
-
-        ]
+        for key in list(
+            st.session_state.keys()
+        ):
 
 
-
-        for key in reset_keys:
-
-
-            if key in st.session_state:
-
-
-                del st.session_state[key]
-
-
-
-        st.success(
-
-            "Podatki počiščeni."
-
-        )
+            del st.session_state[key]
 
 
         st.rerun()
@@ -373,13 +297,10 @@ def initialize_ai(api_key):
 
     if not api_key:
 
-
         return None
 
 
-
     try:
-
 
         return genai.Client(
 
@@ -388,9 +309,7 @@ def initialize_ai(api_key):
         )
 
 
-
     except Exception as e:
-
 
         st.error(
 
@@ -398,56 +317,38 @@ def initialize_ai(api_key):
 
         )
 
-
         return None
 
 
 
 # ============================================================
-# 4. TEST MODELA
+# 4. NALAGANJE PODATKOVNE DATOTEKE
 # ============================================================
 
 
-def test_ai(
+uploaded_file = st.file_uploader(
 
-        client,
+    "📂 Naložite datoteko z odgovori respondentov "
+    "(TXT / CSV / XLSX, največ 200 MB)",
 
-        model_name):
+    type=[
 
+        "txt",
 
-    try:
+        "csv",
 
+        "xlsx"
 
-        response = client.models.generate_content(
+    ]
 
-            model=model_name,
+)
 
-            contents="Pozdravi uporabnika."
-
-        )
-
-
-        return response.text
-
-
-
-    except Exception as e:
-
-
-        return str(e)
-
-
-
-# ============================================================
-# 5. NALAGANJE DATASET-a
-# ============================================================
 
 
 def load_dataset(uploaded_file):
 
 
     if uploaded_file is None:
-
 
         return None
 
@@ -474,24 +375,64 @@ def load_dataset(uploaded_file):
         elif filename.endswith(".csv"):
 
 
-            df = pd.read_csv(
+            try:
 
-                uploaded_file
+                df = pd.read_csv(
 
-            )
+                    uploaded_file,
+
+                    encoding="utf-8"
+
+                )
+
+            except:
+
+
+                uploaded_file.seek(0)
+
+
+                df = pd.read_csv(
+
+                    uploaded_file,
+
+                    encoding="latin1"
+
+                )
 
 
 
         elif filename.endswith(".txt"):
 
 
-            df = pd.read_csv(
+            try:
 
-                uploaded_file,
 
-                sep="\t"
+                df = pd.read_csv(
 
-            )
+                    uploaded_file,
+
+                    sep="\t",
+
+                    encoding="utf-8"
+
+                )
+
+
+            except:
+
+
+                uploaded_file.seek(0)
+
+
+                df = pd.read_csv(
+
+                    uploaded_file,
+
+                    sep="\t",
+
+                    encoding="latin1"
+
+                )
 
 
 
@@ -503,7 +444,6 @@ def load_dataset(uploaded_file):
                 "Nepodprt format."
 
             )
-
 
             return None
 
@@ -518,17 +458,16 @@ def load_dataset(uploaded_file):
 
         st.error(
 
-            f"Napaka pri uvozu: {e}"
+            f"Napaka pri branju datoteke: {e}"
 
         )
-
 
         return None
 
 
 
 # ============================================================
-# 6. PRIPRAVA PODATKOV
+# 5. PRIPRAVA PODATKOV
 # ============================================================
 
 
@@ -537,13 +476,11 @@ def prepare_dataframe(df):
 
     if df is None:
 
-
         return None
 
 
 
     if len(df.columns)==0:
-
 
         return None
 
@@ -603,7 +540,52 @@ def prepare_dataframe(df):
 
 
 # ============================================================
-# 7. JSON ČIŠČENJE
+# 6. IZVEDBA NALAGANJA
+# ============================================================
+
+
+if uploaded_file:
+
+
+    df = load_dataset(
+
+        uploaded_file
+
+    )
+
+
+    df = prepare_dataframe(
+
+        df
+
+    )
+
+
+    if df is not None:
+
+
+        st.success(
+
+            f"Naloženih odgovorov: {len(df)}"
+
+        )
+
+
+        st.dataframe(
+
+            df.head(10),
+
+            use_container_width=True
+
+        )
+
+
+        st.session_state["dataset"] = df
+
+
+
+# ============================================================
+# 7. JSON POMOŽNE FUNKCIJE
 # ============================================================
 
 
@@ -611,7 +593,6 @@ def clean_json_response(text):
 
 
     if not text:
-
 
         return "{}"
 
@@ -662,13 +643,7 @@ def clean_json_response(text):
 
 
 
-# ============================================================
-# 8. PRAZEN REZULTAT
-# ============================================================
-
-
 def empty_analysis():
-
 
     return {
 
