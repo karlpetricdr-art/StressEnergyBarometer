@@ -136,113 +136,76 @@ UNIT_DESCRIPTIONS = {
 
 
 # ============================================================
-# 3. SIDEBAR
+# 3. SIDEBAR (POSODOBLJENO ZA FINE-TUNING)
 # ============================================================
-
 
 with st.sidebar:
 
-
-    st.header(
-        "⚙️ Nastavitve"
-    )
-
+    st.header("⚙️ Nastavitve")
 
     api_key = st.text_input(
-
         "Google API ključ",
-
         type="password"
-
     )
-
 
     st.divider()
 
-
-
-    model_name = st.selectbox(
-
-        "AI model",
-
-        [
-
-            "gemini-2.0-flash",
-
-            "gemini-2.0-flash-lite",
-
-            "gemma-4-26b-a4b-it",
-
-            "gemma-4-31b-it"
-
-        ]
-
+    # IZBIRA VRSTE MODELA
+    model_type = st.radio(
+        "Vrsta modela",
+        ["Standardni", "Uglajeni (Fine-tuned)"],
+        help="Izberite 'Standardni' za splošne modele ali 'Fine-tuned', če ste model naučili s svojimi podatki."
     )
 
+    if model_type == "Standardni":
+        model_name = st.selectbox(
+            "AI model",
+            [
+                "gemini-2.0-flash",
+                "gemini-2.0-flash-lite",
+                "gemma-4-26b-a4b-it",
+                "gemma-4-31b-it"
+            ]
+        )
+    else:
+        # Polje za vnos ID-ja tvojega naučenega modela
+        model_name = st.text_input(
+            "ID vašega modela",
+            value="tunedModels/",
+            help="Vnesite celotno pot modela iz Google AI Studio (npr. tunedModels/vas-model-ime)"
+        )
 
     st.divider()
-
-
 
     max_retries = st.slider(
-
         "Ponovitve ob napaki",
-
         0,
-
         5,
-
         3
-
     )
-
 
     request_delay = st.slider(
-
         "Premor med AI analizami (s)",
-
         0.0,
-
         5.0,
-
         0.5
-
     )
 
-
-
     st.divider()
-
-
 
     test_mode = st.checkbox(
-
         "Testni način (3 odgovori)",
-
         value=False
-
     )
-
-
 
     st.divider()
 
-
-
     if st.button(
-
         "🗑️ RESET",
-
         use_container_width=True
-
     ):
-
-
         for key in list(st.session_state.keys()):
-
             del st.session_state[key]
-
-
         st.rerun()
 
 
@@ -681,150 +644,51 @@ def test_ai(client, model_name):
 
 
 # ============================================================
-# 11. AI PROMPT ZA KLASIFIKACIJO
+# 11. AI PROMPT ZA KLASIFIKACIJO (POSODOBLJENO)
 # ============================================================
 
-
 def build_classifier_prompt(answer):
+    """
+    Pripravi navodila za AI klasifikacijo. 
+    Struktura je usklajena s fine-tuning podatki Modela Petrič.
+    """
 
-
+    # Dinamičen izpis enot iz definicij
     unit_text = ""
-
-
     for code in UNIT_CODES:
-
-
-        unit_text += (
-
-            f"{code} - "
-            f"{UNIT_LABELS[code]}: "
-            f"{UNIT_DESCRIPTIONS[code]}\n"
-
-        )
-
-
+        unit_text += f"- {code} ({UNIT_LABELS[code]}): {UNIT_DESCRIPTIONS[code]}\n"
 
     prompt = f"""
+Si specializiran klasifikator za Psihosocialni Barometer Petrič (2025/2026).
+Tvoja naloga je ekstrakcija dejavnikov iz podanega odgovora.
 
-Si strokovni analizator psihosocialnih dejavnikov.
-
-Uporabljaš model:
-Psihosocialni Barometer Petrič (2025/2026).
-
-Tvoja naloga NI izračun stresne moči.
-
-Tvoja edina naloga je:
-
-1. najti dejavnike v odgovoru,
-2. jih razvrstiti,
-3. določiti intenzivnost.
-
-
-Klasifikacijske enote:
-
-
+NAVODILA:
+1. Analiziraj spodnji odgovor in iz njega izloči STRESORJE, POZITIVNE DEJAVNIKE in PREDLOGE.
+2. Vsak dejavnik uvrsti v eno od 6 enot:
 {unit_text}
+3. Določi intenzivnost/učinek na lestvici 0-5.
 
+PRAVILA:
+- Vrni IZKLJUČNO čisti JSON format.
+- Če določene kategorije ni v odgovoru, vrni prazen seznam [].
+- Ne dodajaj nobene razlage ali besedila pred/za JSON-om.
 
-
-Kategorije:
-
-
-STRESORJI
-
-Kaj povzroča obremenitev.
-
-
-POZITIVNI_DEJAVNIKI
-
-Kaj zmanjšuje stres ali povečuje odpornost.
-
-
-PREDLOGI
-
-Kaj bi lahko izboljšalo stanje.
-
-
-
-Lestvica:
-
-0 = ni prisotno
-
-1 = zelo nizko
-
-2 = nizko
-
-3 = srednje
-
-4 = visoko
-
-5 = zelo visoko
-
-
-
-Vrni IZKLJUČNO JSON.
-
-
-FORMAT:
-
-
+STRUKTURA JSON:
 {{
-"stresorji":[
-
- {{
-
- "faktor":"",
-
- "enota":"AT/ST/IP/PS/SO/HB",
-
- "intenzivnost":0
-
- }}
-
-],
-
-
-"pozitivni_dejavniki":[
-
- {{
-
- "faktor":"",
-
- "enota":"AT/ST/IP/PS/SO/HB",
-
- "intenzivnost":0
-
- }}
-
-],
-
-
-"predlogi":[
-
- {{
-
- "faktor":"",
-
- "enota":"AT/ST/IP/PS/SO/HB",
-
- "ucinek":0
-
- }}
-
-]
-
+  "stresorji": [
+    {{"faktor": "ime faktorja", "enota": "AT/ST/IP/PS/SO/HB", "intenzivnost": 1-5}}
+  ],
+  "pozitivni_dejavniki": [
+    {{"faktor": "ime faktorja", "enota": "AT/ST/IP/PS/SO/HB", "intenzivnost": 1-5}}
+  ],
+  "predlogi": [
+    {{"faktor": "ime faktorja", "enota": "AT/ST/IP/PS/SO/HB", "ucinek": 1-5}}
+  ]
 }}
 
-
-
-ODGOVOR RESPONDENTA:
-
-
+ODGOVOR RESPONDENTA ZA ANALIZO:
 {answer}
-
 """
-
-
     return prompt
 
 
@@ -2902,7 +2766,6 @@ if "sigma_result" in st.session_state:
 # ============================================================
 # KONEC v2.5
 # ============================================================
-
 
 
 
