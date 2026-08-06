@@ -1,30 +1,63 @@
 # ============================================================
-# DEL 1/6
-# PSIHOSOCIALNI BAROMETER v2.4
+# PSIHOSOCIALNI BAROMETER v2.5
 #
-# OSNOVNA STRUKTURA
+# DEL 1/5
+#
+# OSNOVA APLIKACIJE
 # STREAMLIT VMESNIK
-# AI NASTAVITVE
-# NALAGANJE DATOTEK
-# PRIPRAVA PODATKOV
+# NALAGANJE PODATKOV
+# PRIPRAVA ODGOVOROV
+#
+# AI in matematika sta ločena modula
 # ============================================================
 
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import json
 import time
-import math
 import re
 
-from google import genai
+
+# ============================================================
+# 1. STREAMLIT NASTAVITVE
+# ============================================================
+
+
+st.set_page_config(
+
+    page_title="Psihosocialni Barometer v2.5",
+
+    layout="wide"
+
+)
+
+
+
+st.title(
+    "📊 Psihosocialni Barometer v2.5"
+)
+
+
+
+st.markdown(
+
+"""
+### Model Petrič (2025/2026)
+
+Ločena arhitektura:
+
+- AI modul → klasifikacija psihosocialnih dejavnikov
+- Python modul → matematični izračun stresne moči in energije
+
+"""
+
+)
 
 
 
 # ============================================================
-# 0. KLASIFIKACIJSKE ENOTE
-# Petrič (2025/2026)
+# 2. KLASIFIKACIJSKE ENOTE
 # ============================================================
 
 
@@ -42,20 +75,26 @@ UNIT_CODES = [
 
 UNIT_LABELS = {
 
+
     "AT":
     "Pozorna (fizična)",
+
 
     "ST":
     "Storilnostna",
 
+
     "IP":
     "Individualna psihološka",
+
 
     "PS":
     "Delna socialna",
 
+
     "SO":
     "Socialna",
+
 
     "HB":
     "Zdravstveno-biološka"
@@ -66,103 +105,36 @@ UNIT_LABELS = {
 
 UNIT_DESCRIPTIONS = {
 
+
     "AT":
-    "fizično okolje, čuti, hrup, svetloba, temperatura, ergonomija",
+    "okoljski in fizični vplivi: hrup, svetloba, temperatura, ergonomija",
+
 
     "ST":
     "naloge, informacije, postopki, delovna obremenitev",
 
+
     "IP":
-    "notranje psihično stanje, občutki, motivacija, samozavest",
+    "notranje psihološko stanje posameznika",
+
 
     "PS":
     "pričakovanja, priznanje, nagrajevanje, status",
 
+
     "SO":
-    "odnosi, konflikti, sodelovanje, podpora",
+    "odnosi, konflikti, sodelovanje, socialna podpora",
+
 
     "HB":
-    "zdravje, bolezni, prehrana, telesno stanje"
+    "zdravje, bolezen, prehrana, telesno stanje"
 
 }
 
 
 
-def build_unit_legend():
-
-    output = []
-
-    for code in UNIT_CODES:
-
-        output.append(
-
-            f"{code}: "
-            f"{UNIT_LABELS[code]} - "
-            f"{UNIT_DESCRIPTIONS[code]}"
-
-        )
-
-    return "\n".join(output)
-
-
-
 # ============================================================
-# 1. STREAMLIT KONFIGURACIJA
-# ============================================================
-
-
-st.set_page_config(
-
-    page_title="Psihosocialni Barometer v2.4",
-
-    layout="wide"
-
-)
-
-
-
-st.title(
-    "📊 Psihosocialni Barometer v2.4"
-)
-
-
-
-st.markdown(
-
-"""
-### Model Petrič (2025/2026)
-
-AI večfaktorska analiza psihosocialnih dejavnikov.
-
-
-Aplikacija omogoča:
-
-
-✅ nalaganje velikih podatkovnih datotek
-
-✅ AI analizo odgovorov respondentov
-
-✅ več stresorjev iz enega odgovora
-
-✅ pozitivne dejavnike
-
-✅ predloge izboljšav
-
-✅ klasifikacijo v 6 enot
-
-✅ izračun stresne moči °S
-
-✅ energijski model kcal/kJ
-
-
-"""
-
-)
-
-
-
-# ============================================================
-# 2. SIDEBAR
+# 3. SIDEBAR
 # ============================================================
 
 
@@ -170,18 +142,17 @@ with st.sidebar:
 
 
     st.header(
-        "⚙️ AI nastavitve"
+        "⚙️ Nastavitve"
     )
 
 
     api_key = st.text_input(
 
-        "Google API ključ:",
+        "Google API ključ",
 
         type="password"
 
     )
-
 
 
     st.divider()
@@ -190,7 +161,7 @@ with st.sidebar:
 
     model_name = st.selectbox(
 
-        "AI model:",
+        "AI model",
 
         [
 
@@ -207,20 +178,13 @@ with st.sidebar:
     )
 
 
-
-    test_mode = st.checkbox(
-
-        "Testni način (prvi 3 odgovori)",
-
-        value=False
-
-    )
+    st.divider()
 
 
 
     max_retries = st.slider(
 
-        "Število ponovitev ob napaki:",
+        "Ponovitve ob napaki",
 
         0,
 
@@ -231,10 +195,9 @@ with st.sidebar:
     )
 
 
-
     request_delay = st.slider(
 
-        "Premor med AI klici (sek):",
+        "Premor med AI analizami (s)",
 
         0.0,
 
@@ -246,17 +209,15 @@ with st.sidebar:
 
 
 
-    W_I_kcal = st.number_input(
+    st.divider()
 
-        "Referenčna energija (kcal):",
 
-        500,
 
-        6000,
+    test_mode = st.checkbox(
 
-        2500,
+        "Testni način (3 odgovori)",
 
-        step=100
+        value=False
 
     )
 
@@ -275,10 +236,7 @@ with st.sidebar:
     ):
 
 
-        for key in list(
-            st.session_state.keys()
-        ):
-
+        for key in list(st.session_state.keys()):
 
             del st.session_state[key]
 
@@ -288,48 +246,14 @@ with st.sidebar:
 
 
 # ============================================================
-# 3. AI INICIALIZACIJA
-# ============================================================
-
-
-def initialize_ai(api_key):
-
-
-    if not api_key:
-
-        return None
-
-
-    try:
-
-        return genai.Client(
-
-            api_key=api_key
-
-        )
-
-
-    except Exception as e:
-
-        st.error(
-
-            f"AI inicializacija neuspešna: {e}"
-
-        )
-
-        return None
-
-
-
-# ============================================================
-# 4. NALAGANJE PODATKOVNE DATOTEKE
+# 4. UPLOAD DATOTEKE
 # ============================================================
 
 
 uploaded_file = st.file_uploader(
 
-    "📂 Naložite datoteko z odgovori respondentov "
-    "(TXT / CSV / XLSX, največ 200 MB)",
+    "📂 Naloži podatke respondentov "
+    "(TXT, CSV, XLSX - do 200 MB)",
 
     type=[
 
@@ -345,16 +269,21 @@ uploaded_file = st.file_uploader(
 
 
 
-def load_dataset(uploaded_file):
+# ============================================================
+# 5. BRANJE DATOTEK
+# ============================================================
 
 
-    if uploaded_file is None:
+def load_dataset(file):
+
+
+    if file is None:
 
         return None
 
 
 
-    filename = uploaded_file.name.lower()
+    filename = file.name.lower()
 
 
 
@@ -364,11 +293,7 @@ def load_dataset(uploaded_file):
         if filename.endswith(".xlsx"):
 
 
-            df = pd.read_excel(
-
-                uploaded_file
-
-            )
+            df = pd.read_excel(file)
 
 
 
@@ -379,7 +304,7 @@ def load_dataset(uploaded_file):
 
                 df = pd.read_csv(
 
-                    uploaded_file,
+                    file,
 
                     encoding="utf-8"
 
@@ -388,12 +313,12 @@ def load_dataset(uploaded_file):
             except:
 
 
-                uploaded_file.seek(0)
+                file.seek(0)
 
 
                 df = pd.read_csv(
 
-                    uploaded_file,
+                    file,
 
                     encoding="latin1"
 
@@ -406,10 +331,9 @@ def load_dataset(uploaded_file):
 
             try:
 
-
                 df = pd.read_csv(
 
-                    uploaded_file,
+                    file,
 
                     sep="\t",
 
@@ -417,16 +341,15 @@ def load_dataset(uploaded_file):
 
                 )
 
-
             except:
 
 
-                uploaded_file.seek(0)
+                file.seek(0)
 
 
                 df = pd.read_csv(
 
-                    uploaded_file,
+                    file,
 
                     sep="\t",
 
@@ -440,9 +363,7 @@ def load_dataset(uploaded_file):
 
 
             st.error(
-
                 "Nepodprt format."
-
             )
 
             return None
@@ -462,12 +383,13 @@ def load_dataset(uploaded_file):
 
         )
 
+
         return None
 
 
 
 # ============================================================
-# 5. PRIPRAVA PODATKOV
+# 6. STANDARDIZACIJA ODGOVOROV
 # ============================================================
 
 
@@ -480,7 +402,7 @@ def prepare_dataframe(df):
 
 
 
-    if len(df.columns)==0:
+    if len(df.columns) == 0:
 
         return None
 
@@ -540,7 +462,7 @@ def prepare_dataframe(df):
 
 
 # ============================================================
-# 6. IZVEDBA NALAGANJA
+# 7. IZVEDBA UPLOADA
 # ============================================================
 
 
@@ -585,7 +507,7 @@ if uploaded_file:
 
 
 # ============================================================
-# 7. JSON POMOŽNE FUNKCIJE
+# 8. POMOŽNE FUNKCIJE
 # ============================================================
 
 
@@ -613,7 +535,6 @@ def clean_json_response(text):
         flags=re.I
 
     )
-
 
 
     text = text.replace(
@@ -645,82 +566,6 @@ def clean_json_response(text):
 
 def empty_analysis():
 
-    return {
-
-
-        "stresorji":[],
-
-        "pozitivni_dejavniki":[],
-
-        "predlogi":[]
-
-
-    }
-
-
-
-# ============================================================
-# KONEC DELA 1/6
-# ============================================================
-		
-		# ============================================================
-# DEL 2/6
-# AI ANALIZA + JSON OBDELAVA + AGREGACIJA FAKTORJEV
-# ============================================================
-
-
-# ============================================================
-# 9. JSON FUNKCIJE
-# ============================================================
-
-
-def clean_json_response(text):
-
-    """
-    Očisti AI odgovor in izlušči samo JSON objekt.
-    """
-
-    if not text:
-
-        return "{}"
-
-
-    text = str(text).strip()
-
-
-    # odstrani markdown oznake
-
-    text = re.sub(
-        r"```json",
-        "",
-        text,
-        flags=re.IGNORECASE
-    )
-
-
-    text = text.replace(
-        "```",
-        ""
-    )
-
-
-    # poišče prvi in zadnji JSON blok
-
-    start = text.find("{")
-
-    end = text.rfind("}")
-
-
-    if start >= 0 and end >= 0:
-
-        text = text[start:end + 1]
-
-
-    return text.strip()
-
-
-
-def empty_analysis():
 
     return {
 
@@ -734,106 +579,185 @@ def empty_analysis():
 
 
 
-def safe_unit(value):
+# ============================================================
+# KONEC DELA 1/5
+# ============================================================
 
-    """
-    Standardizacija AI klasifikacijske enote.
-    """
+# ============================================================
+# PSIHOSOCIALNI BAROMETER v2.5
+#
+# DEL 2/5
+#
+# AI KLASIFIKACIJSKI MODUL
+#
+# Naloga AI:
+# - prepozna stresorje
+# - prepozna pozitivne dejavnike
+# - prepozna predloge
+# - razvrsti faktorje v 6 enot
+# - določi intenzivnost 0-5
+#
+# AI NE IZRAČUNAVA STRESA
+# ============================================================
 
-    if isinstance(value, str):
 
-        value = value.strip().upper()
-
-
-        if value in UNIT_CODES:
-
-            return value
+from google import genai
 
 
 
-    return "NEZ"
+# ============================================================
+# 9. AI INICIALIZACIJA
+# ============================================================
 
 
+def initialize_ai(api_key):
 
-def safe_number(value):
+
+    if not api_key:
+
+        return None
+
+
 
     try:
 
-        return int(value)
 
-    except:
+        client = genai.Client(
 
-        return 0
-
-
-
-# ============================================================
-# 10. AI PROMPT
-# ============================================================
-
-
-def build_unit_legend():
-
-    lines = []
-
-
-    for code in UNIT_CODES:
-
-        lines.append(
-
-            f"{code}: {UNIT_LABELS[code]} - "
-            f"{UNIT_DESCRIPTIONS[code]}"
+            api_key=api_key
 
         )
 
 
-    return "\n".join(lines)
+        return client
 
 
 
-def build_analysis_prompt(answer):
+    except Exception as e:
 
 
-    legend = build_unit_legend()
+        st.error(
+
+            f"AI inicializacija neuspešna: {e}"
+
+        )
 
 
-    return f"""
+        return None
 
-Analiziraj odgovor respondenta po modelu:
 
+
+# ============================================================
+# 10. TEST AI POVEZAVE
+# ============================================================
+
+
+def test_ai(client, model_name):
+
+
+    try:
+
+
+        response = client.models.generate_content(
+
+            model=model_name,
+
+            contents="Pozdravi uporabnika."
+
+        )
+
+
+        return response.text
+
+
+
+    except Exception as e:
+
+
+        return f"Napaka: {e}"
+
+
+
+# ============================================================
+# 11. AI PROMPT ZA KLASIFIKACIJO
+# ============================================================
+
+
+def build_classifier_prompt(answer):
+
+
+    unit_text = ""
+
+
+    for code in UNIT_CODES:
+
+
+        unit_text += (
+
+            f"{code} - "
+            f"{UNIT_LABELS[code]}: "
+            f"{UNIT_DESCRIPTIONS[code]}\n"
+
+        )
+
+
+
+    prompt = f"""
+
+Si strokovni analizator psihosocialnih dejavnikov.
+
+Uporabljaš model:
 Psihosocialni Barometer Petrič (2025/2026).
 
+Tvoja naloga NI izračun stresne moči.
 
-Iz odgovora identificiraj:
+Tvoja edina naloga je:
 
-
-1. stresorje
-
-2. pozitivne dejavnike
-
-3. predloge izboljšav
+1. najti dejavnike v odgovoru,
+2. jih razvrstiti,
+3. določiti intenzivnost.
 
 
-Vsak faktor mora imeti:
-
-- faktor
-- enota
-- intenzivnost 0-5
-
-Za predloge uporabi:
-
-- ucinek 0-5
+Klasifikacijske enote:
 
 
-Uporabi samo naslednje kode enot:
+{unit_text}
 
 
-{legend}
+
+Kategorije:
 
 
-Če faktorja ni mogoče razvrstiti:
+STRESORJI
 
-NEZ
+Kaj povzroča obremenitev.
+
+
+POZITIVNI_DEJAVNIKI
+
+Kaj zmanjšuje stres ali povečuje odpornost.
+
+
+PREDLOGI
+
+Kaj bi lahko izboljšalo stanje.
+
+
+
+Lestvica:
+
+0 = ni prisotno
+
+1 = zelo nizko
+
+2 = nizko
+
+3 = srednje
+
+4 = visoko
+
+5 = zelo visoko
+
 
 
 Vrni IZKLJUČNO JSON.
@@ -844,35 +768,54 @@ FORMAT:
 
 {{
 "stresorji":[
+
  {{
+
  "faktor":"",
- "enota":"",
+
+ "enota":"AT/ST/IP/PS/SO/HB",
+
  "intenzivnost":0
+
  }}
+
 ],
 
 
 "pozitivni_dejavniki":[
+
  {{
+
  "faktor":"",
- "enota":"",
+
+ "enota":"AT/ST/IP/PS/SO/HB",
+
  "intenzivnost":0
+
  }}
+
 ],
 
 
 "predlogi":[
+
  {{
+
  "faktor":"",
- "enota":"",
+
+ "enota":"AT/ST/IP/PS/SO/HB",
+
  "ucinek":0
+
  }}
+
 ]
 
 }}
 
 
-Odgovor respondenta:
+
+ODGOVOR RESPONDENTA:
 
 
 {answer}
@@ -880,90 +823,139 @@ Odgovor respondenta:
 """
 
 
+    return prompt
+
+
 
 # ============================================================
-# 11. ANALIZA ENEGA ODGOVORA
+# 12. VALIDACIJA AI REZULTATA
+# ============================================================
+
+
+def validate_ai_result(data):
+
+
+    if not isinstance(data, dict):
+
+        return False
+
+
+
+    required = [
+
+        "stresorji",
+
+        "pozitivni_dejavniki",
+
+        "predlogi"
+
+    ]
+
+
+
+    for key in required:
+
+
+        if key not in data:
+
+
+            return False
+
+
+
+        if not isinstance(
+
+            data[key],
+
+            list
+
+        ):
+
+
+            return False
+
+
+
+    return True
+
+
+
+# ============================================================
+# 13. ANALIZA ENEGA ODGOVORA
 # ============================================================
 
 
 def analyze_single_response(
+
         client,
+
         model_name,
+
         answer,
+
         max_retries=3):
 
 
     default = empty_analysis()
 
 
+
     attempt = 0
 
-    wait_time = 2
+
+    wait = 2
 
 
 
     while attempt <= max_retries:
 
 
+
         try:
+
 
 
             response = client.models.generate_content(
 
                 model=model_name,
 
-                contents=
-                build_analysis_prompt(answer)
+                contents=build_classifier_prompt(answer)
 
             )
 
 
 
-            raw = getattr(
-                response,
-                "text",
-                ""
-            )
+            raw = response.text
 
 
 
             cleaned = clean_json_response(
+
                 raw
+
             )
+
 
 
             data = json.loads(
+
                 cleaned
-            )
 
-
-            if not isinstance(
-                data,
-                dict
-            ):
-
-                return default, "prazen_json"
-
-
-
-            data.setdefault(
-                "stresorji",
-                []
-            )
-
-            data.setdefault(
-                "pozitivni_dejavniki",
-                []
-            )
-
-            data.setdefault(
-                "predlogi",
-                []
             )
 
 
 
-            return data, "ok"
+            if validate_ai_result(data):
+
+
+                return data, "OK"
+
+
+
+            else:
+
+
+                return default, "INVALID_JSON"
 
 
 
@@ -974,37 +966,27 @@ def analyze_single_response(
             attempt += 1
 
 
+
             if attempt > max_retries:
 
-                return default, "prazen_json"
+
+                return default, "INVALID_JSON"
 
 
 
-            time.sleep(
-                wait_time
-            )
+            time.sleep(wait)
 
+            wait *= 2
 
-            wait_time *= 2
 
 
 
         except Exception as e:
 
 
+
             error = str(e)
 
-
-            quota_error = (
-
-                "429" in error
-
-                or
-
-                "RESOURCE_EXHAUSTED"
-                in error
-
-            )
 
 
             attempt += 1
@@ -1014,48 +996,46 @@ def analyze_single_response(
             if attempt > max_retries:
 
 
-                if quota_error:
 
-                    return default, "napaka_kvote"
-
-
-                return default, "napaka"
+                if "429" in error or "RESOURCE_EXHAUSTED" in error:
 
 
-
-            if quota_error:
-
-                time.sleep(
-                    wait_time * 2
-                )
-
-            else:
-
-                time.sleep(
-                    wait_time
-                )
+                    return default, "QUOTA_ERROR"
 
 
 
-            wait_time *= 2
+                return default, "ERROR"
 
 
 
-    return default, "napaka"
+            time.sleep(wait)
+
+            wait *= 2
+
+
+
+    return default, "ERROR"
+
 
 
 
 # ============================================================
-# 12. ANALIZA CELOTNEGA DATASETA
+# 14. ANALIZA CELOTNEGA DATASETA
 # ============================================================
 
 
-def run_multifactor_analysis(
+def run_ai_classification(
+
         df,
+
         client,
+
         model_name,
+
         test_mode=False,
+
         max_retries=3,
+
         request_delay=0.5):
 
 
@@ -1063,33 +1043,36 @@ def run_multifactor_analysis(
     results = []
 
 
-    status_counts = {
 
-        "ok":0,
+    status = {
 
-        "prazen_json":0,
 
-        "napaka_kvote":0,
+        "OK":0,
 
-        "napaka":0
+        "INVALID_JSON":0,
+
+        "QUOTA_ERROR":0,
+
+        "ERROR":0
 
     }
 
 
 
+    progress = st.progress(0)
+
+    message = st.empty()
+
+
+
     if test_mode:
+
 
         df = df.head(3)
 
 
 
     total = len(df)
-
-
-
-    progress = st.progress(0)
-
-    status = st.empty()
 
 
 
@@ -1120,88 +1103,116 @@ def run_multifactor_analysis(
 
 
         results.append(
+
             result
+
         )
 
 
-        status_counts[state] += 1
+
+        status[state] += 1
 
 
 
-        done = len(results)
+        done = index + 1
+
+
+
+        progress.progress(
+
+            int(done / total * 100)
+
+        )
 
 
 
         elapsed = time.time() - start
 
 
-        avg = elapsed / done
-
 
         remaining = (
-            total - done
-        ) * avg
 
+            (total-done)
 
+            *
 
-        progress.progress(
+            elapsed
 
-            int(
-                done / total * 100
-            )
+            /
 
-        )
-
-
-
-        status.text(
-
-            f"Obdelano {done}/{total} | "
-
-            f"OK:{status_counts['ok']} | "
-
-            f"JSON:{status_counts['prazen_json']} | "
-
-            f"429:{status_counts['napaka_kvote']} | "
-
-            f"Napake:{status_counts['napaka']} | "
-
-            f"Preostanek ~{remaining:.0f}s"
+            done
 
         )
 
 
 
-        if request_delay:
+        message.text(
+
+            f"AI klasifikacija: {done}/{total} | "
+
+            f"OK={status['OK']} | "
+
+            f"Napake={status['ERROR']} | "
+
+            f"Preostanek ~ {remaining:.0f}s"
+
+        )
+
+
+
+        if request_delay > 0:
+
 
             time.sleep(
+
                 request_delay
+
             )
 
 
 
     progress.empty()
 
-    status.empty()
+    message.empty()
 
 
 
-    return (
-        results,
-        status_counts,
-        total
-    )
+    return results, status, total
 
 
 
 # ============================================================
-# 13. PRAZEN BUCKET
+# KONEC DELA 2/5
+# ============================================================
+
+# ============================================================
+# PSIHOSOCIALNI BAROMETER v2.5
+#
+# DEL 3/5
+#
+# PODATKOVNI ENGINE
+#
+# Namen:
+# - prevzame AI rezultate
+# - šteje faktorje
+# - združuje faktorje
+# - pripravi podatke za matematični model
+#
+# Brez AI in brez izračuna stresne moči
+# ============================================================
+
+
+
+# ============================================================
+# 15. PRAZEN PODATKOVNI BLOK
 # ============================================================
 
 
 def empty_bucket():
 
+
     return {
+
 
         "SF_count":0,
 
@@ -1223,16 +1234,107 @@ def empty_bucket():
 
         "PR_list":[]
 
+
     }
 
 
 
 # ============================================================
-# 14. AGREGACIJA FAKTORJEV
+# 16. VARNA ŠTEVILA
+# ============================================================
+
+
+def safe_number(value):
+
+
+    try:
+
+
+        value = int(value)
+
+
+        if value < 0:
+
+
+            return 0
+
+
+
+        if value > 5:
+
+
+            return 5
+
+
+
+        return value
+
+
+
+    except:
+
+
+        return 0
+
+
+
+# ============================================================
+# 17. VARNA ENOTA
+# ============================================================
+
+
+def safe_unit(value):
+
+
+    if isinstance(value,str):
+
+
+        value=value.strip().upper()
+
+
+
+        if value in UNIT_CODES:
+
+
+            return value
+
+
+
+    return "NEZ"
+
+
+
+# ============================================================
+# 18. AGREGACIJA AI REZULTATOV
 # ============================================================
 
 
 def aggregate_factors(results):
+
+
+    """
+
+    Vhod:
+
+    AI rezultati posameznih respondentov
+
+
+    Izhod:
+
+
+    aggregated
+
+        vsi faktorji skupaj
+
+
+
+    units_data
+
+        faktorji po šestih enotah
+
+
+    """
+
 
 
     aggregated = empty_bucket()
@@ -1241,12 +1343,15 @@ def aggregate_factors(results):
 
     units_data = {
 
+
         code:
+
         empty_bucket()
 
         for code in UNIT_CODES
 
     }
+
 
 
     units_data["NEZ"] = empty_bucket()
@@ -1257,33 +1362,53 @@ def aggregate_factors(results):
 
 
 
-        for sf in item.get(
+        # --------------------------------
+        # STRESORJI
+        # --------------------------------
+
+
+        for factor in item.get(
+
             "stresorji",
+
             []
+
         ):
 
 
-            name = sf.get(
+
+            name = factor.get(
+
                 "faktor",
-                "neznan"
+
+                "neznano"
+
             )
+
 
 
             value = safe_number(
 
-                sf.get(
+                factor.get(
+
                     "intenzivnost",
+
                     0
+
                 )
 
             )
 
 
+
             unit = safe_unit(
 
-                sf.get(
+                factor.get(
+
                     "enota",
+
                     ""
+
                 )
 
             )
@@ -1295,7 +1420,15 @@ def aggregate_factors(results):
             aggregated["SF_weight"] += value
 
             aggregated["SF_list"].append(
-                (name,value)
+
+                (
+
+                    name,
+
+                    value
+
+                )
+
             )
 
 
@@ -1305,41 +1438,71 @@ def aggregate_factors(results):
             units_data[unit]["SF_weight"] += value
 
             units_data[unit]["SF_list"].append(
-                (name,value)
+
+                (
+
+                    name,
+
+                    value
+
+                )
+
             )
 
 
 
-        for pf in item.get(
+
+        # --------------------------------
+        # POZITIVNI DEJAVNIKI
+        # --------------------------------
+
+
+        for factor in item.get(
+
             "pozitivni_dejavniki",
+
             []
+
         ):
 
 
-            name = pf.get(
+
+            name = factor.get(
+
                 "faktor",
-                "neznan"
+
+                "neznano"
+
             )
+
 
 
             value = safe_number(
 
-                pf.get(
+                factor.get(
+
                     "intenzivnost",
+
                     0
+
                 )
 
             )
+
 
 
             unit = safe_unit(
 
-                pf.get(
+                factor.get(
+
                     "enota",
+
                     ""
+
                 )
 
             )
+
 
 
             aggregated["PF_count"] += 1
@@ -1347,7 +1510,15 @@ def aggregate_factors(results):
             aggregated["PF_weight"] += value
 
             aggregated["PF_list"].append(
-                (name,value)
+
+                (
+
+                    name,
+
+                    value
+
+                )
+
             )
 
 
@@ -1357,38 +1528,67 @@ def aggregate_factors(results):
             units_data[unit]["PF_weight"] += value
 
             units_data[unit]["PF_list"].append(
-                (name,value)
-            )
 
+                (
 
+                    name,
 
-        for pr in item.get(
-            "predlogi",
-            []
-        ):
+                    value
 
-
-            name = pr.get(
-                "faktor",
-                "neznan"
-            )
-
-
-            value = safe_number(
-
-                pr.get(
-                    "ucinek",
-                    0
                 )
 
             )
 
 
+
+
+        # --------------------------------
+        # PREDLOGI
+        # --------------------------------
+
+
+        for factor in item.get(
+
+            "predlogi",
+
+            []
+
+        ):
+
+
+
+            name = factor.get(
+
+                "faktor",
+
+                "neznano"
+
+            )
+
+
+
+            value = safe_number(
+
+                factor.get(
+
+                    "ucinek",
+
+                    0
+
+                )
+
+            )
+
+
+
             unit = safe_unit(
 
-                pr.get(
+                factor.get(
+
                     "enota",
+
                     ""
+
                 )
 
             )
@@ -1400,7 +1600,15 @@ def aggregate_factors(results):
             aggregated["PR_weight"] += value
 
             aggregated["PR_list"].append(
-                (name,value)
+
+                (
+
+                    name,
+
+                    value
+
+                )
+
             )
 
 
@@ -1410,30 +1618,25 @@ def aggregate_factors(results):
             units_data[unit]["PR_weight"] += value
 
             units_data[unit]["PR_list"].append(
-                (name,value)
+
+                (
+
+                    name,
+
+                    value
+
+                )
+
             )
 
 
 
-    return (
-        aggregated,
-        units_data
-    )
+    return aggregated, units_data
 
 
 
 # ============================================================
-# KONEC DELA 2/6
-# ============================================================
-
-# ============================================================
-# DEL 3/6
-# PREDELAVA FAKTORJEV + DATAFRAME + POMOŽNE FUNKCIJE
-# ============================================================
-
-
-# ============================================================
-# 15. ZDRUŽEVANJE ENAKIH FAKTORJEV
+# 19. ZDRUŽEVANJE ENAKIH FAKTORJEV
 # ============================================================
 
 
@@ -1444,71 +1647,80 @@ def merge_factors(items):
 
 
 
-    for name, value in items:
-
-
-        if not name:
-
-            name = "neznan"
-
+    for name,value in items:
 
 
         if name not in merged:
 
-            merged[name] = 0
+
+            merged[name]=0
 
 
 
-        merged[name] += value
+        merged[name]+=value
 
 
 
     return list(
+
         merged.items()
+
     )
 
 
 
 # ============================================================
-# 16. DATAFRAME VSEH FAKTORJEV
+# 20. PRETVORBA V DATAFRAME
 # ============================================================
 
 
 def factors_to_dataframe(units_data):
 
 
-    rows = []
+    rows=[]
 
 
 
-    categories = [
+    categories=[
+
 
         (
+
             "Stresorji",
+
             "SF_list"
+
         ),
 
+
         (
-            "Pozitivni dejavniki",
+
+            "Pozitivni",
+
             "PF_list"
+
         ),
 
+
         (
+
             "Predlogi",
+
             "PR_list"
+
         )
 
     ]
 
 
 
-    for unit_code, bucket in units_data.items():
+    for unit,bucket in units_data.items():
 
 
 
         label = UNIT_LABELS.get(
 
-            unit_code,
+            unit,
 
             "Nerazvrščeno"
 
@@ -1516,69 +1728,52 @@ def factors_to_dataframe(units_data):
 
 
 
-        for category, key in categories:
+        for category,key in categories:
 
 
 
-            merged = merge_factors(
+            for name,value in merge_factors(
 
-                bucket.get(
-                    key,
-                    []
-                )
+                bucket[key]
 
-            )
-
-
-
-            for factor, strength in merged:
+            ):
 
 
 
                 rows.append(
 
+
                     {
 
+
                         "Enota":
+
                         label,
 
+
                         "EnotaKoda":
-                        unit_code,
+
+                        unit,
+
 
                         "Kategorija":
+
                         category,
 
+
                         "Faktor":
-                        factor,
+
+                        name,
+
 
                         "Moč":
-                        strength
+
+                        value
 
                     }
 
+
                 )
-
-
-
-    if not rows:
-
-        return pd.DataFrame(
-
-            columns=[
-
-                "Enota",
-
-                "EnotaKoda",
-
-                "Kategorija",
-
-                "Faktor",
-
-                "Moč"
-
-            ]
-
-        )
 
 
 
@@ -1587,52 +1782,56 @@ def factors_to_dataframe(units_data):
 
 
 # ============================================================
-# 17. TOP FAKTORJI
+# 21. TOP FAKTORJI
 # ============================================================
 
 
 def top_factors(
-        df,
+
+        factor_df,
+
         category,
-        unit_code="VSE"):
+
+        unit="VSE"):
 
 
-    if df is None or df.empty:
+    if factor_df.empty:
+
 
         return pd.DataFrame()
 
 
 
-    result = df[
+    df = factor_df[
 
-        df["Kategorija"] == category
+        factor_df["Kategorija"] == category
 
     ]
 
 
 
-    if unit_code != "VSE":
+    if unit != "VSE":
 
 
-        result = result[
+        df = df[
 
-            result["EnotaKoda"] == unit_code
+            df["EnotaKoda"] == unit
 
         ]
 
 
 
-    if result.empty:
+    if df.empty:
+
 
         return pd.DataFrame()
 
 
 
-    result = (
+    result=(
 
-        result
 
-        .groupby(
+        df.groupby(
 
             "Faktor",
 
@@ -1663,113 +1862,188 @@ def top_factors(
 
 
 # ============================================================
-# 18. MATEMATIČNI MODEL STRESNE MOČI
-# Petrič (2025)
+# 22. SHRANJEVANJE REZULTATOV PO AI ANALIZI
+# ============================================================
+
+
+def store_classification_results(
+
+        results,
+
+        status,
+
+        total):
+
+
+    aggregated, units_data = aggregate_factors(
+
+        results
+
+    )
+
+
+
+    factor_df = factors_to_dataframe(
+
+        units_data
+
+    )
+
+
+
+    st.session_state["results"] = results
+
+    st.session_state["status"] = status
+
+    st.session_state["total_processed"] = total
+
+    st.session_state["aggregated"] = aggregated
+
+    st.session_state["units_data"] = units_data
+
+    st.session_state["factor_df"] = factor_df
+
+
+
+# ============================================================
+# KONEC DELA 3/5
+# ============================================================
+
+# ============================================================
+# PSIHOSOCIALNI BAROMETER v2.5
+#
+# DEL 4/5
+#
+# MATEMATIČNI MODEL
+#
+# Namen:
+# - izračun realnih faktorjev Fo
+# - izračun stresne moči σ
+# - izračun energijske izgube
+# - izračun po klasifikacijskih enotah
+#
+# AI tukaj ni več uporabljen
+# ============================================================
+
+
+import math
+
+
+
+# ============================================================
+# 23. IZRAČUN REALNIH FAKTORJEV Fo
+# ============================================================
+
+
+def calculate_Fo(fv, frv, No):
+
+    """
+    fv  = število pojavitev faktorjev
+    frv = število različnih faktorjev
+    No  = število respondentov
+
+    Model Petrič:
+    frekvenca + raznolikost faktorjev
+    """
+
+
+
+    if No == 0 or fv == 0:
+
+        return 0
+
+
+
+    rho = fv / No
+
+
+
+    if frv > 0:
+
+        Co = fv / frv
+
+    else:
+
+        Co = 1
+
+
+
+    Fo = (Co * rho) / 10
+
+
+
+    return Fo
+
+
+
+# ============================================================
+# 24. STRESNA MOČ σ
 # ============================================================
 
 
 def calculate_stress_power(
+
         data,
-        No,
-        pf_default=0.05,
-        pr_default=0.05):
+
+        No):
 
 
     """
-    Izračun realnih faktorjev Fo in stresne moči.
+    Izračun skupne stresne moči
 
-    Vrne:
+    σ = arcsin √((FoSF × FoPR) / FoPF)
 
-    sigma
-    FoSF
-    FoPF
-    FoPR
+    rezultat v stopinjah
 
     """
 
 
 
-    def calculate_Fo(
-            fv,
-            frv):
-
-
-
-        if No <= 0:
-
-            return 0
-
-
-
-        if fv <= 0:
-
-            return 0
-
-
-
-        if frv <= 0:
-
-            frv = 1
-
-
-
-        rho = fv / No
-
-
-
-        Co = fv / frv
-
-
-
-        Fo = (
-
-            Co * rho
-
-        ) / 10
-
-
-
-        return Fo
-
-
-
-    # frekvence
-
-    f_sf = data.get(
+    sf_count = data.get(
 
         "SF_count",
+
         0
 
     )
 
 
-    f_pf = data.get(
+    pf_count = data.get(
 
         "PF_count",
+
         0
 
     )
 
 
-    f_pr = data.get(
+    pr_count = data.get(
 
         "PR_count",
+
         0
 
     )
 
 
 
-    frv_sf = len(
+    sf_unique = len(
 
         set(
 
-            x[0]
+            [
 
-            for x in data.get(
-                "SF_list",
-                []
-            )
+                x[0]
+
+                for x in data.get(
+
+                    "SF_list",
+
+                    []
+
+                )
+
+            ]
 
         )
 
@@ -1777,16 +2051,23 @@ def calculate_stress_power(
 
 
 
-    frv_pf = len(
+    pf_unique = len(
 
         set(
 
-            x[0]
+            [
 
-            for x in data.get(
-                "PF_list",
-                []
-            )
+                x[0]
+
+                for x in data.get(
+
+                    "PF_list",
+
+                    []
+
+                )
+
+            ]
 
         )
 
@@ -1794,83 +2075,102 @@ def calculate_stress_power(
 
 
 
-    frv_pr = len(
+    pr_unique = len(
 
         set(
 
-            x[0]
+            [
 
-            for x in data.get(
-                "PR_list",
-                []
-            )
+                x[0]
+
+                for x in data.get(
+
+                    "PR_list",
+
+                    []
+
+                )
+
+            ]
 
         )
 
     )
+
 
 
 
     FoSF = calculate_Fo(
 
-        f_sf,
+        sf_count,
 
-        frv_sf
+        sf_unique,
+
+        No
 
     )
 
 
     FoPF = calculate_Fo(
 
-        f_pf,
+        pf_count,
 
-        frv_pf
+        pf_unique,
+
+        No
 
     )
 
 
     FoPR = calculate_Fo(
 
-        f_pr,
+        pr_count,
 
-        frv_pr
+        pr_unique,
+
+        No
 
     )
 
 
 
+    # varovalke
+
     if FoPF <= 0:
 
-        FoPF = pf_default
+        FoPF = 0.05
 
 
 
     if FoPR <= 0:
 
-        FoPR = pr_default
+        FoPR = 0.05
+
 
 
 
     try:
 
 
-        argument = (
+        value = (
 
-            FoSF * FoPR
+            FoSF *
+
+            FoPR
 
         ) / FoPF
 
 
 
-        argument = max(
+        value = min(
 
-            0,
+            1,
 
-            min(
+            max(
 
-                1,
+                0,
 
-                argument
+                value
 
             )
 
@@ -1882,9 +2182,7 @@ def calculate_stress_power(
 
             math.asin(
 
-                math.sqrt(
-                    argument
-                )
+                math.sqrt(value)
 
             )
 
@@ -1892,34 +2190,51 @@ def calculate_stress_power(
 
 
 
-    except Exception:
+    except:
 
 
         sigma = 0
 
 
 
-    return (
+
+    return {
+
+
+        "sigma":
 
         sigma,
 
+
+        "FoSF":
+
         FoSF,
+
+
+        "FoPF":
 
         FoPF,
 
+
+        "FoPR":
+
         FoPR
 
-    )
+
+    }
+
 
 
 
 # ============================================================
-# 19. IZRAČUN PO POSAMEZNIH ENOTAH
+# 25. IZRAČUN STRESA PO ENOTAH
 # ============================================================
 
 
-def calculate_all_unit_stress_power(
+def calculate_unit_results(
+
         units_data,
+
         No):
 
 
@@ -1927,19 +2242,12 @@ def calculate_all_unit_stress_power(
 
 
 
-    all_units = UNIT_CODES.copy()
+    for code in list(
 
+        UNIT_CODES
 
+    ) + ["NEZ"]:
 
-    if "NEZ" in units_data:
-
-        all_units.append(
-            "NEZ"
-        )
-
-
-
-    for code in all_units:
 
 
         bucket = units_data.get(
@@ -1952,7 +2260,7 @@ def calculate_all_unit_stress_power(
 
 
 
-        sigma, fsf, fpf, fpr = calculate_stress_power(
+        results[code] = calculate_stress_power(
 
             bucket,
 
@@ -1962,52 +2270,33 @@ def calculate_all_unit_stress_power(
 
 
 
-        results[code] = {
-
-
-            "sigma":
-            sigma,
-
-
-            "FoSF":
-            fsf,
-
-
-            "FoPF":
-            fpf,
-
-
-            "FoPR":
-            fpr,
-
-
-            "SF_count":
-            bucket["SF_count"],
-
-
-            "PF_count":
-            bucket["PF_count"],
-
-
-            "PR_count":
-            bucket["PR_count"]
-
-        }
-
-
-
     return results
 
 
 
+
 # ============================================================
-# 20. ENERGIJSKI MODEL
+# 26. ENERGIJSKI MODEL
 # ============================================================
 
 
 def calculate_energy(
+
         sigma,
+
         W_I_kcal=2500):
+
+
+    """
+
+    Model energije:
+
+    izguba energije je sorazmerna
+    s stresno močjo
+
+
+    """
+
 
 
     loss = (
@@ -2040,10 +2329,6 @@ def calculate_energy(
 
         100
 
-        if W_I_kcal
-
-        else 0
-
     )
 
 
@@ -2056,12 +2341,12 @@ def calculate_energy(
         W_I_kcal,
 
 
-        "loss_kcal":
+        "loss":
 
         loss,
 
 
-        "useful_kcal":
+        "useful":
 
         useful,
 
@@ -2080,17 +2365,21 @@ def calculate_energy(
 
         useful * 4.184
 
+
     }
 
 
 
+
 # ============================================================
-# 21. LESTVICA STRESA
+# 27. OCENA STRESNE STOPNJE
 # ============================================================
 
 
 def stress_level_label(
+
         sigma):
+
 
 
     if sigma <= 15:
@@ -2098,9 +2387,11 @@ def stress_level_label(
         return "Zelo nizka"
 
 
+
     elif sigma <= 30:
 
         return "Nizka"
+
 
 
     elif sigma <= 45:
@@ -2108,14 +2399,17 @@ def stress_level_label(
         return "Srednja"
 
 
+
     elif sigma <= 60:
 
         return "Višja"
 
 
+
     elif sigma <= 75:
 
         return "Visoka"
+
 
 
     else:
@@ -2124,33 +2418,132 @@ def stress_level_label(
 
 
 
-# ============================================================
-# KONEC DELA 3/6
-# ============================================================
 
 # ============================================================
-# DEL 4/6
-# GLAVNI PROGRAM + AI ANALIZA + SHRANJEVANJE REZULTATOV
+# 28. GLAVNI IZRAČUNSKI PIPELINE
 # ============================================================
 
 
+def run_calculation_pipeline():
+
+    """
+    Ločen matematični modul.
+
+    Vzame AI rezultate iz session_state
+    in izračuna:
+
+    - skupni σ
+    - σ po enotah
+    - energijo
+    """
+
+
+
+    if "aggregated" not in st.session_state:
+
+
+        return False
+
+
+
+    aggregated = st.session_state["aggregated"]
+
+
+    units_data = st.session_state["units_data"]
+
+
+    No = st.session_state.get(
+
+        "total_processed",
+
+        0
+
+    )
+
+
+
+    sigma_result = calculate_stress_power(
+
+        aggregated,
+
+        No
+
+    )
+
+
+
+    unit_results = calculate_unit_results(
+
+        units_data,
+
+        No
+
+    )
+
+
+
+    energy = calculate_energy(
+
+        sigma_result["sigma"]
+
+    )
+
+
+
+    st.session_state["sigma_result"] = sigma_result
+
+
+    st.session_state["unit_results"] = unit_results
+
+
+    st.session_state["energy"] = energy
+
+
+
+    return True
+
+
+
 # ============================================================
-# 22. GLAVNI PROGRAM - ZAGON AI ANALIZE
+# KONEC DELA 4/5
+# ============================================================
+
+# ============================================================
+# PSIHOSOCIALNI BAROMETER v2.5
+#
+# DEL 5/5
+#
+# GLAVNI PROGRAM
+# PRIKAZ REZULTATOV
+# IZVOZ PODATKOV
+#
+# Poveže:
+# AI klasifikacijo
+# +
+# matematični model
+# +
+# uporabniški vmesnik
 # ============================================================
 
 
-if st.session_state.get("dataset") is not None:
+
+# ============================================================
+# 29. GUMB ZA ZAGON AI ANALIZE
+# ============================================================
 
 
-    df = st.session_state["dataset"]
+if "dataset" in st.session_state:
 
 
     st.divider()
 
 
     st.header(
-        "🧠 AI analiza respondentov"
+        "🧠 AI klasifikacija odgovorov"
     )
+
+
+    df = st.session_state["dataset"]
 
 
 
@@ -2162,20 +2555,9 @@ if st.session_state.get("dataset") is not None:
 
 
 
-    if test_mode:
-
-
-        st.warning(
-
-            "Testni način: analizirani bodo samo prvi 3 odgovori."
-
-        )
-
-
-
     if st.button(
 
-        "🚀 ZAŽENI AI ANALIZO",
+        "🚀 ZAŽENI ANALIZO",
 
         use_container_width=True
 
@@ -2212,13 +2594,13 @@ if st.session_state.get("dataset") is not None:
 
                 with st.spinner(
 
-                    f"{model_name} analizira odgovore..."
+                    "AI klasificira dejavnike..."
 
                 ):
 
 
 
-                    results, status_counts, total = run_multifactor_analysis(
+                    results, status, total = run_ai_classification(
 
                         df,
 
@@ -2226,224 +2608,136 @@ if st.session_state.get("dataset") is not None:
 
                         model_name,
 
-                        test_mode=test_mode,
+                        test_mode,
 
-                        max_retries=max_retries,
+                        max_retries,
 
-                        request_delay=request_delay
-
-                    )
-
-
-
-                    # agregacija
-
-                    aggregated, units_data = aggregate_factors(
-
-                        results
+                        request_delay
 
                     )
 
 
 
-                    factor_df = factors_to_dataframe(
+                    store_classification_results(
 
-                        units_data
+                        results,
 
-                    )
+                        status,
 
-
-
-                    # stresna moč
-
-                    sigma, FoSF, FoPF, FoPR = calculate_stress_power(
-
-                        aggregated,
-
-                        len(df)
+                        total
 
                     )
 
 
 
-                    # po enotah
-
-                    unit_results = calculate_all_unit_stress_power(
-
-                        units_data,
-
-                        len(df)
-
-                    )
+                    run_calculation_pipeline()
 
 
 
-                    # shranjevanje
+                st.success(
 
-                    st.session_state["results"] = results
+                    "Analiza zaključena."
 
-                    st.session_state["aggregated"] = aggregated
+                )
 
-                    st.session_state["units_data"] = units_data
-
-                    st.session_state["factor_df"] = factor_df
-
-                    st.session_state["sigma"] = sigma
-
-                    st.session_state["f_factors"] = (
-
-                        FoSF,
-
-                        FoPF,
-
-                        FoPR
-
-                    )
-
-                    st.session_state["unit_results"] = unit_results
-
-                    st.session_state["status_counts"] = status_counts
-
-                    st.session_state["total_processed"] = total
-
-
-
-
-
-                ok = status_counts["ok"]
-
-
-
-                if ok == total:
-
-
-
-                    st.success(
-
-                        f"AI analiza uspešna: {ok}/{total}"
-
-                    )
-
-
-                else:
-
-
-                    st.warning(
-
-                        f"Uspešno analizirano {ok}/{total}. "
-
-                        f"JSON napake: "
-
-                        f"{status_counts['prazen_json']}, "
-
-                        f"Kvota: "
-
-                        f"{status_counts['napaka_kvote']}, "
-
-                        f"Druge napake: "
-
-                        f"{status_counts['napaka']}"
-
-                    )
 
 
 
 # ============================================================
-# 23. PRIKAZ REZULTATOV
+# 30. PRIKAZ REZULTATOV
 # ============================================================
 
 
-if st.session_state.get("sigma") is not None:
+if "sigma_result" in st.session_state:
 
 
 
-    sigma = st.session_state["sigma"]
+    sigma_result = st.session_state["sigma_result"]
 
-    aggregated = st.session_state["aggregated"]
 
-    factor_df = st.session_state["factor_df"]
+    energy = st.session_state["energy"]
+
 
     unit_results = st.session_state["unit_results"]
 
 
-
-    energy = calculate_energy(
-
-        sigma,
-
-        W_I_kcal
-
-    )
+    factor_df = st.session_state["factor_df"]
 
 
 
     st.divider()
 
 
+
     st.header(
 
-        "📊 Rezultati"
+        "📊 Rezultati Psihosocialnega Barometra"
 
     )
 
 
 
-    # --------------------------------------------------------
-    # Glavni rezultat
-    # --------------------------------------------------------
-
-
-    col1, col2, col3, col4 = st.columns(4)
+    # -------------------------
+    # GLAVNI REZULTAT
+    # -------------------------
 
 
 
-    with col1:
+    c1,c2,c3,c4 = st.columns(4)
+
+
+
+    with c1:
 
 
         st.metric(
 
-            "Stresna moč",
+            "Stresna moč σ",
 
-            f"{sigma:.2f} °S"
+            f"{sigma_result['sigma']:.2f} °S"
 
         )
 
 
         st.caption(
 
-            stress_level_label(sigma)
+            stress_level_label(
+
+                sigma_result["sigma"]
+
+            )
 
         )
 
 
 
-    with col2:
+    with c2:
 
 
         st.metric(
 
             "Izguba energije",
 
-            f"{energy['loss_kcal']:.0f} kcal"
+            f"{energy['loss']:.0f} kcal"
 
         )
 
 
 
-    with col3:
+    with c3:
 
 
         st.metric(
 
             "Uporabna energija",
 
-            f"{energy['useful_kcal']:.0f} kcal"
+            f"{energy['useful']:.0f} kcal"
 
         )
 
 
 
-    with col4:
+    with c4:
 
 
         st.metric(
@@ -2453,6 +2747,8 @@ if st.session_state.get("sigma") is not None:
             f"{energy['efficiency']:.1f}%"
 
         )
+
+
 
 
 
@@ -2468,184 +2764,138 @@ if st.session_state.get("sigma") is not None:
 
 
 
-    FoSF, FoPF, FoPR = st.session_state["f_factors"]
+    col1,col2,col3 = st.columns(3)
 
 
 
-    c1,c2,c3 = st.columns(3)
+    col1.write(
 
-
-
-    c1.metric(
-
-        "FoSF - stresorji",
-
-        f"{FoSF:.4f}"
+        f"FoSF = {sigma_result['FoSF']:.4f}"
 
     )
 
 
-    c2.metric(
+    col2.write(
 
-        "FoPF - pozitivni",
-
-        f"{FoPF:.4f}"
+        f"FoPF = {sigma_result['FoPF']:.4f}"
 
     )
 
 
-    c3.metric(
+    col3.write(
 
-        "FoPR - predlogi",
-
-        f"{FoPR:.4f}"
+        f"FoPR = {sigma_result['FoPR']:.4f}"
 
     )
 
 
 
-# ============================================================
-# 24. ANALIZA PO 6 ENOTAH
-# ============================================================
+
+
+    # ========================================================
+    # 31. REZULTATI PO ENOTAH
+    # ========================================================
+
 
 
     st.divider()
 
 
-    st.header(
+    st.subheader(
 
-        "🧩 Analiza po klasifikacijskih enotah"
+        "🧩 Stresna moč po klasifikacijskih enotah"
 
     )
 
 
 
-    unit_rows = []
+    unit_rows=[]
 
 
 
-    for code in UNIT_CODES:
+    for code,result in unit_results.items():
 
 
 
-        result = unit_results.get(
+        if code=="NEZ" and result["sigma"]==0:
 
-            code,
-
-            {}
-
-        )
-
-
-
-        u_sigma = result.get(
-
-            "sigma",
-
-            0
-
-        )
-
-
-
-        u_energy = calculate_energy(
-
-            u_sigma,
-
-            W_I_kcal
-
-        )
+            continue
 
 
 
         unit_rows.append(
 
+
             {
 
 
-            "Enota":
+                "Enota":
 
-            UNIT_LABELS[code],
+                UNIT_LABELS.get(
 
+                    code,
 
+                    "Nerazvrščeno"
 
-            "Koda":
-
-            code,
-
-
-
-            "σ °S":
-
-            round(u_sigma,2),
+                ),
 
 
 
-            "Ocena":
+                "σ °S":
 
-            stress_level_label(u_sigma),
+                round(
 
+                    result["sigma"],
 
+                    2
 
-            "Izguba kcal":
-
-            round(
-
-                u_energy["loss_kcal"],
-
-                0
-
-            ),
+                ),
 
 
 
-            "Učinkovitost %":
+                "Ocena":
 
-            round(
+                stress_level_label(
 
-                u_energy["efficiency"],
+                    result["sigma"]
 
-                1
-
-            ),
+                ),
 
 
 
-            "Stresorji":
+                "FoSF":
 
-            result.get(
+                round(
 
-                "SF_count",
+                    result["FoSF"],
 
-                0
+                    4
 
-            ),
-
-
-
-            "Pozitivni":
-
-            result.get(
-
-                "PF_count",
-
-                0
-
-            ),
+                ),
 
 
 
-            "Predlogi":
+                "FoPF":
 
-            result.get(
+                round(
 
-                "PR_count",
+                    result["FoPF"],
 
-                0
+                    4
 
-            )
+                ),
 
 
+
+                "FoPR":
+
+                round(
+
+                    result["FoPR"],
+
+                    4
+
+                )
 
             }
 
@@ -2691,171 +2941,45 @@ if st.session_state.get("sigma") is not None:
 
 
 
-# ============================================================
-# 25. VIZUALIZACIJA FAKTORJEV
-# ============================================================
 
-
-    st.divider()
-
-
-    left,right = st.columns(2)
-
-
-
-    with left:
-
-
-        pie = pd.DataFrame(
-
-            {
-
-            "Tip":
-
-            [
-
-                "Stresorji",
-
-                "Pozitivni",
-
-                "Predlogi"
-
-            ],
-
-
-            "Vrednost":
-
-            [
-
-                aggregated["SF_weight"],
-
-                aggregated["PF_weight"],
-
-                aggregated["PR_weight"]
-
-            ]
-
-            }
-
-        )
-
-
-
-        st.plotly_chart(
-
-            px.pie(
-
-                pie,
-
-                names="Tip",
-
-                values="Vrednost"
-
-            ),
-
-            use_container_width=True
-
-        )
-
-
-
-    with right:
-
-
-        st.subheader(
-
-            "Vsi faktorji"
-
-        )
-
-
-        st.dataframe(
-
-            factor_df,
-
-            use_container_width=True
-
-        )
-
-
-
-# ============================================================
-# KONEC DELA 4/6
-# ============================================================
-
-# ============================================================
-# DEL 5/6
-# TOP FAKTORJI + FILTRIRANJE + IZVOZ REZULTATOV
-# ============================================================
-
-
-# ============================================================
-# 26. PODROBNA ANALIZA FAKTORJEV
-# ============================================================
-
-
-if st.session_state.get("factor_df") is not None:
-
-
-    factor_df = st.session_state["factor_df"]
+    # ========================================================
+    # 32. FAKTORJI
+    # ========================================================
 
 
 
     st.divider()
 
 
-    st.header(
-        "🔎 Podrobna analiza dejavnikov"
-    )
 
+    st.subheader(
 
-
-    # --------------------------------------------------------
-    # Filter enote
-    # --------------------------------------------------------
-
-
-    unit_options = [
-
-        "VSE"
-
-    ] + UNIT_CODES
-
-
-
-    unit_labels = {
-
-        "VSE":
-        "Vse enote"
-
-    }
-
-
-    unit_labels.update(
-        UNIT_LABELS
-    )
-
-
-
-    selected_unit = st.selectbox(
-
-        "Izberi klasifikacijsko enoto:",
-
-        options=unit_options,
-
-        format_func=lambda x:
-        unit_labels.get(
-            x,
-            x
-        )
+        "📌 Identificirani faktorji"
 
     )
 
 
 
-    # --------------------------------------------------------
-    # Najmočnejši stresorji
-    # --------------------------------------------------------
+    st.dataframe(
+
+        factor_df,
+
+        use_container_width=True
+
+    )
+
+
+
+
+
+    # ========================================================
+    # 33. TOP STRESORJI
+    # ========================================================
+
+
+
+    st.divider()
+
 
 
     st.subheader(
@@ -2866,34 +2990,31 @@ if st.session_state.get("factor_df") is not None:
 
 
 
-    sf_top = top_factors(
+    top_sf = top_factors(
 
         factor_df,
 
-        "Stresorji",
-
-        selected_unit
+        "Stresorji"
 
     )
 
 
 
-    if not sf_top.empty:
+    if not top_sf.empty:
+
 
 
         st.plotly_chart(
 
             px.bar(
 
-                sf_top,
+                top_sf,
 
                 x="Moč",
 
                 y="Faktor",
 
-                orientation="h",
-
-                title="Top stresorji"
+                orientation="h"
 
             ),
 
@@ -2902,98 +3023,37 @@ if st.session_state.get("factor_df") is not None:
         )
 
 
-        st.dataframe(
 
-            sf_top,
-
-            use_container_width=True
-
-        )
-
-
-    else:
-
-
-        st.info(
-
-            "Ni zaznanih stresorjev."
-
-        )
-
-
-
-    # --------------------------------------------------------
-    # Pozitivni dejavniki
-    # --------------------------------------------------------
 
 
     st.subheader(
 
-        "🛡️ Pozitivni dejavniki"
+        "🛡️ Zaščitni dejavniki"
 
     )
 
 
 
-    pf_top = top_factors(
+    top_pf = top_factors(
 
         factor_df,
 
-        "Pozitivni dejavniki",
-
-        selected_unit
+        "Pozitivni"
 
     )
 
 
 
-    if not pf_top.empty:
+    st.dataframe(
 
+        top_pf,
 
-        st.plotly_chart(
+        use_container_width=True
 
-            px.bar(
-
-                pf_top,
-
-                x="Moč",
-
-                y="Faktor",
-
-                orientation="h",
-
-                title="Top zaščitni dejavniki"
-
-            ),
-
-            use_container_width=True
-
-        )
-
-
-        st.dataframe(
-
-            pf_top,
-
-            use_container_width=True
-
-        )
-
-
-    else:
-
-
-        st.info(
-
-            "Ni zaznanih pozitivnih dejavnikov."
-
-        )
+    )
 
 
 
-    # --------------------------------------------------------
-    # Predlogi
-    # --------------------------------------------------------
 
 
     st.subheader(
@@ -3004,842 +3064,111 @@ if st.session_state.get("factor_df") is not None:
 
 
 
-    pr_top = top_factors(
+    top_pr = top_factors(
 
         factor_df,
 
-        "Predlogi",
+        "Predlogi"
 
-        selected_unit
+    )
+
+
+    st.dataframe(
+
+        top_pr,
+
+        use_container_width=True
 
     )
 
 
 
-    if not pr_top.empty:
 
 
-        st.dataframe(
+    # ========================================================
+    # 34. IZVOZ
+    # ========================================================
 
-            pr_top,
-
-            use_container_width=True
-
-        )
-
-
-    else:
-
-
-        st.info(
-
-            "Ni predlogov."
-
-        )
-
-
-
-# ============================================================
-# 27. STATUS AI ANALIZE
-# ============================================================
-
-
-if st.session_state.get(
-        "status_counts"):
 
 
     st.divider()
 
 
-    st.header(
 
-        "📋 Diagnostika AI analize"
+    csv = factor_df.to_csv(
 
-    )
+        index=False
 
+    ).encode(
 
-
-    status = st.session_state["status_counts"]
-
-
-
-    c1,c2,c3,c4 = st.columns(4)
-
-
-
-    c1.metric(
-
-        "Uspešni JSON",
-
-        status.get(
-            "ok",
-            0
-        )
-
-    )
-
-
-    c2.metric(
-
-        "Neveljaven JSON",
-
-        status.get(
-            "prazen_json",
-            0
-        )
-
-    )
-
-
-    c3.metric(
-
-        "Quota napake",
-
-        status.get(
-            "napaka_kvote",
-            0
-        )
-
-    )
-
-
-    c4.metric(
-
-        "Druge napake",
-
-        status.get(
-            "napaka",
-            0
-        )
+        "utf-8"
 
     )
 
 
 
-# ============================================================
-# 28. IZVOZ PODATKOV
-# ============================================================
+    st.download_button(
 
+        "⬇️ Prenesi faktorje CSV",
 
-if st.session_state.get(
-        "factor_df") is not None:
+        csv,
 
+        "Psihosocialni_Barometer_faktorji.csv",
 
-    st.divider()
-
-
-    st.header(
-
-        "⬇️ Izvoz rezultatov"
+        "text/csv"
 
     )
 
 
 
-    factor_df = st.session_state["factor_df"]
+    csv2 = unit_df.to_csv(
 
+        index=False
 
+    ).encode(
 
-    col1,col2 = st.columns(2)
-
-
-
-    with col1:
-
-
-        csv_factor = (
-
-            factor_df
-
-            .to_csv(
-
-                index=False,
-
-                encoding="utf-8"
-
-            )
-
-            .encode(
-                "utf-8"
-            )
-
-        )
-
-
-
-        st.download_button(
-
-            label=
-            "⬇️ Prenesi vse faktorje CSV",
-
-            data=
-            csv_factor,
-
-            file_name=
-            "Psihosocialni_Barometer_faktorji.csv",
-
-            mime=
-            "text/csv"
-
-        )
-
-
-
-    with col2:
-
-
-        if st.session_state.get(
-                "unit_results"):
-
-
-
-            unit_results = st.session_state["unit_results"]
-
-
-
-            export_rows = []
-
-
-
-            for code, value in unit_results.items():
-
-
-                export_rows.append(
-
-                    {
-
-                    "Enota":
-
-                    UNIT_LABELS.get(
-                        code,
-                        "NEZ"
-                    ),
-
-
-                    "Koda":
-
-                    code,
-
-
-                    "Sigma":
-
-                    value.get(
-                        "sigma",
-                        0
-                    ),
-
-
-                    "FoSF":
-
-                    value.get(
-                        "FoSF",
-                        0
-                    ),
-
-
-                    "FoPF":
-
-                    value.get(
-                        "FoPF",
-                        0
-                    ),
-
-
-                    "FoPR":
-
-                    value.get(
-                        "FoPR",
-                        0
-                    )
-
-                    }
-
-                )
-
-
-
-            unit_export = pd.DataFrame(
-
-                export_rows
-
-            )
-
-
-
-            csv_units = (
-
-                unit_export
-
-                .to_csv(
-
-                    index=False
-
-                )
-
-                .encode(
-                    "utf-8"
-                )
-
-            )
-
-
-
-            st.download_button(
-
-                label=
-                "⬇️ Prenesi analizo po enotah CSV",
-
-                data=
-                csv_units,
-
-                file_name=
-                "Psihosocialni_Barometer_enote.csv",
-
-                mime=
-                "text/csv"
-
-            )
-
-
-
-# ============================================================
-# 29. POVZETEK MODELA
-# ============================================================
-
-
-if st.session_state.get("sigma") is not None:
-
-
-    st.divider()
-
-
-    st.subheader(
-
-        "📌 Povzetek"
+        "utf-8"
 
     )
 
 
 
-    sigma = st.session_state["sigma"]
+    st.download_button(
 
+        "⬇️ Prenesi stres po enotah CSV",
 
+        csv2,
 
-    st.write(
+        "Psihosocialni_Barometer_enote.csv",
 
-        f"""
-
-**Skupna stresna moč:** {sigma:.2f} °S  
-
-**Stopnja:** {stress_level_label(sigma)}  
-
-**Model:** Psihosocialni Barometer Petrič (2025/2026)
-
-Aplikacija je analizirala večdimenzionalne psihosocialne dejavnike
-in jih razvrstila v šest klasifikacijskih enot.
-
-"""
+        "text/csv"
 
     )
 
 
 
-# ============================================================
-# KONEC DELA 5/6
-# ============================================================
-
-# ============================================================
-# DEL 6/6
-# AI POMOČ PRI KLASIFIKACIJI + RESET + ZAKLJUČEK APLIKACIJE
-# ============================================================
 
 
 # ============================================================
-# 30. AI POMOČ PRI TEŽJIH KLASIFIKACIJAH
-# ============================================================
-
-
-st.divider()
-
-
-st.header(
-    "🧭 AI pomoč pri klasifikaciji"
-)
-
-
-
-st.markdown(
-"""
-Če avtomatska analiza določenega odgovora ni dovolj jasna,
-lahko tukaj uporabite dodatno AI razlago.
-
-AI bo predlagal:
-
-- stresorje
-- pozitivne dejavnike
-- predloge izboljšav
-- klasifikacijsko enoto
-- intenzivnost/učinek
-- obrazložitev odločitve
-"""
-)
-
-
-
-manual_text = st.text_area(
-
-    "Vnesite problematičen odgovor:",
-
-    height=150,
-
-    placeholder=
-    "Primer: Vodstvo me pogosto ignorira, "
-    "vendar imam dobre odnose s sodelavci."
-
-)
-
-
-
-# ------------------------------------------------------------
-# Prompt
-# ------------------------------------------------------------
-
-
-def build_manual_help_prompt(text):
-
-
-    legend = build_unit_legend()
-
-
-
-    return f"""
-
-Si strokovni AI pomočnik za model
-Psihosocialni Barometer Petrič (2025/2026).
-
-
-Analiziraj spodnji odgovor respondenta.
-
-
-Uporabi klasifikacijske enote:
-
-
-{legend}
-
-
-Za vsak dejavnik določi:
-
-
-- faktor
-- enota
-- intenzivnost 0-5
-- obrazložitev
-
-
-Vrni IZKLJUČNO JSON:
-
-
-{{
-"stresorji":[],
-
-"pozitivni_dejavniki":[],
-
-"predlogi":[]
-}}
-
-
-
-Odgovor:
-
-
-{text}
-
-"""
-
-
-
-# ------------------------------------------------------------
-# Klic AI za ročni primer
-# ------------------------------------------------------------
-
-
-def classify_manual_case(
-        client,
-        model_name,
-        text):
-
-
-    try:
-
-
-        response = client.models.generate_content(
-
-            model=model_name,
-
-            contents=
-            build_manual_help_prompt(text)
-
-        )
-
-
-
-        cleaned = clean_json_response(
-
-            response.text
-
-        )
-
-
-
-        data = json.loads(
-
-            cleaned
-
-        )
-
-
-
-        if not isinstance(
-                data,
-                dict):
-
-
-            return None
-
-
-
-        data.setdefault(
-
-            "stresorji",
-
-            []
-
-        )
-
-
-        data.setdefault(
-
-            "pozitivni_dejavniki",
-
-            []
-
-        )
-
-
-        data.setdefault(
-
-            "predlogi",
-
-            []
-
-        )
-
-
-        return data
-
-
-
-    except Exception as e:
-
-
-        st.error(
-
-            f"Napaka AI klasifikacije: {e}"
-
-        )
-
-
-        return None
-
-
-
-# ------------------------------------------------------------
-# Gumb
-# ------------------------------------------------------------
-
-
-if st.button(
-
-    "🔎 Analiziraj primer z AI"
-
-):
-
-
-    if not api_key:
-
-
-        st.error(
-
-            "Najprej vnesite API ključ."
-
-        )
-
-
-
-    elif len(manual_text.strip()) < 3:
-
-
-        st.warning(
-
-            "Vnesite besedilo."
-
-        )
-
-
-
-    else:
-
-
-        client = initialize_ai(
-
-            api_key
-
-        )
-
-
-
-        if client:
-
-
-            with st.spinner(
-
-                "AI pripravlja klasifikacijo..."
-
-            ):
-
-
-                result = classify_manual_case(
-
-                    client,
-
-                    model_name,
-
-                    manual_text
-
-                )
-
-
-
-            if result:
-
-
-                st.session_state[
-
-                    "manual_help_result"
-
-                ] = result
-
-
-
-# ------------------------------------------------------------
-# Prikaz rezultata
-# ------------------------------------------------------------
-
-
-if st.session_state.get(
-        "manual_help_result"):
-
-
-    st.subheader(
-
-        "📌 Predlagana klasifikacija"
-
-    )
-
-
-
-    result = st.session_state[
-
-        "manual_help_result"
-
-    ]
-
-
-
-    for title, key in [
-
-        ("🔥 Stresorji","stresorji"),
-
-        ("🛡️ Pozitivni dejavniki",
-         "pozitivni_dejavniki"),
-
-        ("💡 Predlogi",
-         "predlogi")
-
-    ]:
-
-
-
-        st.markdown(
-
-            f"### {title}"
-
-        )
-
-
-
-        items = result.get(
-
-            key,
-
-            []
-
-        )
-
-
-
-        if not items:
-
-
-            st.caption(
-
-                "Ni zaznanih faktorjev."
-
-            )
-
-
-        else:
-
-
-
-            for item in items:
-
-
-
-                unit = safe_unit(
-
-                    item.get(
-
-                        "enota",
-
-                        ""
-
-                    )
-
-                )
-
-
-
-                st.write(
-
-                    f"""
-
-**{item.get('faktor','')}**
-
-- Enota:
-{UNIT_LABELS.get(unit,'NEZ')}
-
-- Vrednost:
-{item.get('intenzivnost',
-item.get('ucinek',''))}
-
-- Razlaga:
-{item.get('obrazlozitev','')}
-
-"""
-
-                )
-
-
-
-    if st.button(
-
-        "🗑️ Skrij AI predlog"
-
-    ):
-
-
-        del st.session_state[
-
-            "manual_help_result"
-
-        ]
-
-        st.rerun()
-
-
-
-# ============================================================
-# 31. KONČNI INFORMACIJSKI PANEL
-# ============================================================
-
-
-st.divider()
-
-
-with st.expander(
-
-    "ℹ️ O aplikaciji"
-
-):
-
-
-    st.markdown(
-
-"""
-## Psihosocialni Barometer v2.4
-
-Avtor:
-**Karl Petrič**
-
-Model omogoča:
-
-
-✅ AI ekstrakcijo psihosocialnih dejavnikov
-
-✅ večfaktorsko analizo posameznih odgovorov
-
-✅ klasifikacijo v šest hierarhičnih enot
-
-✅ izračun stresne moči (°S)
-
-✅ energijski model izgube/uporabne energije
-
-✅ agregacijo rezultatov respondentov
-
-✅ pomoč AI pri spornih primerih
-
-
-Model:
-Petrič (2025/2026)
-
-"""
-
-    )
-
-
-
-# ============================================================
-# 32. VARNOSTNI RESET OB NAPAKAH
-# ============================================================
-
-
-def safe_reset():
-
-
-    keys = list(
-
-        st.session_state.keys()
-
-    )
-
-
-    for key in keys:
-
-
-        if key not in [
-
-            "api_key"
-
-        ]:
-
-
-            del st.session_state[key]
-
-
-
-# ============================================================
-# KONEC APLIKACIJE
+# KONEC v2.5
+#
+# ARHITEKTURA:
+#
+# DEL 1:
+# Streamlit + upload + priprava
+#
+# DEL 2:
+# AI klasifikacija
+#
+# DEL 3:
+# agregacija faktorjev
+#
+# DEL 4:
+# matematični model
+#
+# DEL 5:
+# vmesnik + rezultati
+#
 # ============================================================
 
 
