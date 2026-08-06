@@ -17,7 +17,9 @@ import pandas as pd
 import json
 import time
 import re
+import plotly.express as px
 
+from google import genai
 
 # ============================================================
 # 1. STREAMLIT NASTAVITVE
@@ -1915,231 +1917,96 @@ def store_classification_results(
 # DEL 4/5
 #
 # MATEMATIČNI MODEL
-#
-# Namen:
-# - izračun realnih faktorjev Fo
-# - izračun stresne moči σ
-# - izračun energijske izgube
-# - izračun po klasifikacijskih enotah
-#
-# AI tukaj ni več uporabljen
 # ============================================================
 
 
 import math
 
 
-
 # ============================================================
-# 23. IZRAČUN REALNIH FAKTORJEV Fo
+# 23. IZRAČUN REALNEGA FAKTORJA Fo
 # ============================================================
 
 
 def calculate_Fo(fv, frv, No):
 
-    """
-    fv  = število pojavitev faktorjev
-    frv = število različnih faktorjev
-    No  = število respondentov
-
-    Model Petrič:
-    frekvenca + raznolikost faktorjev
-    """
-
-
-
     if No == 0 or fv == 0:
-
         return 0
-
-
 
     rho = fv / No
 
-
-
-    if frv > 0:
-
-        Co = fv / frv
-
-    else:
-
-        Co = 1
-
-
+    Co = fv / frv if frv > 0 else 1
 
     Fo = (Co * rho) / 10
-
-
 
     return Fo
 
 
 
 # ============================================================
-# 24. STRESNA MOČ σ
+# 24. IZRAČUN STRESNE MOČI
 # ============================================================
 
 
-def calculate_stress_power(
-
-        data,
-
-        No):
+def calculate_stress_power(data, No):
 
 
-    """
-    Izračun skupne stresne moči
-
-    σ = arcsin √((FoSF × FoPR) / FoPF)
-
-    rezultat v stopinjah
-
-    """
-
-
-
-    sf_count = data.get(
-
-        "SF_count",
-
-        0
-
-    )
-
-
-    pf_count = data.get(
-
-        "PF_count",
-
-        0
-
-    )
-
-
-    pr_count = data.get(
-
-        "PR_count",
-
-        0
-
-    )
-
+    sf_count = data.get("SF_count", 0)
+    pf_count = data.get("PF_count", 0)
+    pr_count = data.get("PR_count", 0)
 
 
     sf_unique = len(
-
         set(
-
-            [
-
-                x[0]
-
-                for x in data.get(
-
-                    "SF_list",
-
-                    []
-
-                )
-
-            ]
-
+            x[0]
+            for x in data.get("SF_list", [])
         )
-
     )
-
 
 
     pf_unique = len(
-
         set(
-
-            [
-
-                x[0]
-
-                for x in data.get(
-
-                    "PF_list",
-
-                    []
-
-                )
-
-            ]
-
+            x[0]
+            for x in data.get("PF_list", [])
         )
-
     )
-
 
 
     pr_unique = len(
-
         set(
-
-            [
-
-                x[0]
-
-                for x in data.get(
-
-                    "PR_list",
-
-                    []
-
-                )
-
-            ]
-
+            x[0]
+            for x in data.get("PR_list", [])
         )
-
     )
-
 
 
 
     FoSF = calculate_Fo(
-
         sf_count,
-
         sf_unique,
-
         No
-
     )
 
 
     FoPF = calculate_Fo(
-
         pf_count,
-
         pf_unique,
-
         No
-
     )
 
 
     FoPR = calculate_Fo(
-
         pr_count,
-
         pr_unique,
-
         No
-
     )
 
 
-
-    # varovalke
+    # zaščita pred deljenjem z nič
 
     if FoPF <= 0:
 
         FoPF = 0.05
-
 
 
     if FoPR <= 0:
@@ -2148,106 +2015,67 @@ def calculate_stress_power(
 
 
 
-
     try:
 
+        ratio = (
 
-        value = (
-
-            FoSF *
-
-            FoPR
+            FoSF * FoPR
 
         ) / FoPF
 
 
-
-        value = min(
-
-            1,
-
-            max(
-
-                0,
-
-                value
-
+        ratio = max(
+            0,
+            min(
+                1,
+                ratio
             )
-
         )
-
 
 
         sigma = math.degrees(
 
             math.asin(
 
-                math.sqrt(value)
+                math.sqrt(ratio)
 
             )
 
         )
 
 
-
-    except:
-
+    except Exception:
 
         sigma = 0
 
 
 
-
     return {
 
+        "sigma": sigma,
 
-        "sigma":
+        "FoSF": FoSF,
 
-        sigma,
+        "FoPF": FoPF,
 
-
-        "FoSF":
-
-        FoSF,
-
-
-        "FoPF":
-
-        FoPF,
-
-
-        "FoPR":
-
-        FoPR
-
+        "FoPR": FoPR
 
     }
 
 
 
-
 # ============================================================
-# 25. IZRAČUN STRESA PO ENOTAH
+# 25. IZRAČUN PO ENOTAH
 # ============================================================
 
 
-def calculate_unit_results(
-
-        units_data,
-
-        No):
+def calculate_unit_results(units_data, No):
 
 
     results = {}
 
 
-
-    for code in list(
-
-        UNIT_CODES
-
-    ) + ["NEZ"]:
-
+    for code in list(UNIT_CODES) + ["NEZ"]:
 
 
         bucket = units_data.get(
@@ -2259,7 +2087,6 @@ def calculate_unit_results(
         )
 
 
-
         results[code] = calculate_stress_power(
 
             bucket,
@@ -2269,9 +2096,7 @@ def calculate_unit_results(
         )
 
 
-
     return results
-
 
 
 
@@ -2281,22 +2106,8 @@ def calculate_unit_results(
 
 
 def calculate_energy(
-
         sigma,
-
         W_I_kcal=2500):
-
-
-    """
-
-    Model energije:
-
-    izguba energije je sorazmerna
-    s stresno močjo
-
-
-    """
-
 
 
     loss = (
@@ -2310,7 +2121,6 @@ def calculate_energy(
     )
 
 
-
     useful = (
 
         W_I_kcal -
@@ -2318,7 +2128,6 @@ def calculate_energy(
         loss
 
     )
-
 
 
     efficiency = (
@@ -2329,57 +2138,34 @@ def calculate_energy(
 
         100
 
-    )
+    ) if W_I_kcal else 0
 
 
 
     return {
 
+        "input_kcal": W_I_kcal,
 
-        "input":
+        "loss_kcal": loss,
 
-        W_I_kcal,
+        "useful_kcal": useful,
 
+        "efficiency": efficiency,
 
-        "loss":
+        "loss_kJ": loss * 4.184,
 
-        loss,
-
-
-        "useful":
-
-        useful,
-
-
-        "efficiency":
-
-        efficiency,
-
-
-        "loss_kJ":
-
-        loss * 4.184,
-
-
-        "useful_kJ":
-
-        useful * 4.184
-
+        "useful_kJ": useful * 4.184
 
     }
 
 
 
-
 # ============================================================
-# 27. OCENA STRESNE STOPNJE
+# 27. KLASIFIKACIJA STRESA
 # ============================================================
 
 
-def stress_level_label(
-
-        sigma):
-
+def stress_level_label(sigma):
 
 
     if sigma <= 15:
@@ -2387,11 +2173,9 @@ def stress_level_label(
         return "Zelo nizka"
 
 
-
     elif sigma <= 30:
 
         return "Nizka"
-
 
 
     elif sigma <= 45:
@@ -2399,17 +2183,14 @@ def stress_level_label(
         return "Srednja"
 
 
-
     elif sigma <= 60:
 
         return "Višja"
 
 
-
     elif sigma <= 75:
 
         return "Visoka"
-
 
 
     else:
@@ -2418,36 +2199,32 @@ def stress_level_label(
 
 
 
-
 # ============================================================
-# 28. GLAVNI IZRAČUNSKI PIPELINE
+# 28. GLAVNI IZRAČUN
 # ============================================================
 
 
 def run_calculation_pipeline():
 
-    """
-    Ločen matematični modul.
 
-    Vzame AI rezultate iz session_state
-    in izračuna:
+    required = [
 
-    - skupni σ
-    - σ po enotah
-    - energijo
-    """
+        "aggregated",
+
+        "units_data"
+
+    ]
 
 
+    for key in required:
 
-    if "aggregated" not in st.session_state:
+        if key not in st.session_state:
 
-
-        return False
+            return False
 
 
 
     aggregated = st.session_state["aggregated"]
-
 
     units_data = st.session_state["units_data"]
 
@@ -2471,7 +2248,6 @@ def run_calculation_pipeline():
     )
 
 
-
     unit_results = calculate_unit_results(
 
         units_data,
@@ -2479,7 +2255,6 @@ def run_calculation_pipeline():
         No
 
     )
-
 
 
     energy = calculate_energy(
@@ -2492,9 +2267,7 @@ def run_calculation_pipeline():
 
     st.session_state["sigma_result"] = sigma_result
 
-
     st.session_state["unit_results"] = unit_results
-
 
     st.session_state["energy"] = energy
 
@@ -2505,7 +2278,7 @@ def run_calculation_pipeline():
 
 
 # ============================================================
-# KONEC DELA 4/5
+# KONEC DEL 4/5
 # ============================================================
 
 # ============================================================
@@ -2514,25 +2287,21 @@ def run_calculation_pipeline():
 # DEL 5/5
 #
 # GLAVNI PROGRAM
+# ZAGON AI ANALIZE
 # PRIKAZ REZULTATOV
-# IZVOZ PODATKOV
-#
-# Poveže:
-# AI klasifikacijo
-# +
-# matematični model
-# +
-# uporabniški vmesnik
+# IZVOZ
 # ============================================================
 
 
-
 # ============================================================
-# 29. GUMB ZA ZAGON AI ANALIZE
+# 29. ZAGON AI ANALIZE
 # ============================================================
 
 
 if "dataset" in st.session_state:
+
+
+    df = st.session_state["dataset"]
 
 
     st.divider()
@@ -2543,21 +2312,15 @@ if "dataset" in st.session_state:
     )
 
 
-    df = st.session_state["dataset"]
-
-
-
-    st.info(
-
-        f"Pripravljenih odgovorov: {len(df)}"
-
+    st.write(
+        f"Število pripravljenih odgovorov: {len(df)}"
     )
 
 
 
     if st.button(
 
-        "🚀 ZAŽENI ANALIZO",
+        "🚀 ZAŽENI AI ANALIZO",
 
         use_container_width=True
 
@@ -2569,15 +2332,12 @@ if "dataset" in st.session_state:
 
 
             st.error(
-
                 "Vnesite Google API ključ."
-
             )
 
 
 
         else:
-
 
 
             client = initialize_ai(
@@ -2587,14 +2347,12 @@ if "dataset" in st.session_state:
             )
 
 
-
             if client:
-
 
 
                 with st.spinner(
 
-                    "AI klasificira dejavnike..."
+                    "AI analizira odgovore..."
 
                 ):
 
@@ -2629,17 +2387,19 @@ if "dataset" in st.session_state:
                     )
 
 
-
                     run_calculation_pipeline()
 
 
 
                 st.success(
 
-                    "Analiza zaključena."
+                    "AI analiza in matematični izračun zaključena."
 
                 )
 
+
+
+                st.write(status)
 
 
 
@@ -2661,7 +2421,13 @@ if "sigma_result" in st.session_state:
     unit_results = st.session_state["unit_results"]
 
 
-    factor_df = st.session_state["factor_df"]
+    factor_df = st.session_state.get(
+
+        "factor_df",
+
+        pd.DataFrame()
+
+    )
 
 
 
@@ -2677,10 +2443,9 @@ if "sigma_result" in st.session_state:
 
 
 
-    # -------------------------
+    # --------------------------------------------------------
     # GLAVNI REZULTAT
-    # -------------------------
-
+    # --------------------------------------------------------
 
 
     c1,c2,c3,c4 = st.columns(4)
@@ -2692,7 +2457,7 @@ if "sigma_result" in st.session_state:
 
         st.metric(
 
-            "Stresna moč σ",
+            "Stresna moč",
 
             f"{sigma_result['sigma']:.2f} °S"
 
@@ -2718,7 +2483,7 @@ if "sigma_result" in st.session_state:
 
             "Izguba energije",
 
-            f"{energy['loss']:.0f} kcal"
+            f"{energy['loss_kcal']:.0f} kcal"
 
         )
 
@@ -2731,7 +2496,7 @@ if "sigma_result" in st.session_state:
 
             "Uporabna energija",
 
-            f"{energy['useful']:.0f} kcal"
+            f"{energy['useful_kcal']:.0f} kcal"
 
         )
 
@@ -2750,10 +2515,12 @@ if "sigma_result" in st.session_state:
 
 
 
+    # --------------------------------------------------------
+    # REALNI FAKTORJI
+    # --------------------------------------------------------
 
 
     st.divider()
-
 
 
     st.subheader(
@@ -2768,34 +2535,37 @@ if "sigma_result" in st.session_state:
 
 
 
-    col1.write(
+    col1.metric(
 
-        f"FoSF = {sigma_result['FoSF']:.4f}"
+        "FoSF",
 
-    )
-
-
-    col2.write(
-
-        f"FoPF = {sigma_result['FoPF']:.4f}"
+        f"{sigma_result['FoSF']:.4f}"
 
     )
 
 
-    col3.write(
+    col2.metric(
 
-        f"FoPR = {sigma_result['FoPR']:.4f}"
+        "FoPF",
+
+        f"{sigma_result['FoPF']:.4f}"
+
+    )
+
+
+    col3.metric(
+
+        "FoPR",
+
+        f"{sigma_result['FoPR']:.4f}"
 
     )
 
 
 
-
-
-    # ========================================================
-    # 31. REZULTATI PO ENOTAH
-    # ========================================================
-
+    # --------------------------------------------------------
+    # ENOTE
+    # --------------------------------------------------------
 
 
     st.divider()
@@ -2809,7 +2579,7 @@ if "sigma_result" in st.session_state:
 
 
 
-    unit_rows=[]
+    unit_rows = []
 
 
 
@@ -2817,7 +2587,7 @@ if "sigma_result" in st.session_state:
 
 
 
-        if code=="NEZ" and result["sigma"]==0:
+        if code == "NEZ" and result["sigma"] == 0:
 
             continue
 
@@ -2825,9 +2595,7 @@ if "sigma_result" in st.session_state:
 
         unit_rows.append(
 
-
             {
-
 
                 "Enota":
 
@@ -2840,8 +2608,7 @@ if "sigma_result" in st.session_state:
                 ),
 
 
-
-                "σ °S":
+                "σ (°S)":
 
                 round(
 
@@ -2852,7 +2619,6 @@ if "sigma_result" in st.session_state:
                 ),
 
 
-
                 "Ocena":
 
                 stress_level_label(
@@ -2860,7 +2626,6 @@ if "sigma_result" in st.session_state:
                     result["sigma"]
 
                 ),
-
 
 
                 "FoSF":
@@ -2874,7 +2639,6 @@ if "sigma_result" in st.session_state:
                 ),
 
 
-
                 "FoPF":
 
                 round(
@@ -2884,7 +2648,6 @@ if "sigma_result" in st.session_state:
                     4
 
                 ),
-
 
 
                 "FoPR":
@@ -2921,100 +2684,20 @@ if "sigma_result" in st.session_state:
 
 
 
-    st.plotly_chart(
-
-        px.bar(
-
-            unit_df,
-
-            x="Enota",
-
-            y="σ °S",
-
-            title="Stresna moč po enotah"
-
-        ),
-
-        use_container_width=True
-
-    )
-
-
-
-
-    # ========================================================
-    # 32. FAKTORJI
-    # ========================================================
-
-
-
-    st.divider()
-
-
-
-    st.subheader(
-
-        "📌 Identificirani faktorji"
-
-    )
-
-
-
-    st.dataframe(
-
-        factor_df,
-
-        use_container_width=True
-
-    )
-
-
-
-
-
-    # ========================================================
-    # 33. TOP STRESORJI
-    # ========================================================
-
-
-
-    st.divider()
-
-
-
-    st.subheader(
-
-        "🔥 Najmočnejši stresorji"
-
-    )
-
-
-
-    top_sf = top_factors(
-
-        factor_df,
-
-        "Stresorji"
-
-    )
-
-
-
-    if not top_sf.empty:
-
+    if not unit_df.empty:
 
 
         st.plotly_chart(
 
             px.bar(
 
-                top_sf,
+                unit_df,
 
-                x="Moč",
+                x="Enota",
 
-                y="Faktor",
+                y="σ (°S)",
 
-                orientation="h"
+                title="Stresna moč po enotah"
 
             ),
 
@@ -3024,151 +2707,200 @@ if "sigma_result" in st.session_state:
 
 
 
-
-
-    st.subheader(
-
-        "🛡️ Zaščitni dejavniki"
-
-    )
-
-
-
-    top_pf = top_factors(
-
-        factor_df,
-
-        "Pozitivni"
-
-    )
-
-
-
-    st.dataframe(
-
-        top_pf,
-
-        use_container_width=True
-
-    )
-
-
-
-
-
-    st.subheader(
-
-        "💡 Predlogi izboljšav"
-
-    )
-
-
-
-    top_pr = top_factors(
-
-        factor_df,
-
-        "Predlogi"
-
-    )
-
-
-    st.dataframe(
-
-        top_pr,
-
-        use_container_width=True
-
-    )
-
-
-
-
-
-    # ========================================================
-    # 34. IZVOZ
-    # ========================================================
-
+    # --------------------------------------------------------
+    # FAKTORJI
+    # --------------------------------------------------------
 
 
     st.divider()
 
 
+    st.subheader(
 
-    csv = factor_df.to_csv(
-
-        index=False
-
-    ).encode(
-
-        "utf-8"
+        "📌 Faktorji"
 
     )
 
 
 
-    st.download_button(
-
-        "⬇️ Prenesi faktorje CSV",
-
-        csv,
-
-        "Psihosocialni_Barometer_faktorji.csv",
-
-        "text/csv"
-
-    )
+    if not factor_df.empty:
 
 
+        st.dataframe(
 
-    csv2 = unit_df.to_csv(
+            factor_df,
 
-        index=False
+            use_container_width=True
 
-    ).encode(
+        )
 
-        "utf-8"
 
-    )
+    else:
+
+
+        st.warning(
+
+            "Ni podatkov faktorjev."
+
+        )
 
 
 
-    st.download_button(
-
-        "⬇️ Prenesi stres po enotah CSV",
-
-        csv2,
-
-        "Psihosocialni_Barometer_enote.csv",
-
-        "text/csv"
-
-    )
+    # --------------------------------------------------------
+    # TOP FAKTORJI
+    # --------------------------------------------------------
 
 
+    if not factor_df.empty:
+
+
+        st.divider()
+
+
+        st.subheader(
+
+            "🔥 Najmočnejši stresorji"
+
+        )
+
+
+        sf = top_factors(
+
+            factor_df,
+
+            "Stresorji"
+
+        )
+
+
+        st.dataframe(
+
+            sf,
+
+            use_container_width=True
+
+        )
+
+
+
+        st.subheader(
+
+            "🛡️ Pozitivni dejavniki"
+
+        )
+
+
+        pf = top_factors(
+
+            factor_df,
+
+            "Pozitivni"
+
+        )
+
+
+        st.dataframe(
+
+            pf,
+
+            use_container_width=True
+
+        )
+
+
+
+        st.subheader(
+
+            "💡 Predlogi"
+
+        )
+
+
+        pr = top_factors(
+
+            factor_df,
+
+            "Predlogi"
+
+        )
+
+
+        st.dataframe(
+
+            pr,
+
+            use_container_width=True
+
+        )
+
+
+
+    # --------------------------------------------------------
+    # IZVOZ
+    # --------------------------------------------------------
+
+
+    st.divider()
+
+
+    if not factor_df.empty:
+
+
+        csv = factor_df.to_csv(
+
+            index=False
+
+        ).encode(
+
+            "utf-8"
+
+        )
+
+
+        st.download_button(
+
+            "⬇️ Prenesi faktorje CSV",
+
+            csv,
+
+            "Psihosocialni_Barometer_faktorji.csv",
+
+            "text/csv"
+
+        )
+
+
+
+    if not unit_df.empty:
+
+
+        csv_units = unit_df.to_csv(
+
+            index=False
+
+        ).encode(
+
+            "utf-8"
+
+        )
+
+
+        st.download_button(
+
+            "⬇️ Prenesi enote CSV",
+
+            csv_units,
+
+            "Psihosocialni_Barometer_enote.csv",
+
+            "text/csv"
+
+        )
 
 
 
 # ============================================================
 # KONEC v2.5
-#
-# ARHITEKTURA:
-#
-# DEL 1:
-# Streamlit + upload + priprava
-#
-# DEL 2:
-# AI klasifikacija
-#
-# DEL 3:
-# agregacija faktorjev
-#
-# DEL 4:
-# matematični model
-#
-# DEL 5:
-# vmesnik + rezultati
-#
 # ============================================================
 
 
