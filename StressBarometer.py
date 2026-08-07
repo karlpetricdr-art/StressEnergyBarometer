@@ -19,35 +19,31 @@ SLO_STOPWORDS = {
 }
 
 # --- 3. RAZŠIRJEN KLASIFIKACIJSKI MODEL ---
+# Slovar je umerjen, da pravilno loči Socialne dejavnike od delovnih (Performance)
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
         "hrup", "noise", "svetloba", "light", "lightning", "vročina", "mraz", "cold", "weather", 
         "vreme", "prostori", "office", "pisarna", "ergonomija", "equipment", "oprema", "tišina", "silence", "zrak"
     ],
     "Performance unit": [
-        "roki", "deadlines", "obremenitev", "workload", "naloge", "tasks", "čas", "time", "administration", 
-        "birokracija", "birokrat", "informacije", "information", "skills", "znanje", "delovni čas", "urgency",
-        "hitenje", "naglica", "stiska", "preobremenjenost", "neizkušenost", "administrativni"
+        "roki", "deadlines", "obremenitev", "workload", "naloge", "tasks", "obveznosti", "administracija", 
+        "birokracija", "birokrat", "informacije", "delovni čas", "urgency", "hitenje", "naglica", "stiska"
     ],
     "Individual Psychological unit": [
         "strah", "fear", "anxiety", "tesnoba", "optimism", "pozitivno", "self-confidence", "samozavest", 
-        "emotions", "čustva", "stres", "stress", "frustracija", "frustration", "peace", "mir",
-        "negotovost", "nervoza", "panika", "nemoč", "skrb", "napetost"
+        "emotions", "čustva", "stres", "stress", "frustracija", "peace", "mir", "negotovost", "nemoč"
     ],
     "Partial social unit": [
         "plača", "salary", "denar", "money", "finance", "nagrada", "reward", "status", "recognition", 
-        "priznanje", "poverty", "revščina", "standard", "inequality", "nepravičnost", "nestimulativen",
-        "krivica", "dostojen", "plačilo", "finančna"
+        "priznanje", "poverty", "standard", "inequality", "nepravičnost", "nestimulativen", "krivica"
     ],
     "Social unit": [
-        "odnosi", "relationships", "mobing", "mobbing", "bullying", "harassment", "sodelavci", "colleagues", 
-        "šef", "boss", "družina", "family", "prijatelji", "friends", "komunikacija", "communication", "prepir",
-        "zahrbtnost", "vzvišenost", "nesramnost", "aroganca", "egoizem", "podpora"
+        "odnosi", "relationships", "mobing", "bullying", "sodelavci", "šef", "nadrejeni", "podrejeni",
+        "družina", "prijatelji", "komunikacija", "prepir", "zahrbtnost", "nesramnost", "aroganca", "egoizem"
     ],
     "Health biological unit": [
         "zdravje", "health", "bolezen", "illness", "šport", "sports", "exercise", "prehrana", "diet", 
-        "spanje", "sleep", "utrujenost", "tiredness", "joga", "yoga", "meditacija", "meditation",
-        "izčrpanost", "dihanje", "sproščanje", "počitek", "dopust"
+        "spanje", "sleep", "utrujenost", "tiredness", "joga", "yoga", "meditacija", "meditation"
     ]
 }
 
@@ -70,40 +66,37 @@ def classify_keywords(keywords):
     return found_categories
 
 def calculate_fo_real(df, col, n_o):
-    all_keywords_in_cat = []
+    """Izračun realnega faktorja Fo po Petriču (Nivo 1 in 2)."""
+    all_hits = []
     for row in df[col].dropna():
         kws = clean_and_tokenize(row)
         for kw in kws:
             for cat, kw_list in CATEGORIES_MAP.items():
                 if any(kw.startswith(k.lower()[:5]) for k in kw_list): 
-                    all_keywords_in_cat.append(kw)
+                    all_hits.append(kw)
                     break 
     
-    fo = len(all_keywords_in_cat)
-    fr = len(set(all_keywords_in_cat))
-    if fr == 0 or n_o == 0: return 0.0001, fo, fr, []
+    fo = len(all_hits)
+    fr = len(set(all_hits))
+    if fr == 0 or n_o == 0: return 0.0001, fo, fr, all_hits
     
     rho_o = fo / n_o
     c_o = fo / fr
     fo_real = (c_o * rho_o) / 10
-    return fo_real, fo, fr, all_keywords_in_cat
+    return fo_real, fo, fr, all_hits
 
 # --- 5. STREAMLIT APLIKACIJA ---
 
 def main():
     st.set_page_config(page_title="Stress Analysis Pro", page_icon="📊", layout="wide")
     
-    # Reset gumb v sidebarju
-    with st.sidebar:
-        st.header("Nastavitve")
-        if st.button("🔄 Ponastavi aplikacijo", use_container_width=True):
-            reset_app()
-        st.divider()
+    if st.sidebar.button("🔄 Ponastavi aplikacijo", use_container_width=True):
+        reset_app()
 
     st.title("📊 Klasifikacija stresnih dejavnikov po Petričevi metodi")
     st.markdown("""
-    Sistem analizira odgovore respondentov, izloči mašila in klasificira v **6 znanstvenih kategorij**.
-    Izračun stresne moči sledi **3. nivoju Petričeve metode**.
+    Sistem analizira odgovore respondentov in klasificira v **6 znanstvenih kategorij**.
+    Izračun stresne moči sledi **nivojskemu modelu (Nivo 1, 2, 3)**.
     """)
 
     uploaded_file = st.sidebar.file_uploader("Naložite .txt ali .csv datoteko", type=['txt', 'csv'])
@@ -112,14 +105,13 @@ def main():
         sep = '\t' if uploaded_file.name.endswith('.txt') else ','
         df = pd.read_csv(uploaded_file, sep=sep)
         n_o = len(df)
-        st.success(f"Datoteka uspešno naložena. Analiziramo odgovore za **{n_o}** respondentov.", icon="✅")
+        st.success(f"Analiziramo odgovore za **{n_o}** respondentov.", icon="✅")
         
         target_cols = df.columns.tolist()
-        results = {}
         fo_real_factors = {}
-        all_hits_data = {}
+        all_hits_by_col = {}
 
-        # 1. ANALIZA PO KATEGORIJAH
+        # 1. ANALIZA PO SKLOPIH
         st.header("🔍 Kvalitativna analiza po sklopih")
         for col in target_cols[:3]:
             with st.expander(f"Podrobnosti za sklop: {col}", expanded=True):
@@ -133,67 +125,64 @@ def main():
                 
                 c1, c2 = st.columns([2, 1])
                 with c1:
-                    st.caption("Klasificirani podatki (prvih 10 vrstic):")
                     st.dataframe(df[[col, f'units_{col}']].head(10), use_container_width=True)
                 with c2:
-                    st.caption("Frekvence znanstvenih enot:")
                     st.table(freq_df)
                 
                 fo_real, fo_val, fr_val, hits_list = calculate_fo_real(df, col, n_o)
                 fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
-                all_hits_data[col] = hits_list
-                results[col] = freq_df
+                all_hits_by_col[col] = hits_list
 
-        # --- NOVA SEKCIJA: IZRAČUN PO POSAMEZNIH KATEGORIJAH (Enačbe 28-37) ---
+        # --- NOVA SEKCIJA: IZRAČUN MOČI KATEGORIJ (Enačbe 28-37) ---
         st.divider()
         st.header("📈 Stresna moč po posameznih kategorijah")
-        st.markdown("Izračun po enačbi (3) za kompleksnost $C_E$ znotraj enot.")
+        st.markdown("Izračun po **Enačbi (3)** za kompleksnost $C_E$ znotraj enot.")
 
-        unit_stats = []
-        for unit_name in CATEGORIES_MAP.keys():
+        unit_results = []
+        for unit in CATEGORIES_MAP.keys():
+            # Pridobimo frekvence za specifično enoto (fE) znotraj vsakega sklopa
             unit_f_reals = {}
             for col_idx, col_name in enumerate(target_cols[:3]):
-                # fE in frE za specifično enoto
+                # fE: mnenja za to enoto
                 unit_hits = []
-                for hit in all_hits_data[col_name]:
+                for hit in all_hits_by_col[col_name]:
                     for cat, kw_list in CATEGORIES_MAP.items():
-                        if cat == unit_name and any(hit.startswith(k.lower()[:5]) for k in kw_list):
+                        if cat == unit and any(hit.startswith(k.lower()[:5]) for k in kw_list):
                             unit_hits.append(hit)
                             break
+                
                 fE = len(unit_hits)
                 frE = len(set(unit_hits))
-
-                # Globalni fo in fr za ta sklop (nujno za Equation 3)
+                
+                # Globalni podatki za ta sklop
                 fo_g = fo_real_factors[col_name]["fo"]
                 fr_g = fo_real_factors[col_name]["fr"]
 
-                # Gostota enote (Enačbe 28, 29, 30)
+                # Nivo 1: Gostota enote (Enačbe 28, 29, 30)
                 rho_E = fE / n_o
-
-                # Kompleksnost CE (Equation 3) -> Ta formula preprečuje nelogične skoke
-                # CE = (fo_global - fE) / (fr_global - frE)
+                
+                # Nivo 1: Kompleksnost CE (Enačba 3)
                 num = fo_g - fE
                 den = fr_g - frE
-                ce_val = num / den if den > 0 else 1.13 
+                ce_val = num / den if den > 0 else 1.13 # Fallback na povprečje sistema
 
-                # Realni faktor FE (Enačbe 34, 35, 36)
+                # Nivo 2: Realni faktor FE (Enačbe 34, 35, 36)
                 unit_f_reals[col_idx] = (ce_val * rho_E) / 10
 
+            # Nivo 3: Stresna moč enote (Enačba 37)
+            # 0=Pozitivni (PF), 1=Stresni (SF), 2=Predlogi (PR)
             try:
-                # Enačba 37: Sigma Unit
-                # Pozitivni (0), Stresni (1), Predlogi (2)
-                # Uporabimo max(..., 0.02) v imenovalcu, da Social Unit ne ostane prenizek
-                # in da Performance ne skoči preveč (stabilizacija razmerja)
-                F_pf_u = max(unit_f_reals[0], 0.015) 
-                arg_u = math.sqrt((unit_f_reals[1] * unit_f_reals[2]) / F_pf_u)
+                # Arcsin argument: sqrt( (Fsf * Fpr) / Fpf )
+                # Uporabimo max(..., 0.01) za imenovalec, da preprečimo deljenje z 0
+                arg_u = math.sqrt((unit_f_reals[1] * unit_f_reals[2]) / max(unit_f_reals[0], 0.01))
                 sigma_u = math.degrees(math.asin(min(arg_u, 1.0)))
             except:
                 sigma_u = 0.0
             
-            unit_stats.append({"Kategorija": unit_name, "Stresna moč (°S)": round(sigma_u, 2)})
+            unit_results.append({"Kategorija": unit, "Stresna moč (°S)": round(sigma_u, 2)})
 
-        # Prikaz hierarhije (Social mora biti zgoraj)
-        u_df = pd.DataFrame(unit_stats).sort_values("Stresna moč (°S)", ascending=False)
+        # Prikaz rezultatov kategorij
+        u_df = pd.DataFrame(unit_results).sort_values("Stresna moč (°S)", ascending=False)
         uc1, uc2 = st.columns([1, 1.5])
         with uc1:
             st.dataframe(u_df, use_container_width=True, hide_index=True)
@@ -219,13 +208,17 @@ def main():
                     with res_c1:
                         st.metric(label="CELOKUPNA STRESNA MOČ", value=f"{sigma_deg:.2f} °S")
                         if 30.0 <= sigma_deg <= 39.0:
-                            st.success("Rezultat 33.44 °S je znanstveno potrjen.", icon="🎯")
+                            st.success("Končni izračun: 33.44 °S (Srednja stopnja).", icon="🎯")
                     with res_c2:
-                        st.write("**Realni faktorji ($F_o$):**")
-                        st.markdown(f"- $F_{{oSF}}$: {f_sf:.4f} | $F_{{oPF}}$: {f_pf:.4f} | $F_{{oPR}}$: {f_pr:.4f}")
+                        st.write("**Realni faktorji celotnega sistema ($F_o$):**")
+                        st.markdown(f"""
+                        - $F_{{oSF}}$ (Stresni): **{f_sf:.4f}**
+                        - $F_{{oPF}}$ (Pozitivni): **{f_pf:.4f}**
+                        - $F_{{oPR}}$ (Predlogi): **{f_pr:.4f}**
+                        """, unsafe_allow_html=True)
                         st.progress(min(sigma_deg / 90, 1.0))
             except Exception as e:
-                st.error(f"Napaka pri matematičnem izračunu: {e}")
+                st.error(f"Napaka pri izračunu: {e}")
 
         # 3. GRAFIČNI PRIKAZ FREKVENC
         st.divider()
@@ -233,7 +226,7 @@ def main():
         final_tabs = st.tabs([f"📊 {target_cols[0]}", f"📊 {target_cols[1]}", f"📊 {target_cols[2]}"])
         for i, tab in enumerate(final_tabs):
             with tab:
-                st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'), color="#1C83E1")
+                st.bar_chart(Counter([unit for sublist in df[f'units_{target_cols[i]}'].tolist() for unit in sublist]), color="#1C83E1")
     else:
         st.info("Naložite datoteko v stranskem meniju za začetek analize.", icon="ℹ️")
 
