@@ -117,7 +117,7 @@ def main():
         target_cols = df.columns.tolist()
         results = {}
         fo_real_factors = {}
-        all_hits_data = {} # Za shranjevanje vseh najdenih besed po stolpcih
+        all_hits_data = {} # Shranimo zadetke za izračun CE (Equation 3)
 
         # 1. ANALIZA PO KATEGORIJAH
         st.header("🔍 Kvalitativna analiza po sklopih")
@@ -144,61 +144,57 @@ def main():
                 all_hits_data[col] = hits_list
                 results[col] = freq_df
 
-        # --- NOVA SEKCIJA: ANALIZA PO POSAMEZNIH KATEGORIJAH (Enačbe 28-37) ---
+        # --- NOVA SEKCIJA: IZRAČUN PO POSAMEZNIH KATEGORIJAH (Enačbe 28-37) ---
         st.divider()
         st.header("📈 Stresna moč po posameznih kategorijah")
-        st.markdown("Individualni izračun stresne moči za vsako od 6 znanstvenih enot (Nivo 3, Enačba 37).")
+        st.markdown("Izračun po enačbi (3) za kompleksnost $C_E$ znotraj enot.")
 
-        unit_stats = []
+        unit_power_data = []
         for unit_name in CATEGORIES_MAP.keys():
             unit_f_reals = {}
-            
             for col_idx, col_name in enumerate(target_cols[:3]):
-                # fE: frekvenca mnenj znotraj te enote za ta stolpec
-                # frE: število unikatnih mnenj znotraj te enote za ta stolpec
+                # fE in frE za specifično enoto
                 unit_hits = []
                 for hit in all_hits_data[col_name]:
                     for cat, kw_list in CATEGORIES_MAP.items():
                         if cat == unit_name and any(hit.startswith(k.lower()[:5]) for k in kw_list):
                             unit_hits.append(hit)
                             break
-                
                 fE = len(unit_hits)
                 frE = len(set(unit_hits))
-                
-                # Globalni fo in fr za celoten sklop (npr. vsi Stresni dejavniki)
-                fo_global = fo_real_factors[col_name]["fo"]
-                fr_global = fo_real_factors[col_name]["fr"]
-                
+
+                # Globalni fo in fr za ta stolpec
+                fo_g = fo_real_factors[col_name]["fo"]
+                fr_g = fo_real_factors[col_name]["fr"]
+
                 # Gostota enote (Enačbe 28, 29, 30)
                 rho_E = fE / n_o
-                
-                # Kompleksnost enote CE po enačbi (3): (fo - fE) / (fr - frE)
-                numerator = fo_global - fE
-                denominator = fr_global - frE
-                ce_val = numerator / denominator if denominator > 0 else 1.13 # fallback na povprečje
-                
-                # Realni faktor FE za to enoto (Enačbe 34, 35, 36)
+
+                # Kompleksnost CE (Enačba 3)
+                num = fo_g - fE
+                den = fr_g - frE
+                ce_val = num / den if den > 0 else 1.13 # Fallback na sistemsko konstanto
+
+                # Realni faktor FE (Enačbe 34, 35, 36)
                 unit_f_reals[col_idx] = (ce_val * rho_E) / 10
 
-            # Izračun sigma_unit (Enačba 37)
-            # 0=Pozitivni (PF), 1=Stresni (SF), 2=Predlogi (PR)
             try:
-                # Uporabimo max(..., 0.0001) za stabilnost imenovalca
+                # Enačba 37: Sigma Unit (sqrt( (Fsf * Fpr) / Fpf ))
+                # 0=PF, 1=SF, 2=PR
                 arg_u = math.sqrt((unit_f_reals[1] * unit_f_reals[2]) / max(unit_f_reals[0], 0.0001))
                 sigma_u = math.degrees(math.asin(min(arg_u, 1.0)))
             except:
                 sigma_u = 0.0
             
-            unit_stats.append({"Kategorija": unit_name, "Stresna moč (°S)": round(sigma_u, 2)})
+            unit_power_data.append({"Kategorija": unit_name, "Stresna moč (°S)": round(sigma_u, 2)})
 
-        # Prikaz tabele in grafa za kategorije
-        u_col1, u_col2 = st.columns([1, 1.5])
-        with u_col1:
-            st.dataframe(pd.DataFrame(unit_stats).sort_values("Stresna moč (°S)", ascending=False), 
+        # Prikaz razčlenitve
+        uc1, uc2 = st.columns([1, 1.5])
+        with uc1:
+            st.dataframe(pd.DataFrame(unit_power_data).sort_values("Stresna moč (°S)", ascending=False), 
                          hide_index=True, use_container_width=True)
-        with u_col2:
-            st.bar_chart(pd.DataFrame(unit_stats).set_index("Kategorija"), color="#00C49A")
+        with uc2:
+            st.bar_chart(pd.DataFrame(unit_power_data).set_index("Kategorija"), color="#00C49A")
 
         # 2. IZRAČUN CELOKUPNE STRESNE MOČI (°S)
         st.divider()
@@ -220,7 +216,6 @@ def main():
                     with res_c1:
                         st.metric(label="CELOKUPNA STRESNA MOČ", value=f"{sigma_deg:.2f} °S")
                         
-                        # Interpretacija stopnje
                         if sigma_deg <= 15.04:
                             st.info("Stopnja: Zelo nizka (Very low)")
                         elif sigma_deg <= 30.04:
@@ -241,7 +236,7 @@ def main():
                         - $F_{{oPR}}$ (Predlogi): **{f_pr:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[2]]['fo']})</small>
                         """, unsafe_allow_html=True)
                         st.progress(min(sigma_deg / 90, 1.0))
-                        st.caption("Psihosocialni barometer stresa (nelinearna integracija vseh šestih kategorij)")
+                        st.caption("Psihosocialni barometer stresa (nelinearna integracija vseh šestih enot)")
             except Exception as e:
                 st.error(f"Napaka pri matematičnem izračunu: {e}")
 
