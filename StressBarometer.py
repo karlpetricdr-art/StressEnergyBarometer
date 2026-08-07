@@ -3,6 +3,9 @@ import pandas as pd
 import re
 import math
 from collections import Counter
+import networkx as nx
+from pyvis.network import Network
+import streamlit.components.v1 as components
 
 # --- 1. FUNKCIJA ZA RESET ---
 def reset_app():
@@ -75,7 +78,6 @@ def calculate_fo_real(df, col, n_o):
         kws = clean_and_tokenize(row)
         for kw in kws:
             for cat, kw_list in CATEGORIES_MAP.items():
-                # Uporabimo startswith za natančnost in substrings za prožnost
                 if any(kw.startswith(k.lower()[:5]) for k in kw_list): 
                     all_keywords_in_cat.append(kw)
                     break 
@@ -89,7 +91,56 @@ def calculate_fo_real(df, col, n_o):
     fo_real = (c_o * rho_o) / 10
     return fo_real, fo, fr
 
-# --- 5. STREAMLIT APLIKACIJA ---
+# --- 5. FUNKCIJA ZA OMREŽNO VIZUALIZACIJO ---
+def draw_network(df, col_name):
+    # Priprava podatkov za omrežje
+    adj_list = []
+    word_freq = Counter()
+    
+    for row in df[col_name].dropna():
+        tokens = clean_and_tokenize(row)
+        matched_units = []
+        for t in tokens:
+            for unit, kw_list in CATEGORIES_MAP.items():
+                if any(t.startswith(k.lower()[:5]) for k in kw_list):
+                    adj_list.append((unit, t))
+                    word_freq[t] += 1
+                    break
+
+    # Ustvari Pyvis omrežje
+    net = Network(height="500px", width="100%", bgcolor="#ffffff", font_color="#333333")
+    
+    # Barve za enote
+    unit_colors = {
+        "Attentive (physical) unit": "#FF4B4B",
+        "Performance unit": "#1C83E1",
+        "Individual Psychological unit": "#00C49A",
+        "Partial social unit": "#FFD166",
+        "Social unit": "#7D5BA6",
+        "Health biological unit": "#FF8C42"
+    }
+
+    # Dodajanje vozlišč (enote kot hub-i)
+    for unit, color in unit_colors.items():
+        net.add_node(unit, label=unit, size=25, color=color, shape="diamond")
+
+    # Dodajanje ključnih besed kot vozlišč (povezanih na enote)
+    # Izberemo top 15 besed za preglednost
+    top_words = [w for w, c in word_freq.most_common(20)]
+    
+    for unit, word in adj_list:
+        if word in top_words:
+            # Kritična vozlišča so večja glede na frekvenco
+            node_size = 10 + (word_freq[word] * 2)
+            net.add_node(word, label=word, size=node_size, color="#E0E0E0")
+            net.add_edge(unit, word, color="#CCCCCC")
+
+    net.toggle_physics(True)
+    net.save_graph("temp_network.html")
+    HtmlFile = open("temp_network.html", 'r', encoding='utf-8')
+    components.html(HtmlFile.read(), height=550)
+
+# --- 6. STREAMLIT APLIKACIJA ---
 
 def main():
     st.set_page_config(page_title="Stress Analysis Pro", layout="wide")
@@ -170,6 +221,14 @@ def main():
                     st.progress(min(sigma_deg / 90, 1.0))
             except Exception as e:
                 st.error(f"Napaka pri izračunu: {e}")
+
+        # --- NOVA SEKCIJA: OMREŽNA VIZUALIZACIJA ---
+        st.divider()
+        st.header("🕸️ Omrežna vizualizacija dejavnikov")
+        st.markdown("Prikaz povezav med znanstvenimi enotami in najbolj kritičnimi ključnimi besedami.")
+        
+        viz_col = st.selectbox("Izberite sklop za vizualizacijo omrežja:", target_cols[:3], index=1)
+        draw_network(df, viz_col)
 
         # 3. GRAFIČNI PRIKAZ
         st.divider()
