@@ -1,246 +1,725 @@
-import streamlit as st
-import pandas as pd
-import re
-import math
-from collections import Counter
-import networkx as nx
-from pyvis.network import Network
-import streamlit.components.v1 as components
+# ============================================================
+# DODATNI IMPORT ZA OMREŽNI DIAGRAM
+# ============================================================
 
-# --- 1. FUNKCIJA ZA RESET ---
-def reset_app():
-    for key in st.session_state.keys():
-        del st.session_state[key]
-    st.rerun()
+import plotly.graph_objects as go
+import numpy as np
 
-# --- 2. DEFINICIJA STOP-WORDS (MAŠIL) ---
-SLO_STOPWORDS = {
-    "se", "oh", "na", "potem", "in", "ter", "bi", "da", "pa", "že", "tudi", "iz", "za",
-    "še", "samo", "tako", "kot", "sem", "smo", "ste", "so", "je", "bil", "biti", "ali",
-    "bi", "bil", "bila", "bi", "v", "na", "pri", "o", "z", "s", "k", "h", "vse", "vsi",
-    "tisti", "nekaj", "včasih", "npr", "itd", "the", "and", "to", "of", "a", "is", "in", "it"
-}
 
-# --- 3. RAZŠIRJEN KLASIFIKACIJSKI MODEL (Za rezultat > 30 °S) ---
-CATEGORIES_MAP = {
-    "Attentive (physical) unit": [
-        "hrup", "noise", "svetloba", "light", "lightning", "vročina", "mraz", "cold", "weather", 
-        "vreme", "prostori", "office", "pisarna", "ergonomija", "equipment", "oprema", "tišina", "silence", "zrak"
-    ],
-    "Performance unit": [
-        "roki", "deadlines", "obremenitev", "workload", "naloge", "tasks", "čas", "time", "administration", 
-        "birokracija", "birokrat", "informacije", "information", "skills", "znanje", "delovni čas", "urgency",
-        "hitenje", "naglica", "stiska", "preobremenjenost", "neizkušenost", "administrativni"
-    ],
-    "Individual Psychological unit": [
-        "strah", "fear", "anxiety", "tesnoba", "optimism", "pozitivno", "self-confidence", "samozavest", 
-        "emotions", "čustva", "stres", "stress", "frustracija", "frustration", "peace", "mir",
-        "negotovost", "nervoza", "panika", "nemoč", "skrb", "napetost"
-    ],
-    "Partial social unit": [
-        "plača", "salary", "denar", "money", "finance", "nagrada", "reward", "status", "recognition", 
-        "priznanje", "poverty", "revščina", "standard", "inequality", "nepravičnost", "nestimulativen",
-        "krivica", "dostojen", "plačilo", "finančna"
-    ],
-    "Social unit": [
-        "odnosi", "relationships", "mobing", "mobbing", "bullying", "harassment", "sodelavci", "colleagues", 
-        "šef", "boss", "družina", "family", "prijatelji", "friends", "komunikacija", "communication", "prepir",
-        "zahrbtnost", "vzvišenost", "nesramnost", "aroganca", "egoizem", "podpora"
-    ],
-    "Health biological unit": [
-        "zdravje", "health", "bolezen", "illness", "šport", "sports", "exercise", "prehrana", "diet", 
-        "spanje", "sleep", "utrujenost", "tiredness", "joga", "yoga", "meditacija", "meditation",
-        "izčrpanost", "dihanje", "sproščanje", "počitek", "dopust"
-    ]
-}
+# ============================================================
+# OMREŽNI DIAGRAM - HIERARHIČNA MREŽA
+# ============================================================
 
-# --- 4. POMOŽNE FUNKCIJE ---
+def create_network_graph(
+    df,
+    columns,
+    top_categories=6,
+    top_keywords=5
+):
 
-def clean_and_tokenize(text):
-    if not isinstance(text, str): return []
-    text = text.lower()
-    text = re.sub(r'[^\w\s]', ' ', text)
-    words = text.split()
-    keywords = [w for w in words if w not in SLO_STOPWORDS and len(w) > 2]
-    return keywords
+    nodes = []
+    edges = []
+    node_type = {}
 
-def classify_keywords(keywords):
-    found_categories = []
-    for word in keywords:
-        for cat, kw_list in CATEGORIES_MAP.items():
-            if any(kw in word for kw in kw_list):
-                found_categories.append(cat)
-    return found_categories
-
-def calculate_fo_real(df, col, n_o):
-    all_keywords_in_cat = []
-    for row in df[col].dropna():
-        kws = clean_and_tokenize(row)
-        for kw in kws:
-            for cat, kw_list in CATEGORIES_MAP.items():
-                if any(kw.startswith(k.lower()[:5]) for k in kw_list): 
-                    all_keywords_in_cat.append(kw)
-                    break 
-    
-    fo = len(all_keywords_in_cat)
-    fr = len(set(all_keywords_in_cat))
-    if fr == 0 or n_o == 0: return 0.0001, fo, fr
-    
-    rho_o = fo / n_o
-    c_o = fo / fr
-    fo_real = (c_o * rho_o) / 10
-    return fo_real, fo, fr
-
-# --- 5. FUNKCIJA ZA OMREŽNO VIZUALIZACIJO ---
-def draw_network(df, col_name):
-    # Priprava podatkov za omrežje
-    adj_list = []
-    word_freq = Counter()
-    
-    for row in df[col_name].dropna():
-        tokens = clean_and_tokenize(row)
-        matched_units = []
-        for t in tokens:
-            for unit, kw_list in CATEGORIES_MAP.items():
-                if any(t.startswith(k.lower()[:5]) for k in kw_list):
-                    adj_list.append((unit, t))
-                    word_freq[t] += 1
-                    break
-
-    # Ustvari Pyvis omrežje
-    net = Network(height="500px", width="100%", bgcolor="#ffffff", font_color="#333333")
-    
-    # Barve za enote
-    unit_colors = {
-        "Attentive (physical) unit": "#FF4B4B",
-        "Performance unit": "#1C83E1",
-        "Individual Psychological unit": "#00C49A",
-        "Partial social unit": "#FFD166",
-        "Social unit": "#7D5BA6",
-        "Health biological unit": "#FF8C42"
+    center_nodes = {
+        columns[0]: "PF",
+        columns[1]: "SF",
+        columns[2]: "PR"
     }
 
-    # Dodajanje vozlišč (enote kot hub-i)
-    for unit, color in unit_colors.items():
-        net.add_node(unit, label=unit, size=25, color=color, shape="diamond")
 
-    # Dodajanje ključnih besed kot vozlišč (povezanih na enote)
-    # Izberemo top 15 besed za preglednost
-    top_words = [w for w, c in word_freq.most_common(20)]
-    
-    for unit, word in adj_list:
-        if word in top_words:
-            # Kritična vozlišča so večja glede na frekvenco
-            node_size = 10 + (word_freq[word] * 2)
-            net.add_node(word, label=word, size=node_size, color="#E0E0E0")
-            net.add_edge(unit, word, color="#CCCCCC")
+    # --------------------------------------------------------
+    # CENTRALNA VOZLIŠČA
+    # --------------------------------------------------------
 
-    net.toggle_physics(True)
-    net.save_graph("temp_network.html")
-    HtmlFile = open("temp_network.html", 'r', encoding='utf-8')
-    components.html(HtmlFile.read(), height=550)
+    for col, short in center_nodes.items():
 
-# --- 6. STREAMLIT APLIKACIJA ---
+        nodes.append(short)
 
-def main():
-    st.set_page_config(page_title="Stress Analysis Pro", layout="wide")
-    
-    # Reset gumb v sidebarju
-    if st.sidebar.button("🔄 Ponastavi aplikacijo"):
-        reset_app()
+        node_type[short] = "center"
 
-    st.title("📊 Klasifikacija stresnih dejavnikov po Petričevi metodi")
-    st.markdown("""
-    Sistem analizira odgovore respondentov, izloči mašila in klasificira v **6 znanstvenih kategorij**.
-    Izračun stresne moči sledi 3. nivoju Petričeve metode.
-    """)
 
-    uploaded_file = st.sidebar.file_uploader("Naložite .txt ali .csv datoteko", type=['txt', 'csv'])
-    
-    if uploaded_file:
-        sep = '\t' if uploaded_file.name.endswith('.txt') else ','
-        df = pd.read_csv(uploaded_file, sep=sep)
-        n_o = len(df)
-        st.success(f"Uspešno naloženo: {n_o} vrstic.")
-        
-        target_cols = df.columns.tolist()
-        results = {}
-        fo_real_factors = {}
 
-        # 1. ANALIZA PO KATEGORIJAH
-        for col in target_cols[:3]:
-            st.subheader(f"🔍 Analiza: {col}")
-            
-            df[f'keywords_{col}'] = df[col].apply(clean_and_tokenize)
-            df[f'units_{col}'] = df[f'keywords_{col}'].apply(classify_keywords)
-            
-            all_units = [unit for sublist in df[f'units_{col}'].tolist() for unit in sublist]
-            unit_counts = Counter(all_units)
-            
-            freq_df = pd.DataFrame(unit_counts.items(), columns=['Klasifikacijska enota', 'Frekvenca']).sort_values(by='Frekvenca', ascending=False)
-            
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.write("Klasificirani podatki po vrsticah (top 10):")
-                st.dataframe(df[[col, f'units_{col}']].head(10))
-            with c2:
-                st.write("Tabela frekvenc enot:")
-                st.table(freq_df)
-            
-            fo_real, fo_val, fr_val = calculate_fo_real(df, col, n_o)
-            fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
-            results[col] = freq_df
+    # --------------------------------------------------------
+    # KATEGORIJE IN KLJUČNE BESEDE
+    # --------------------------------------------------------
 
-        # 2. IZRAČUN CELOKUPNE STRESNE MOČI (°S)
-        st.divider()
-        st.header("📐 Izračun celokupne stresne moči (Third level)")
-        
-        if len(target_cols) >= 3:
-            f_pf = fo_real_factors[target_cols[0]]["val"]
-            f_sf = fo_real_factors[target_cols[1]]["val"]
-            f_pr = fo_real_factors[target_cols[2]]["val"]
-            
-            try:
-                argument = math.sqrt((f_sf * f_pr) / f_pf)
-                sigma_rad = math.asin(min(argument, 1.0))
-                sigma_deg = math.degrees(sigma_rad)
-                
-                res_c1, res_c2 = st.columns(2)
-                with res_c1:
-                    st.metric("CELOKUPNA STRESNA MOČ", f"{sigma_deg:.2f} °S")
-                    if 30.0 <= sigma_deg <= 39.0:
-                        st.success("Rezultat je v realnem znanstvenem razponu (30-39 °S).")
-                    else:
-                        st.warning("Rezultat odstopa od razpona. Preverite slovar.")
-                
-                with res_c2:
-                    st.write("**Realni faktorji ($F_o$):**")
-                    st.write(f"- $F_{{oSF}}$ (Stresni): {f_sf:.4f} (mnenj: {fo_real_factors[target_cols[1]]['fo']})")
-                    st.write(f"- $F_{{oPF}}$ (Pozitivni): {f_pf:.4f} (mnenj: {fo_real_factors[target_cols[0]]['fo']})")
-                    st.write(f"- $F_{{oPR}}$ (Predlogi): {f_pr:.4f} (mnenj: {fo_real_factors[target_cols[2]]['fo']})")
-                    st.progress(min(sigma_deg / 90, 1.0))
-            except Exception as e:
-                st.error(f"Napaka pri izračunu: {e}")
+    for col, short in center_nodes.items():
 
-        # --- NOVA SEKCIJA: OMREŽNA VIZUALIZACIJA ---
-        st.divider()
-        st.header("🕸️ Omrežna vizualizacija dejavnikov")
-        st.markdown("Prikaz povezav med znanstvenimi enotami in najbolj kritičnimi ključnimi besedami.")
-        
-        viz_col = st.selectbox("Izberite sklop za vizualizacijo omrežja:", target_cols[:3], index=1)
-        draw_network(df, viz_col)
+        category_counter = Counter()
 
-        # 3. GRAFIČNI PRIKAZ
-        st.divider()
-        st.header("📈 Skupni frekvenčni pregled")
-        final_tabs = st.tabs(target_cols[:3])
-        for i, tab in enumerate(final_tabs):
-            with tab:
-                st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'))
+
+        for value in df[col].dropna():
+
+            keywords = clean_and_tokenize(value)
+
+            categories = classify_keywords(
+                keywords
+            )
+
+            category_counter.update(
+                categories
+            )
+
+
+        for category, freq in category_counter.most_common(
+            top_categories
+        ):
+
+            category_node = (
+                f"{category}"
+            )
+
+
+            if category_node not in nodes:
+
+                nodes.append(
+                    category_node
+                )
+
+                node_type[
+                    category_node
+                ] = "category"
+
+
+            edges.append(
+                (
+                    short,
+                    category_node,
+                    freq
+                )
+            )
+
+
+            keyword_counter = Counter()
+
+
+            for value in df[col].dropna():
+
+                words = clean_and_tokenize(
+                    value
+                )
+
+
+                for word in words:
+
+                    for key in CATEGORIES_MAP[category]:
+
+                        if word.startswith(
+                            key.lower()[:5]
+                        ):
+
+                            keyword_counter.update(
+                                [word]
+                            )
+
+
+            for word, wf in keyword_counter.most_common(
+                top_keywords
+            ):
+
+                if word not in nodes:
+
+                    nodes.append(
+                        word
+                    )
+
+                    node_type[word] = "keyword"
+
+
+                edges.append(
+                    (
+                        category_node,
+                        word,
+                        wf
+                    )
+                )
+
+
+
+    # --------------------------------------------------------
+    # POZICIJE VOZLIŠČ
+    # --------------------------------------------------------
+
+    positions = {}
+
+
+    positions["PF"] = (-2,0)
+    positions["SF"] = (0,0)
+    positions["PR"] = (2,0)
+
+
+
+    category_nodes = [
+        n for n in nodes
+        if node_type[n]=="category"
+    ]
+
+
+    for i,n in enumerate(category_nodes):
+
+        angle = (
+            2*np.pi*i /
+            max(len(category_nodes),1)
+        )
+
+        positions[n] = (
+            np.cos(angle)*3,
+            np.sin(angle)*3
+        )
+
+
+
+    keyword_nodes = [
+        n for n in nodes
+        if node_type[n]=="keyword"
+    ]
+
+
+    for i,n in enumerate(keyword_nodes):
+
+        angle = (
+            2*np.pi*i /
+            max(len(keyword_nodes),1)
+        )
+
+        positions[n] = (
+            np.cos(angle)*5,
+            np.sin(angle)*5
+        )
+
+
+
+    # --------------------------------------------------------
+    # POVEZAVE
+    # --------------------------------------------------------
+
+    edge_x=[]
+    edge_y=[]
+
+
+    for a,b,w in edges:
+
+        if a in positions and b in positions:
+
+            x0,y0 = positions[a]
+            x1,y1 = positions[b]
+
+            edge_x += [
+                x0,x1,None
+            ]
+
+            edge_y += [
+                y0,y1,None
+            ]
+
+
+
+    edge_trace = go.Scatter(
+
+        x=edge_x,
+        y=edge_y,
+
+        mode="lines",
+
+        line=dict(
+            width=1
+        ),
+
+        hoverinfo="none"
+
+    )
+
+
+
+    # --------------------------------------------------------
+    # VOZLIŠČA
+    # --------------------------------------------------------
+
+    node_x=[]
+    node_y=[]
+    labels=[]
+
+
+    for n in nodes:
+
+        if n in positions:
+
+            x,y = positions[n]
+
+            node_x.append(x)
+            node_y.append(y)
+
+            labels.append(n)
+
+
+
+    node_trace = go.Scatter(
+
+        x=node_x,
+        y=node_y,
+
+        mode="markers+text",
+
+        text=labels,
+
+        textposition="top center",
+
+        marker=dict(
+            size=25
+        )
+
+    )
+
+
+
+    fig = go.Figure(
+        data=[
+            edge_trace,
+            node_trace
+        ]
+    )
+
+
+    fig.update_layout(
+
+        title=
+        "🕸️ Hierarhični omrežni prikaz stresnih struktur",
+
+        height=750,
+
+        showlegend=False,
+
+        xaxis=dict(
+            visible=False
+        ),
+
+        yaxis=dict(
+            visible=False
+        )
+
+    )
+
+
+    return fig
+	
+# ========================================================
+# MATEMATIČNA FORMULA
+# ========================================================
+
+# ========================================================
+# OMREŽNA ANALIZA STRESNIH STRUKTUR
+# ========================================================
+
+st.divider()
+
+st.header(
+    "🕸️ Omrežni diagram povezanosti dejavnikov"
+)
+
+
+st.markdown(
+"""
+Interaktivni prikaz prikazuje hierarhične povezave:
+
+**PF / SF / PR → klasifikacijska enota → ključni pojmi**
+
+- PF = pozitivni zaščitni dejavniki
+- SF = stresni dejavniki
+- PR = predlogi izboljšav
+
+Velikost mreže je odvisna od števila zaznanih povezav.
+"""
+)
+
+
+network_mode = st.selectbox(
+    "🔧 Globina omrežnega prikaza",
+    [
+        "Kategorije + ključne besede",
+        "Samo kategorije"
+    ]
+)
+
+
+
+if network_mode == "Samo kategorije":
+
+    network_fig = create_network_graph(
+        df,
+        target_cols,
+        top_categories=8,
+        top_keywords=0
+    )
+
+else:
+
+    network_fig = create_network_graph(
+        df,
+        target_cols,
+        top_categories=6,
+        top_keywords=5
+    )
+
+
+st.plotly_chart(
+    network_fig,
+    use_container_width=True
+)
+
+
+
+# ========================================================
+# OMREŽNA STATISTIKA
+# ========================================================
+
+st.subheader(
+    "📡 Strukturna statistika omrežja"
+)
+
+
+network_col1, network_col2, network_col3 = st.columns(3)
+
+
+with network_col1:
+
+    st.metric(
+        "Osrednje ravni",
+        "PF / SF / PR"
+    )
+
+
+with network_col2:
+
+    total_categories = 0
+
+    for col in target_cols[:3]:
+
+        for value in df[col].dropna():
+
+            total_categories += len(
+                classify_keywords(
+                    clean_and_tokenize(value)
+                )
+            )
+
+
+    st.metric(
+        "Zaznane povezave",
+        total_categories
+    )
+
+
+with network_col3:
+
+    st.metric(
+        "Hierarhični nivoji",
+        "3"
+    )
+
+
+
+# ========================================================
+# TOP POVEZAVE
+# ========================================================
+
+st.subheader(
+    "🔗 Najmočnejše vsebinske povezave"
+)
+
+
+network_edges = []
+
+
+for col in target_cols[:3]:
+
+    if col == target_cols[0]:
+
+        source = "PF"
+
+    elif col == target_cols[1]:
+
+        source = "SF"
+
     else:
-        st.info("Naložite datoteko za začetek.")
+
+        source = "PR"
+
+
+
+    counter = Counter()
+
+
+    for value in df[col].dropna():
+
+        cats = classify_keywords(
+            clean_and_tokenize(value)
+        )
+
+        counter.update(
+            cats
+        )
+
+
+    for category, freq in counter.most_common(10):
+
+        network_edges.append(
+            {
+                "Izvor": source,
+                "Cilj": category,
+                "Moč povezave": freq
+            }
+        )
+
+
+
+if network_edges:
+
+    edge_df = pd.DataFrame(
+        network_edges
+    )
+
+
+    st.dataframe(
+        edge_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+
+    fig_network_bar = px.bar(
+        edge_df.sort_values(
+            "Moč povezave"
+        ),
+        x="Moč povezave",
+        y="Cilj",
+        color="Izvor",
+        orientation="h",
+        text="Moč povezave",
+        title="Najpogostejše hierarhične povezave"
+    )
+
+
+    fig_network_bar.update_layout(
+        height=450,
+        yaxis_title="",
+        xaxis_title="Število povezav"
+    )
+
+
+    fig_network_bar.update_traces(
+        textposition="outside"
+    )
+
+
+    st.plotly_chart(
+        fig_network_bar,
+        use_container_width=True
+    )
+
+
+else:
+
+    st.info(
+        "Ni dovolj podatkov za omrežno analizo."
+    )
+	
+	# ============================================================
+# DODATNA FUNKCIJA - IZVOZ OMREŽNIH PODATKOV
+# ============================================================
+
+def export_network_data(
+    df,
+    columns
+):
+
+    network_data = []
+
+
+    for col in columns[:3]:
+
+        if col == columns[0]:
+
+            source = "PF"
+
+        elif col == columns[1]:
+
+            source = "SF"
+
+        else:
+
+            source = "PR"
+
+
+        category_counter = Counter()
+
+
+        for value in df[col].dropna():
+
+            keywords = clean_and_tokenize(
+                value
+            )
+
+            categories = classify_keywords(
+                keywords
+            )
+
+            category_counter.update(
+                categories
+            )
+
+
+        for category, freq in category_counter.items():
+
+            network_data.append(
+                {
+                    "Vir": source,
+                    "Kategorija": category,
+                    "Frekvenca": freq
+                }
+            )
+
+
+    return pd.DataFrame(
+        network_data
+    )
+
+
+
+# ============================================================
+# DODATNA VIZUALIZACIJA - STRUKTURNA MREŽA
+# ============================================================
+
+def create_simple_network_summary(
+    df,
+    columns
+):
+
+    summary = []
+
+
+    labels = [
+        "PF",
+        "SF",
+        "PR"
+    ]
+
+
+    for i,col in enumerate(columns[:3]):
+
+        counter = Counter()
+
+
+        for value in df[col].dropna():
+
+            categories = classify_keywords(
+                clean_and_tokenize(value)
+            )
+
+            counter.update(
+                categories
+            )
+
+
+        for cat,freq in counter.most_common(5):
+
+            summary.append(
+                {
+                    "Nivo 1": labels[i],
+                    "Nivo 2": cat,
+                    "Moč": freq
+                }
+            )
+
+
+    return pd.DataFrame(
+        summary
+    )
+
+
+
+# ============================================================
+# DODATNI IZVOZ V GLAVNEM DELU APLIKACIJE
+# ============================================================
+
+# Vstavite pred matematično formulo ali pred konec main():
+
+st.divider()
+
+st.header(
+    "💾 Izvoz omrežne analize"
+)
+
+
+network_export_df = export_network_data(
+    df,
+    target_cols
+)
+
+
+if not network_export_df.empty:
+
+
+    csv_network = (
+        network_export_df
+        .to_csv(
+            index=False
+        )
+        .encode(
+            "utf-8"
+        )
+    )
+
+
+    st.download_button(
+
+        label=
+        "⬇️ Prenesi omrežne podatke CSV",
+
+        data=csv_network,
+
+        file_name=
+        "stress_network_analysis.csv",
+
+        mime=
+        "text/csv"
+
+    )
+
+
+    st.dataframe(
+        network_export_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# ============================================================
+# ZAKLJUČEK APLIKACIJE
+# ============================================================
+
+
+st.divider()
+
+st.caption(
+"""
+Stress Analysis Pro
+|
+Petričeva klasifikacija stresnih dejavnikov
+|
+Hierarhični omrežni model PF-SF-PR
+"""
+)
+
+
+
+# ============================================================
+# ZAGON
+# ============================================================
 
 if __name__ == "__main__":
+
     main()
 
 
