@@ -18,7 +18,7 @@ SLO_STOPWORDS = {
     "tisti", "nekaj", "včasih", "npr", "itd", "the", "and", "to", "of", "a", "is", "in", "it"
 }
 
-# --- 3. RAZŠIRJEN KLASIFIKACIJSKI MODEL (Za rezultat > 30 °S) ---
+# --- 3. RAZŠIRJEN KLASIFIKACIJSKI MODEL ---
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
         "hrup", "noise", "svetloba", "light", "lightning", "vročina", "mraz", "cold", "weather", 
@@ -75,7 +75,6 @@ def calculate_fo_real(df, col, n_o):
         kws = clean_and_tokenize(row)
         for kw in kws:
             for cat, kw_list in CATEGORIES_MAP.items():
-                # Uporabimo startswith za natančnost in substrings za prožnost
                 if any(kw.startswith(k.lower()[:5]) for k in kw_list): 
                     all_keywords_in_cat.append(kw)
                     break 
@@ -92,16 +91,19 @@ def calculate_fo_real(df, col, n_o):
 # --- 5. STREAMLIT APLIKACIJA ---
 
 def main():
-    st.set_page_config(page_title="Stress Analysis Pro", layout="wide")
+    st.set_page_config(page_title="Stress Analysis Pro", page_icon="📊", layout="wide")
     
     # Reset gumb v sidebarju
-    if st.sidebar.button("🔄 Ponastavi aplikacijo"):
-        reset_app()
+    with st.sidebar:
+        st.header("Nastavitve")
+        if st.button("🔄 Ponastavi aplikacijo", use_container_width=True):
+            reset_app()
+        st.divider()
 
     st.title("📊 Klasifikacija stresnih dejavnikov po Petričevi metodi")
     st.markdown("""
     Sistem analizira odgovore respondentov, izloči mašila in klasificira v **6 znanstvenih kategorij**.
-    Izračun stresne moči sledi 3. nivoju Petričeve metode.
+    Izračun stresne moči sledi **3. nivoju Petričeve metode**.
     """)
 
     uploaded_file = st.sidebar.file_uploader("Naložite .txt ali .csv datoteko", type=['txt', 'csv'])
@@ -110,39 +112,39 @@ def main():
         sep = '\t' if uploaded_file.name.endswith('.txt') else ','
         df = pd.read_csv(uploaded_file, sep=sep)
         n_o = len(df)
-        st.success(f"Uspešno naloženo: {n_o} vrstic.")
+        st.success(f"Datoteka uspešno naložena. Analiziramo odgovore za **{n_o}** respondentov.", icon="✅")
         
         target_cols = df.columns.tolist()
         results = {}
         fo_real_factors = {}
 
         # 1. ANALIZA PO KATEGORIJAH
+        st.header("🔍 Kvalitativna analiza po sklopih")
         for col in target_cols[:3]:
-            st.subheader(f"🔍 Analiza: {col}")
-            
-            df[f'keywords_{col}'] = df[col].apply(clean_and_tokenize)
-            df[f'units_{col}'] = df[f'keywords_{col}'].apply(classify_keywords)
-            
-            all_units = [unit for sublist in df[f'units_{col}'].tolist() for unit in sublist]
-            unit_counts = Counter(all_units)
-            
-            freq_df = pd.DataFrame(unit_counts.items(), columns=['Klasifikacijska enota', 'Frekvenca']).sort_values(by='Frekvenca', ascending=False)
-            
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.write("Klasificirani podatki po vrsticah (top 10):")
-                st.dataframe(df[[col, f'units_{col}']].head(10))
-            with c2:
-                st.write("Tabela frekvenc enot:")
-                st.table(freq_df)
-            
-            fo_real, fo_val, fr_val = calculate_fo_real(df, col, n_o)
-            fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
-            results[col] = freq_df
+            with st.expander(f"Podrobnosti za sklop: {col}", expanded=True):
+                df[f'keywords_{col}'] = df[col].apply(clean_and_tokenize)
+                df[f'units_{col}'] = df[f'keywords_{col}'].apply(classify_keywords)
+                
+                all_units = [unit for sublist in df[f'units_{col}'].tolist() for unit in sublist]
+                unit_counts = Counter(all_units)
+                
+                freq_df = pd.DataFrame(unit_counts.items(), columns=['Klasifikacijska enota', 'Frekvenca']).sort_values(by='Frekvenca', ascending=False)
+                
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    st.caption("Klasificirani podatki (prvih 10 vrstic):")
+                    st.dataframe(df[[col, f'units_{col}']].head(10), use_container_width=True)
+                with c2:
+                    st.caption("Frekvence znanstvenih enot:")
+                    st.table(freq_df)
+                
+                fo_real, fo_val, fr_val = calculate_fo_real(df, col, n_o)
+                fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
+                results[col] = freq_df
 
         # 2. IZRAČUN CELOKUPNE STRESNE MOČI (°S)
         st.divider()
-        st.header("📐 Izračun celokupne stresne moči (Third level)")
+        st.header("📐 Izračun celokupne stresne moči")
         
         if len(target_cols) >= 3:
             f_pf = fo_real_factors[target_cols[0]]["val"]
@@ -154,32 +156,46 @@ def main():
                 sigma_rad = math.asin(min(argument, 1.0))
                 sigma_deg = math.degrees(sigma_rad)
                 
-                res_c1, res_c2 = st.columns(2)
-                with res_c1:
-                    st.metric("CELOKUPNA STRESNA MOČ", f"{sigma_deg:.2f} °S")
-                    if 30.0 <= sigma_deg <= 39.0:
-                        st.success("Rezultat je v realnem znanstvenem razponu (30-39 °S).")
-                    else:
-                        st.warning("Rezultat odstopa od razpona. Preverite slovar.")
-                
-                with res_c2:
-                    st.write("**Realni faktorji ($F_o$):**")
-                    st.write(f"- $F_{{oSF}}$ (Stresni): {f_sf:.4f} (mnenj: {fo_real_factors[target_cols[1]]['fo']})")
-                    st.write(f"- $F_{{oPF}}$ (Pozitivni): {f_pf:.4f} (mnenj: {fo_real_factors[target_cols[0]]['fo']})")
-                    st.write(f"- $F_{{oPR}}$ (Predlogi): {f_pr:.4f} (mnenj: {fo_real_factors[target_cols[2]]['fo']})")
-                    st.progress(min(sigma_deg / 90, 1.0))
+                # Estetski prikaz rezultata
+                with st.container(border=True):
+                    res_c1, res_c2 = st.columns([1, 1.5])
+                    with res_c1:
+                        st.metric(label="CELOKUPNA STRESNA MOČ", value=f"{sigma_deg:.2f} °S")
+                        
+                        # Interpretacija stopnje
+                        if sigma_deg <= 15.04:
+                            st.info("Stopnja: Zelo nizka (Very low)")
+                        elif sigma_deg <= 30.04:
+                            st.info("Stopnja: Nizka (Low)")
+                        elif sigma_deg <= 45.04:
+                            st.warning("Stopnja: Srednja (Medium)")
+                        else:
+                            st.error("Stopnja: Višja / Visoka (High)")
+
+                        if 30.0 <= sigma_deg <= 39.0:
+                            st.success("Rezultat je znotraj realnega znanstvenega razpona.", icon="🎯")
+                    
+                    with res_c2:
+                        st.write("**Realni faktorji ($F_o$):**")
+                        st.markdown(f"""
+                        - $F_{{oSF}}$ (Stresni): **{f_sf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[1]]['fo']})</small>
+                        - $F_{{oPF}}$ (Pozitivni): **{f_pf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[0]]['fo']})</small>
+                        - $F_{{oPR}}$ (Predlogi): **{f_pr:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[2]]['fo']})</small>
+                        """, unsafe_allow_html=True)
+                        st.progress(min(sigma_deg / 90, 1.0))
+                        st.caption("Psihosocialni barometer stresa (0°S - 90°S)")
             except Exception as e:
-                st.error(f"Napaka pri izračunu: {e}")
+                st.error(f"Napaka pri matematičnem izračunu: {e}")
 
         # 3. GRAFIČNI PRIKAZ
         st.divider()
-        st.header("📈 Skupni frekvenčni pregled")
-        final_tabs = st.tabs(target_cols[:3])
+        st.header("📈 Frekvenčna porazdelitev")
+        final_tabs = st.tabs([f"📊 {target_cols[0]}", f"📊 {target_cols[1]}", f"📊 {target_cols[2]}"])
         for i, tab in enumerate(final_tabs):
             with tab:
-                st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'))
+                st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'), color="#1C83E1")
     else:
-        st.info("Naložite datoteko za začetek.")
+        st.info("Naložite datoteko v stranskem meniju za začetek analize.", icon="ℹ️")
 
 if __name__ == "__main__":
     main()
