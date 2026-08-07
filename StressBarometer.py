@@ -4,115 +4,198 @@ import re
 import math
 from collections import Counter
 
-# ============================================================
-# STRESS ANALYSIS PRO
-# Petrič – analiza več dejavnikov znotraj celotnega odgovora
-# Brez atomizacije odgovorov
-# ============================================================
 
 # ============================================================
-# 1. PETRIČEVE KLASIFIKACIJSKE ENOTE
+# PETRIČ STRESS POWER CALCULATOR
+#
+# Izračun celokupne stresne moči po:
+# Karl Petrič (2025)
+#
+# σSF = arcsin(sqrt((FSF * FPR) / FPF))
+#
+# Rezultat: stresne stopinje °S
 # ============================================================
 
-CATEGORIES_MAP = {
-    "Attentive (physical) unit": [
-        "hrup", "noise", "svetloba", "light", "vročina", "mraz",
-        "cold", "weather", "vreme", "prostori", "office", "pisarna",
-        "ergonomija", "equipment", "oprema", "tišina", "silence",
-        "temperatura", "zrak", "hrupnost", "delovno okolje"
+
+# ============================================================
+# 1. OSNOVNE NASTAVITVE MODELA
+# ============================================================
+
+THEORETICAL_DENSITY = 10.0
+THEORETICAL_COMPLEXITY = 1.0
+
+
+# ============================================================
+# 2. PETRIČEVE KATEGORIJE
+# ============================================================
+
+CATEGORIES = {
+
+    "Attentive": [
+        "hrup",
+        "svetloba",
+        "vročina",
+        "mraz",
+        "temperatura",
+        "vlažnost",
+        "vonj",
+        "neprijeten vonj",
+        "prostori",
+        "pisarna",
+        "ergonomija",
+        "oprema",
+        "delovno okolje",
+        "hrupno",
+        "neustrezni prostori"
     ],
 
-    "Performance unit": [
-        "rok", "roki", "deadline", "deadlines", "obremenitev",
-        "obremenjen", "obremenjena", "workload", "naloga", "naloge",
-        "tasks", "čas", "time", "administracija", "administracija",
-        "birokracija", "informacije", "information", "znanje",
-        "delovni čas", "nadure", "overwork", "urgenca", "nujnost",
-        "organizacija dela", "organizacija", "preveč dela",
-        "premalo časa"
+    "Performance": [
+        "obremenitev",
+        "preobremenitev",
+        "preveč dela",
+        "preveč nalog",
+        "premalo časa",
+        "pomanjkanje časa",
+        "roki",
+        "kratek rok",
+        "nadure",
+        "birokracija",
+        "administracija",
+        "administrativno delo",
+        "delovni čas",
+        "nujnost",
+        "časovni pritisk",
+        "organizacija dela",
+        "slaba organizacija",
+        "preveč dela",
+        "zahteve",
+        "pričakovanja"
     ],
 
-    "Individual Psychological unit": [
-        "strah", "fear", "anxiety", "tesnoba", "optimism",
-        "pozitivno", "samozavest", "self-confidence", "čustvo",
-        "čustva", "stres", "stress", "frustracija", "frustration",
-        "mir", "peace", "napetost", "napet", "skrbi", "skrb",
-        "motivacija", "demotivacija", "nezadovoljstvo"
+    "Individual psychological": [
+        "strah",
+        "tesnoba",
+        "anksioznost",
+        "stres",
+        "frustracija",
+        "napetost",
+        "skrb",
+        "skrbi",
+        "negotovost",
+        "nezadovoljstvo",
+        "izgorelost",
+        "izčrpanost",
+        "demotivacija",
+        "pomanjkanje samozavesti",
+        "samozavest"
     ],
 
-    "Partial social unit": [
-        "plača", "salary", "denar", "money", "finance", "finan",
-        "nagrada", "reward", "status", "recognition", "priznanje",
-        "revščina", "poverty", "standard", "neenakost",
-        "inequality", "nepravičnost", "krivičnost", "plačilo"
+    "Partial social": [
+        "plača",
+        "prenizka plača",
+        "slaba plača",
+        "plačilo",
+        "denar",
+        "finančna situacija",
+        "finančna negotovost",
+        "nagrada",
+        "status",
+        "priznanje",
+        "nepravičnost",
+        "neenakost",
+        "standard",
+        "davki",
+        "stroški"
     ],
 
-    "Social unit": [
-        "odnos", "odnosi", "relationships", "mobing", "mobbing",
-        "bullying", "harassment", "nadlegovanje", "sodelavec",
-        "sodelavci", "colleagues", "šef", "boss", "vodja",
-        "vodstvo", "družina", "family", "prijatelj", "prijatelji",
-        "friends", "komunikacija", "communication", "prepir",
-        "konflikt", "konflikti", "sodelovanje", "nespoštovanje"
+    "Social": [
+        "odnosi",
+        "slabi odnosi",
+        "konflikt",
+        "konflikti",
+        "prepir",
+        "mobing",
+        "mobbing",
+        "nadlegovanje",
+        "sodelavci",
+        "sodelavec",
+        "šef",
+        "vodja",
+        "vodstvo",
+        "komunikacija",
+        "slaba komunikacija",
+        "nespoštovanje",
+        "medosebni odnosi"
     ],
 
-    "Health biological unit": [
-        "zdravje", "health", "bolezen", "illness", "šport",
-        "sports", "exercise", "vadba", "prehrana", "diet",
-        "spanje", "sleep", "utrujenost", "tiredness", "utrujen",
-        "joga", "yoga", "meditacija", "meditation", "počitek",
-        "rekreacija", "počivanje", "izčrpanost"
+    "Health biological": [
+        "zdravje",
+        "bolezen",
+        "zdravstvene težave",
+        "spanje",
+        "slabo spanje",
+        "pomanjkanje spanja",
+        "utrujenost",
+        "utrujen",
+        "izčrpanost",
+        "počitek",
+        "premalo počitka",
+        "prehrana",
+        "slaba prehrana",
+        "šport",
+        "vadba",
+        "rekreacija"
     ]
 }
 
 
 # ============================================================
-# 2. SLOVENSKI IN ANGLEŠKI VZORCI
+# 3. POZITIVNI DEJAVNIKI
 # ============================================================
 
-POSITIVE_PATTERNS = [
+POSITIVE_FACTORS = [
+
+    "dobra komunikacija",
+    "dobri odnosi",
+    "podpora",
+    "podpora sodelavcev",
+    "podpora vodstva",
+    "sodelovanje",
+    "priznanje",
+    "nagrada",
+    "fleksibilnost",
+    "samostojnost",
+    "avtonomija",
+    "dobra organizacija",
+    "dobra organizacija dela",
+    "dovolj časa",
+    "mir",
+    "počitek",
+    "spanje",
+    "dober spanec",
     "šport",
     "vadba",
     "rekreacija",
     "meditacija",
     "joga",
-    "počitek",
-    "spanje",
-    "dober spanec",
-    "dobra komunikacija",
-    "podpora",
-    "podpora sodelavcev",
-    "podpora vodstva",
-    "dober odnos",
-    "dobri odnosi",
-    "sodelovanje",
-    "priznanje",
-    "nagrada",
-    "fleksibilnost",
-    "avtonomija",
-    "samostojnost",
-    "mir",
-    "pozitivno okolje",
-    "dobra organizacija",
-    "dobra organizacija dela",
-    "zdrava prehrana",
     "družina",
     "prijatelji",
-    "family",
-    "friends",
-    "exercise",
-    "meditation",
-    "yoga",
-    "support",
-    "good communication",
-    "good relationships",
-    "autonomy",
-    "flexibility",
-    "rest",
-    "sleep"
+    "zdrava prehrana",
+    "pozitivno okolje",
+    "dobri pogoji",
+    "ustrezna oprema",
+    "ustrezni prostori",
+    "motivacija",
+    "samozavest"
 ]
 
+
+# ============================================================
+# 4. PREDLOGI
+# ============================================================
+
 PROPOSAL_PATTERNS = [
+
     "predlagam",
     "predlagal",
     "predlagala",
@@ -122,513 +205,456 @@ PROPOSAL_PATTERNS = [
     "morali bi",
     "morala bi",
     "moral bi",
-    "naj se",
-    "naj bi",
     "potrebujemo",
-    "potrebna je",
-    "potrebno bi bilo",
     "priporočam",
     "priporočljivo je",
-    "rešitev je",
-    "rešitve so",
+    "naj se",
+    "naj bi",
     "uvesti",
     "izboljšati",
     "zmanjšati",
     "povečati",
     "odpraviti",
-    "organizirati",
     "omogočiti",
     "zagotoviti",
-    "več",
-    "manj",
-    "predlog",
-    "proposal",
-    "suggest",
-    "should",
-    "need to",
-    "reduce",
-    "increase",
-    "improve"
+    "organizirati",
+    "rešitev",
+    "rešitve",
+    "predlog"
 ]
 
 
 # ============================================================
-# 3. POMOŽNE FUNKCIJE
+# 5. NORMALIZACIJA
 # ============================================================
 
-def normalize_text(text):
-    """
-    Normalizira besedilo, vendar ga NE atomizira.
-    Celoten odgovor ostane analitična enota.
-    """
+def normalize(text):
+
     if pd.isna(text):
         return ""
 
-    text = str(text).strip().lower()
+    text = str(text).lower().strip()
 
-    # odstrani odvečne presledke
     text = re.sub(r"\s+", " ", text)
 
     return text
 
 
-def split_sentences(text):
-    """
-    Razdeli odgovor samo na stavke zaradi lažjega iskanja
-    različnih dejavnikov. To NI atomizacija na besede.
-    """
-    if not text:
-        return []
-
-    sentences = re.split(r"(?<=[.!?;])\s+", text)
-
-    return [
-        s.strip()
-        for s in sentences
-        if s.strip()
-    ]
-
-
-def contains_phrase(text, phrase):
-    """
-    Varno preverjanje prisotnosti pojma v celotnem odgovoru.
-    """
-    text = normalize_text(text)
-    phrase = normalize_text(phrase)
-
-    if not phrase:
-        return False
-
-    return phrase in text
-
-
 # ============================================================
-# 4. KLASIFIKACIJA CELOTNEGA ODGOVORA
-# ============================================================
-
-def classify_response(text):
-    """
-    V celotnem odgovoru poišče VSE Petričeve klasifikacijske enote.
-    En odgovor lahko vsebuje več različnih enot.
-    """
-
-    text = normalize_text(text)
-
-    found_categories = []
-
-    for category, keywords in CATEGORIES_MAP.items():
-
-        for keyword in keywords:
-
-            if contains_phrase(text, keyword):
-                found_categories.append(category)
-                break
-
-    return found_categories
-
-
-# ============================================================
-# 5. ISKANJE VEČ STRESNIH DEJAVNIKOV
+# 6. ZAZNAVANJE STRESNIH DEJAVNIKOV
 # ============================================================
 
 def detect_stress_factors(text):
-    """
-    Poišče več različnih stresnih dejavnikov znotraj istega
-    celotnega odgovora.
 
-    Ne uporablja atomizacije posameznih besed.
-    """
-
-    text = normalize_text(text)
+    text = normalize(text)
 
     found = []
 
-    # Stresni izrazi po posameznih kategorijah
-    stress_keywords = {
+    for category, factors in CATEGORIES.items():
 
-        "Attentive (physical) unit": [
-            "hrup", "svetloba", "vročina", "mraz", "slabi prostori",
-            "neustrezni prostori", "ergonomija", "oprema",
-            "slabo delovno okolje", "hrupno okolje"
-        ],
+        for factor in factors:
 
-        "Performance unit": [
-            "obremenitev", "preobremenitev", "preveč dela",
-            "preveč nalog", "premalo časa", "roki", "kratki roki",
-            "nadure", "delovni čas", "birokracija",
-            "administracija", "nujnost", "organizacija dela",
-            "slaba organizacija", "pomanjkanje časa"
-        ],
+            if factor in text:
 
-        "Individual Psychological unit": [
-            "stres", "strah", "tesnoba", "frustracija",
-            "napetost", "skrb", "skrbi", "nezadovoljstvo",
-            "izgorelost", "izčrpanost", "demotivacija"
-        ],
+                found.append(
+                    (factor, category)
+                )
 
-        "Partial social unit": [
-            "nizka plača", "prenizka plača", "slaba plača",
-            "neustrezno plačilo", "finančna negotovost",
-            "nepravičnost", "neenakost", "pomanjkanje priznanja"
-        ],
+    # isti dejavnik v istem odgovoru
+    # šteje samo enkrat
 
-        "Social unit": [
-            "slabi odnosi", "konflikt", "konflikti", "prepir",
-            "mobing", "nadlegovanje", "bullying", "slaba komunikacija",
-            "nespoštovanje", "težave s šefom", "težave z vodstvom",
-            "težave s sodelavci"
-        ],
+    unique = []
 
-        "Health biological unit": [
-            "pomanjkanje spanja", "slabo spanje", "nespečnost",
-            "utrujenost", "izčrpanost", "bolezen",
-            "zdravstvene težave", "premalo počitka"
-        ]
-    }
+    for item in found:
 
-    for category, keywords in stress_keywords.items():
+        if item not in unique:
+            unique.append(item)
 
-        for keyword in keywords:
-
-            if contains_phrase(text, keyword):
-
-                factor = {
-                    "dejavnik": keyword,
-                    "kategorija": category
-                }
-
-                if factor not in found:
-                    found.append(factor)
-
-    return found
+    return unique
 
 
 # ============================================================
-# 6. ISKANJE POZITIVNIH DEJAVNIKOV
+# 7. ZAZNAVANJE POZITIVNIH DEJAVNIKOV
 # ============================================================
 
 def detect_positive_factors(text):
-    """
-    Poišče več pozitivnih dejavnikov znotraj istega odgovora.
-    """
 
-    text = normalize_text(text)
+    text = normalize(text)
 
     found = []
 
-    for phrase in POSITIVE_PATTERNS:
+    for factor in POSITIVE_FACTORS:
 
-        if contains_phrase(text, phrase):
+        if factor in text:
 
-            if phrase not in found:
-                found.append(phrase)
+            if factor not in found:
+                found.append(factor)
 
     return found
 
 
 # ============================================================
-# 7. ISKANJE PREDLOGOV
+# 8. ZAZNAVANJE PREDLOGOV
 # ============================================================
 
 def detect_proposals(text):
-    """
-    Poišče predloge za zmanjšanje stresa.
 
-    Predlog ni omejen na eno besedo.
-    Sistem lahko zazna več predlogov v istem odgovoru.
-    """
+    text = normalize(text)
 
-    text = normalize_text(text)
+    found = []
 
-    sentences = split_sentences(text)
-
-    proposals = []
+    # Najprej poiščemo stavke, v katerih je predlog
+    sentences = re.split(
+        r"(?<=[.!?;])\s+",
+        text
+    )
 
     for sentence in sentences:
-
-        is_proposal = False
 
         for pattern in PROPOSAL_PATTERNS:
 
             if pattern in sentence:
-                is_proposal = True
+
+                sentence = sentence.strip()
+
+                if sentence not in found:
+                    found.append(sentence)
+
                 break
 
-        if is_proposal:
-
-            clean_sentence = sentence.strip()
-
-            if clean_sentence and clean_sentence not in proposals:
-                proposals.append(clean_sentence)
-
-    return proposals
+    return found
 
 
 # ============================================================
-# 8. OCENA INTENZIVNOSTI STRESNIH DEJAVNIKOV
+# 9. ANALIZA ENEGA ODGOVORA
 # ============================================================
 
-def estimate_intensity(text):
-    """
-    Hevristična ocena intenzivnosti 1–5.
+def analyze_answer(text):
 
-    1 = zelo nizka
-    2 = nizka
-    3 = srednja
-    4 = visoka
-    5 = zelo visoka
-    """
+    text = normalize(text)
 
-    text = normalize_text(text)
+    sf = detect_stress_factors(text)
 
-    very_high = [
-        "izredno", "zelo močno", "popolnoma izčrpan",
-        "izgorelost", "neznosno", "katastrofalno",
-        "extreme", "extremely", "burnout"
-    ]
+    pf = detect_positive_factors(text)
 
-    high = [
-        "zelo", "močno", "veliko", "hudo", "preobremenjen",
-        "preobremenitev", "stalno", "nenehno", "high"
-    ]
-
-    medium = [
-        "pogosto", "večkrat", "problem", "težava",
-        "stres", "frustracija", "medium"
-    ]
-
-    low = [
-        "malo", "občasno", "rahlo", "manjša težava",
-        "low"
-    ]
-
-    for phrase in very_high:
-        if phrase in text:
-            return 5
-
-    for phrase in high:
-        if phrase in text:
-            return 4
-
-    for phrase in medium:
-        if phrase in text:
-            return 3
-
-    for phrase in low:
-        if phrase in text:
-            return 2
-
-    return 3
-
-
-# ============================================================
-# 9. ANALIZA ENEGA CELOTNEGA ODGOVORA
-# ============================================================
-
-def analyze_response(text):
-
-    text = normalize_text(text)
-
-    if not text:
-        return {
-            "stresni_dejavniki": [],
-            "pozitivni_dejavniki": [],
-            "predlogi": [],
-            "kategorije": [],
-            "intenzivnost": 0,
-            "SF_count": 0,
-            "PF_count": 0,
-            "PR_count": 0
-        }
-
-    stress_factors = detect_stress_factors(text)
-    positive_factors = detect_positive_factors(text)
-    proposals = detect_proposals(text)
-    categories = classify_response(text)
-
-    intensity = estimate_intensity(text)
+    pr = detect_proposals(text)
 
     return {
-        "stresni_dejavniki": stress_factors,
-        "pozitivni_dejavniki": positive_factors,
-        "predlogi": proposals,
-        "kategorije": categories,
-        "intenzivnost": intensity,
-        "SF_count": len(stress_factors),
-        "PF_count": len(positive_factors),
-        "PR_count": len(proposals)
+        "SF": sf,
+        "PF": pf,
+        "PR": pr
     }
 
 
 # ============================================================
-# 10. IZRAČUN STRESNE MOČI
+# 10. IZRAČUN DENSITY
 # ============================================================
 
-def calculate_stress_power(sf_weight, pf_weight, pr_weight):
-    """
-    Izračun stresne moči sigma v stresnih stopinjah.
+def calculate_density(total_opinions, number_of_persons):
 
-    SF = stresni dejavniki
-    PF = pozitivni dejavniki
-    PR = predlogi
-
-    Rezultat:
-        0–50 stresnih stopinj
-    """
-
-    if sf_weight <= 0:
+    if number_of_persons <= 0:
         return 0.0
 
-    # Pozitivni dejavniki zmanjšujejo relativni stres
-    stress_ratio = sf_weight / (pf_weight + 1.0)
+    return total_opinions / number_of_persons
 
-    # Predlogi povečujejo potencial za zmanjšanje stresa
-    recovery_factor = 1.0 + (pr_weight / 10.0)
 
-    adjusted_ratio = stress_ratio / recovery_factor
+# ============================================================
+# 11. IZRAČUN COMPLEXITY / VARIABILITY
+# ============================================================
 
-    sigma = (
-        math.log10(adjusted_ratio + 1.0) * 50.0
+def calculate_complexity(total_opinions, diverse_opinions):
+
+    if diverse_opinions <= 0:
+        return 0.0
+
+    return total_opinions / diverse_opinions
+
+
+# ============================================================
+# 12. REAL FACTOR Fo
+#
+# Fo = Co * rho_o / (Ct * rho_t)
+#
+# Ct = 1
+# rho_t = 10
+# ============================================================
+
+def calculate_real_factor(
+    complexity,
+    density
+):
+
+    return (
+        complexity * density
+    ) / (
+        THEORETICAL_COMPLEXITY *
+        THEORETICAL_DENSITY
     )
 
-    sigma = max(0.0, min(50.0, sigma))
 
-    return round(sigma, 2)
+# ============================================================
+# 13. STRESNA MOČ
+#
+# σSF = arcsin sqrt(FSF * FPR / FPF)
+#
+# Python math.asin vrne radiane,
+# zato rezultat pretvorimo v stopinje.
+# ============================================================
+
+def calculate_stress_power(
+    F_SF,
+    F_PF,
+    F_PR
+):
+
+    if F_PF <= 0:
+
+        return None
+
+    ratio = (
+        F_SF * F_PR
+    ) / F_PF
+
+    # Zaradi numerične varnosti
+    ratio = max(
+        0.0,
+        min(1.0, ratio)
+    )
+
+    sigma_radians = math.asin(
+        math.sqrt(ratio)
+    )
+
+    sigma_degrees = math.degrees(
+        sigma_radians
+    )
+
+    return sigma_degrees
 
 
 # ============================================================
-# 11. IZRAČUN ENERGIJE
+# 14. GLAVNA AGREGACIJA
 # ============================================================
 
-def calculate_energy(sigma):
-    """
-    Model energijske izgube pri osnovni razpoložljivi energiji
-    2500 enot.
-    """
+def calculate_dataset(results):
 
-    W_I = 2500.0
+    number_of_persons = len(results)
 
-    energy_loss = W_I * sigma / 50.0
+    # --------------------------------------------------------
+    # SF
+    # --------------------------------------------------------
 
-    useful_energy = W_I - energy_loss
-
-    efficiency = (useful_energy / W_I) * 100.0
-
-    return {
-        "vhodna_energija": round(W_I, 2),
-        "izguba_energije": round(energy_loss, 2),
-        "uporabna_energija": round(useful_energy, 2),
-        "ucinkovitost": round(efficiency, 2)
-    }
-
-
-# ============================================================
-# 12. AGREGACIJA CELOTNEGA DATASETA
-# ============================================================
-
-def aggregate_results(results):
-
-    total_sf = 0
-    total_pf = 0
-    total_pr = 0
-
-    sf_weight = 0
-    pf_weight = 0
-    pr_weight = 0
-
-    all_categories = []
+    all_sf = []
 
     for result in results:
 
-        sf = result["SF_count"]
-        pf = result["PF_count"]
-        pr = result["PR_count"]
+        all_sf.extend(
+            result["SF"]
+        )
 
-        intensity = result["intenzivnost"]
+    total_sf = len(all_sf)
 
-        total_sf += sf
-        total_pf += pf
-        total_pr += pr
-
-        # Stresni dejavniki so ponderirani z intenzivnostjo
-        sf_weight += sf * intensity
-
-        # Pozitivni dejavniki imajo nekoliko manjšo težo
-        pf_weight += pf * 2
-
-        # Predlog ima obnovitveni učinek
-        pr_weight += pr * 2
-
-        all_categories.extend(result["kategorije"])
-
-    sigma = calculate_stress_power(
-        sf_weight,
-        pf_weight,
-        pr_weight
+    diverse_sf = len(
+        set(all_sf)
     )
 
-    energy = calculate_energy(sigma)
+    rho_sf = calculate_density(
+        total_sf,
+        number_of_persons
+    )
+
+    C_sf = calculate_complexity(
+        total_sf,
+        diverse_sf
+    )
+
+    F_sf = calculate_real_factor(
+        C_sf,
+        rho_sf
+    )
+
+    # --------------------------------------------------------
+    # PF
+    # --------------------------------------------------------
+
+    all_pf = []
+
+    for result in results:
+
+        all_pf.extend(
+            result["PF"]
+        )
+
+    total_pf = len(all_pf)
+
+    diverse_pf = len(
+        set(all_pf)
+    )
+
+    rho_pf = calculate_density(
+        total_pf,
+        number_of_persons
+    )
+
+    C_pf = calculate_complexity(
+        total_pf,
+        diverse_pf
+    )
+
+    F_pf = calculate_real_factor(
+        C_pf,
+        rho_pf
+    )
+
+    # --------------------------------------------------------
+    # PR
+    # --------------------------------------------------------
+
+    all_pr = []
+
+    for result in results:
+
+        all_pr.extend(
+            result["PR"]
+        )
+
+    total_pr = len(all_pr)
+
+    # Za predloge uporabimo normalizirano
+    # besedilno vsebino predloga kot raznolikost.
+
+    diverse_pr = len(
+        set(all_pr)
+    )
+
+    rho_pr = calculate_density(
+        total_pr,
+        number_of_persons
+    )
+
+    C_pr = calculate_complexity(
+        total_pr,
+        diverse_pr
+    )
+
+    F_pr = calculate_real_factor(
+        C_pr,
+        rho_pr
+    )
+
+    # --------------------------------------------------------
+    # KONČNA STRESNA MOČ
+    # --------------------------------------------------------
+
+    sigma = calculate_stress_power(
+        F_sf,
+        F_pf,
+        F_pr
+    )
 
     return {
-        "SF_count": total_sf,
-        "PF_count": total_pf,
-        "PR_count": total_pr,
-        "SF_weight": sf_weight,
-        "PF_weight": pf_weight,
-        "PR_weight": pr_weight,
-        "sigma": sigma,
-        "energy": energy,
-        "categories": Counter(all_categories)
+
+        "N": number_of_persons,
+
+        "total_sf": total_sf,
+        "diverse_sf": diverse_sf,
+        "rho_sf": rho_sf,
+        "C_sf": C_sf,
+        "F_sf": F_sf,
+
+        "total_pf": total_pf,
+        "diverse_pf": diverse_pf,
+        "rho_pf": rho_pf,
+        "C_pf": C_pf,
+        "F_pf": F_pf,
+
+        "total_pr": total_pr,
+        "diverse_pr": diverse_pr,
+        "rho_pr": rho_pr,
+        "C_pr": C_pr,
+        "F_pr": F_pr,
+
+        "sigma": sigma
     }
 
 
 # ============================================================
-# 13. GLAVNA STREAMLIT APLIKACIJA
+# 15. INTERPRETACIJA
+# ============================================================
+
+def interpret_stress(sigma):
+
+    if sigma is None:
+        return "Ni mogoče izračunati."
+
+    if sigma < 15.05:
+        return "Zelo nizka stresna moč"
+
+    elif sigma < 30.05:
+        return "Nizka stresna moč"
+
+    elif sigma < 45.05:
+        return "Srednja stresna moč"
+
+    elif sigma < 60.05:
+        return "Višja stresna moč"
+
+    elif sigma < 75.05:
+        return "Visoka stresna moč"
+
+    else:
+        return "Zelo visoka stresna moč"
+
+
+# ============================================================
+# 16. STREAMLIT
 # ============================================================
 
 def main():
 
     st.set_page_config(
-        page_title="Stress Analysis Pro",
+        page_title="Petrič Stress Power",
         layout="wide"
     )
 
     st.title(
-        "📊 Stress Analysis Pro – Petričeva analiza"
+        "🧠 Petrič – izračun celokupne stresne moči"
     )
 
     st.markdown(
         """
-        Sistem analizira **celoten odgovor respondenta kot eno vsebinsko enoto**.
+        Ta različica izračunava **samo celokupno moč stresnih
+        dejavnikov v stresnih stopinjah (°S)**.
 
-        Odgovor se ne atomizira na posamezne besede. Znotraj istega odgovora
-        lahko sistem zazna **več stresnih dejavnikov, več pozitivnih dejavnikov
-        in več predlogov**.
-
-        Na podlagi rezultatov izračuna tudi **stresno moč σ v stresnih stopinjah
-        (0–50)**.
+        Celotni odgovori respondentov ostanejo nedotaknjeni.
+        Znotraj posameznega odgovora sistem lahko zazna več
+        stresnih dejavnikov, pozitivnih dejavnikov in predlogov.
         """
     )
 
     # ========================================================
-    # DATOTEKA
+    # UPLOAD
     # ========================================================
 
     uploaded_file = st.sidebar.file_uploader(
-        "Naložite .txt, .csv ali .xlsx datoteko",
-        type=["txt", "csv", "xlsx"]
+        "Naložite podatke",
+        type=[
+            "xlsx",
+            "csv",
+            "txt"
+        ]
     )
 
     if uploaded_file is None:
 
         st.info(
-            "Prosim, naložite podatkovno datoteko."
+            "Naložite .xlsx, .csv ali .txt datoteko."
         )
 
         return
 
     # ========================================================
-    # BRANJE DATOTEKE
+    # BRANJE
     # ========================================================
 
     try:
@@ -637,15 +663,19 @@ def main():
 
         if filename.endswith(".xlsx"):
 
-            df = pd.read_excel(uploaded_file)
+            df = pd.read_excel(
+                uploaded_file
+            )
 
         elif filename.endswith(".txt"):
 
             try:
+
                 df = pd.read_csv(
                     uploaded_file,
                     sep="\t"
                 )
+
             except Exception:
 
                 uploaded_file.seek(0)
@@ -658,7 +688,9 @@ def main():
 
         else:
 
-            df = pd.read_csv(uploaded_file)
+            df = pd.read_csv(
+                uploaded_file
+            )
 
     except Exception as e:
 
@@ -671,394 +703,292 @@ def main():
     if df.empty:
 
         st.warning(
-            "Datoteka ne vsebuje podatkov."
+            "Datoteka je prazna."
         )
 
         return
 
     st.success(
-        f"Uspešno naloženo: {len(df)} vrstic."
+        f"Naloženih odgovorov: {len(df)}"
     )
 
     # ========================================================
-    # PREGLED PODATKOV
-    # ========================================================
-
-    with st.expander("👁️ Pregled surovih podatkov"):
-
-        st.dataframe(
-            df.head(20),
-            use_container_width=True
-        )
-
-    # ========================================================
-    # IZBIRA STOLPCEV
+    # IZBIRA STOLPCA
     # ========================================================
 
     st.sidebar.markdown("---")
 
     st.sidebar.subheader(
-        "📌 Analizirani stolpci"
+        "Stolpec z odgovori"
     )
 
-    available_columns = df.columns.tolist()
-
-    selected_columns = st.sidebar.multiselect(
-        "Izberite stolpce za analizo",
-        available_columns,
-        default=available_columns
+    column = st.sidebar.selectbox(
+        "Izberite stolpec",
+        df.columns.tolist()
     )
-
-    if not selected_columns:
-
-        st.warning(
-            "Izberite vsaj en stolpec."
-        )
-
-        return
 
     # ========================================================
     # ANALIZA
     # ========================================================
 
-    all_analysis = []
+    results = []
 
-    for column in selected_columns:
+    for answer in df[column]:
 
-        st.divider()
-
-        st.header(
-            f"🔍 Analiza: {column}"
+        results.append(
+            analyze_answer(answer)
         )
 
-        column_results = []
+    # ========================================================
+    # IZRAČUN
+    # ========================================================
 
-        for index, value in df[column].items():
+    calculation = calculate_dataset(
+        results
+    )
 
-            result = analyze_response(value)
+    # ========================================================
+    # GLAVNI REZULTAT
+    # ========================================================
 
-            result["respondent"] = index + 1
-            result["odgovor"] = value
+    st.divider()
 
-            column_results.append(result)
+    st.header(
+        "🔥 CELOKUPNA MOČ STRESNIH DEJAVNIKOV"
+    )
 
-            all_analysis.append(result)
+    sigma = calculation["sigma"]
 
-        # ====================================================
-        # TABELA POSAMEZNIH ODGOVOROV
-        # ====================================================
+    if sigma is None:
 
-        display_rows = []
+        st.error(
+            "Stresne moči ni mogoče izračunati, "
+            "ker ni zaznanih pozitivnih dejavnikov."
+        )
 
-        for result in column_results:
+        return
 
-            stress_text = "; ".join(
+    st.metric(
+        "σSF – stresna moč",
+        f"{sigma:.2f} °S"
+    )
+
+    st.progress(
+        min(sigma / 90.0, 1.0)
+    )
+
+    st.subheader(
+        interpret_stress(sigma)
+    )
+
+    # ========================================================
+    # OPOZORILO GLEDE TVOJEGA EMPIRIČNEGA OBMOČJA
+    # ========================================================
+
+    if sigma < 30:
+
+        st.warning(
+            f"⚠️ Rezultat {sigma:.2f} °S je pod "
+            "pričakovanim empiričnim območjem 30–39 °S."
+        )
+
+    elif sigma > 39:
+
+        st.warning(
+            f"⚠️ Rezultat {sigma:.2f} °S je nad "
+            "pričakovanim empiričnim območjem 30–39 °S."
+        )
+
+    else:
+
+        st.success(
+            f"✅ Rezultat {sigma:.2f} °S je znotraj "
+            "pričakovanega območja 30–39 °S."
+        )
+
+    # ========================================================
+    # PODROBNOSTI IZRAČUNA
+    # ========================================================
+
+    with st.expander(
+        "🧮 Prikaži znanstveni izračun"
+    ):
+
+        st.write(
+            f"**Število respondentov N:** "
+            f"{calculation['N']}"
+        )
+
+        st.markdown("### SF – stresni dejavniki")
+
+        st.write(
+            f"Skupno SF: "
+            f"{calculation['total_sf']}"
+        )
+
+        st.write(
+            f"Različni SF: "
+            f"{calculation['diverse_sf']}"
+        )
+
+        st.write(
+            f"ρSF = "
+            f"{calculation['rho_sf']:.4f}"
+        )
+
+        st.write(
+            f"CSF = "
+            f"{calculation['C_sf']:.4f}"
+        )
+
+        st.write(
+            f"FSF = "
+            f"{calculation['F_sf']:.4f}"
+        )
+
+        st.markdown("### PF – pozitivni dejavniki")
+
+        st.write(
+            f"Skupno PF: "
+            f"{calculation['total_pf']}"
+        )
+
+        st.write(
+            f"Različni PF: "
+            f"{calculation['diverse_pf']}"
+        )
+
+        st.write(
+            f"ρPF = "
+            f"{calculation['rho_pf']:.4f}"
+        )
+
+        st.write(
+            f"CPF = "
+            f"{calculation['C_pf']:.4f}"
+        )
+
+        st.write(
+            f"FPF = "
+            f"{calculation['F_pf']:.4f}"
+        )
+
+        st.markdown("### PR – predlogi")
+
+        st.write(
+            f"Skupno PR: "
+            f"{calculation['total_pr']}"
+        )
+
+        st.write(
+            f"Različni PR: "
+            f"{calculation['diverse_pr']}"
+        )
+
+        st.write(
+            f"ρPR = "
+            f"{calculation['rho_pr']:.4f}"
+        )
+
+        st.write(
+            f"CPR = "
+            f"{calculation['C_pr']:.4f}"
+        )
+
+        st.write(
+            f"FPR = "
+            f"{calculation['F_pr']:.4f}"
+        )
+
+        st.markdown("---")
+
+        st.write(
+            "### Končna formula"
+        )
+
+        st.latex(
+            r"""
+            \sigma_{SF}
+            =
+            \arcsin
+            \sqrt{
+            \frac{
+            F_{SF}\cdot F_{PR}
+            }{
+            F_{PF}
+            }}
+            """
+        )
+
+        st.write(
+            f"**σSF = {sigma:.4f} °S**"
+        )
+
+    # ========================================================
+    # PREGLED ZAZNANIH DEJAVNIKOV
+    # ========================================================
+
+    with st.expander(
+        "🔎 Pregled zaznanih dejavnikov"
+    ):
+
+        rows = []
+
+        for i, result in enumerate(results):
+
+            sf = ", ".join(
                 [
-                    f"{x['dejavnik']} ({x['kategorija']})"
-                    for x in result["stresni_dejavniki"]
+                    f"{factor} [{category}]"
+                    for factor, category
+                    in result["SF"]
                 ]
             )
 
-            positive_text = "; ".join(
-                result["pozitivni_dejavniki"]
+            pf = ", ".join(
+                result["PF"]
             )
 
-            proposal_text = " | ".join(
-                result["predlogi"]
+            pr = " | ".join(
+                result["PR"]
             )
 
-            category_text = "; ".join(
-                result["kategorije"]
-            )
+            rows.append({
 
-            display_rows.append({
-                "Respondent": result["respondent"],
-                "Odgovor": result["odgovor"],
-                "Stresni dejavniki": stress_text,
-                "Pozitivni dejavniki": positive_text,
-                "Predlogi": proposal_text,
-                "Petričeve enote": category_text,
-                "Intenzivnost": result["intenzivnost"],
-                "SF": result["SF_count"],
-                "PF": result["PF_count"],
-                "PR": result["PR_count"]
+                "Respondent":
+                    i + 1,
+
+                "Stresni dejavniki":
+                    sf,
+
+                "Pozitivni dejavniki":
+                    pf,
+
+                "Predlogi":
+                    pr,
+
+                "SF":
+                    len(result["SF"]),
+
+                "PF":
+                    len(result["PF"]),
+
+                "PR":
+                    len(result["PR"])
             })
 
-        result_df = pd.DataFrame(display_rows)
+        result_df = pd.DataFrame(
+            rows
+        )
 
         st.dataframe(
             result_df,
             use_container_width=True,
-            height=450
-        )
-
-        # ====================================================
-        # AGREGACIJA TEGA STOLPCA
-        # ====================================================
-
-        aggregate = aggregate_results(
-            column_results
-        )
-
-        # ====================================================
-        # METRIKE
-        # ====================================================
-
-        c1, c2, c3, c4 = st.columns(4)
-
-        with c1:
-            st.metric(
-                "Stresni dejavniki (SF)",
-                aggregate["SF_count"]
-            )
-
-        with c2:
-            st.metric(
-                "Pozitivni dejavniki (PF)",
-                aggregate["PF_count"]
-            )
-
-        with c3:
-            st.metric(
-                "Predlogi (PR)",
-                aggregate["PR_count"]
-            )
-
-        with c4:
-            st.metric(
-                "Stresna moč σ",
-                f"{aggregate['sigma']:.2f}°"
-            )
-
-        # ====================================================
-        # STRESNA MOČ
-        # ====================================================
-
-        sigma = aggregate["sigma"]
-
-        st.subheader(
-            "🔥 Stresna moč"
-        )
-
-        st.progress(
-            min(sigma / 50.0, 1.0)
-        )
-
-        if sigma < 10:
-
-            st.success(
-                f"Stresna moč: {sigma:.2f}° – zelo nizka"
-            )
-
-        elif sigma < 20:
-
-            st.info(
-                f"Stresna moč: {sigma:.2f}° – nizka"
-            )
-
-        elif sigma < 30:
-
-            st.warning(
-                f"Stresna moč: {sigma:.2f}° – zmerna"
-            )
-
-        elif sigma < 40:
-
-            st.warning(
-                f"Stresna moč: {sigma:.2f}° – visoka"
-            )
-
-        else:
-
-            st.error(
-                f"Stresna moč: {sigma:.2f}° – zelo visoka"
-            )
-
-        # ====================================================
-        # MATEMATIČNI MODEL
-        # ====================================================
-
-        with st.expander(
-            "🧮 Podrobnosti izračuna stresne moči"
-        ):
-
-            st.write(
-                f"**SF utež:** {aggregate['SF_weight']:.2f}"
-            )
-
-            st.write(
-                f"**PF utež:** {aggregate['PF_weight']:.2f}"
-            )
-
-            st.write(
-                f"**PR utež:** {aggregate['PR_weight']:.2f}"
-            )
-
-            stress_ratio = (
-                aggregate["SF_weight"] /
-                (aggregate["PF_weight"] + 1.0)
-            )
-
-            recovery_factor = (
-                1.0 +
-                aggregate["PR_weight"] / 10.0
-            )
-
-            adjusted_ratio = (
-                stress_ratio /
-                recovery_factor
-            )
-
-            st.write(
-                f"**Stress ratio:** {stress_ratio:.4f}"
-            )
-
-            st.write(
-                f"**Recovery factor:** {recovery_factor:.4f}"
-            )
-
-            st.write(
-                f"**Adjusted ratio:** {adjusted_ratio:.4f}"
-            )
-
-            st.write(
-                "**Formula:** "
-                "σ = log10(adjusted ratio + 1) × 50"
-            )
-
-            st.write(
-                f"**Končna stresna moč:** "
-                f"σ = {sigma:.2f} stresnih stopinj"
-            )
-
-        # ====================================================
-        # ENERGIJSKI MODEL
-        # ====================================================
-
-        energy = aggregate["energy"]
-
-        st.subheader(
-            "⚡ Energijski model"
-        )
-
-        e1, e2, e3 = st.columns(3)
-
-        with e1:
-
-            st.metric(
-                "Izguba energije",
-                f"{energy['izguba_energije']:.2f}"
-            )
-
-        with e2:
-
-            st.metric(
-                "Uporabna energija",
-                f"{energy['uporabna_energija']:.2f}"
-            )
-
-        with e3:
-
-            st.metric(
-                "Učinkovitost",
-                f"{energy['ucinkovitost']:.2f}%"
-            )
-
-        # ====================================================
-        # PETRIČEVE KATEGORIJE
-        # ====================================================
-
-        st.subheader(
-            "🧠 Petričeve klasifikacijske enote"
-        )
-
-        category_counts = aggregate["categories"]
-
-        if category_counts:
-
-            category_df = pd.DataFrame(
-                category_counts.items(),
-                columns=[
-                    "Klasifikacijska enota",
-                    "Frekvenca"
-                ]
-            ).sort_values(
-                "Frekvenca",
-                ascending=False
-            )
-
-            st.dataframe(
-                category_df,
-                use_container_width=True
-            )
-
-            st.bar_chart(
-                category_df.set_index(
-                    "Klasifikacijska enota"
-                )
-            )
-
-        else:
-
-            st.info(
-                "V odgovorih ni bilo mogoče zaznati "
-                "Petričevih klasifikacijskih enot."
-            )
-
-    # ========================================================
-    # SKUPNI REZULTAT VSEH STOLPCEV
-    # ========================================================
-
-    if all_analysis:
-
-        st.divider()
-
-        st.header(
-            "📈 Skupna analiza vseh odgovorov"
-        )
-
-        global_result = aggregate_results(
-            all_analysis
-        )
-
-        g1, g2, g3, g4 = st.columns(4)
-
-        with g1:
-            st.metric(
-                "Skupaj SF",
-                global_result["SF_count"]
-            )
-
-        with g2:
-            st.metric(
-                "Skupaj PF",
-                global_result["PF_count"]
-            )
-
-        with g3:
-            st.metric(
-                "Skupaj PR",
-                global_result["PR_count"]
-            )
-
-        with g4:
-            st.metric(
-                "SKUPNA STRESNA MOČ",
-                f"{global_result['sigma']:.2f}°"
-            )
-
-        st.progress(
-            min(global_result["sigma"] / 50.0, 1.0)
-        )
-
-        st.caption(
-            "Stresna moč je izražena v stresnih stopinjah "
-            "na lestvici 0–50."
+            height=500
         )
 
 
 # ============================================================
-# ZAGON
+# START
 # ============================================================
 
 if __name__ == "__main__":
