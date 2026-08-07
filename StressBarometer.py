@@ -61,24 +61,24 @@ def classify_keywords(keywords):
 # Funkcija za izračun realnega faktorja Fo po nivojih 1 in 2
 def calculate_fo_real(df, col, n_o):
     all_keywords_in_cat = []
-    # Gremo čez vse vrstice in poberemo samo tiste besede, ki dejansko padejo v kategorije
     for row in df[col].dropna():
         kws = clean_and_tokenize(row)
         for kw in kws:
+            # Preverimo vsako besedo iz odgovora
             for cat, kw_list in CATEGORIES_MAP.items():
-                if any(k in kw for k in kw_list):
+                # STROŽJE UJEMANJE: beseda se mora natančno ujemati 
+                # ali pa biti koren besede (npr. 'družin' v 'družina')
+                if any(kw.startswith(k.lower()[:5]) for k in kw_list): 
                     all_keywords_in_cat.append(kw)
-                    break
+                    break 
     
-    fo = len(all_keywords_in_cat) # Skupna frekvenca relevantnih mnenj
-    fr = len(set(all_keywords_in_cat)) # Število različnih relevantnih mnenj
+    fo = len(all_keywords_in_cat)
+    fr = len(set(all_keywords_in_cat))
     
-    if fr == 0 or n_o == 0: return 0.0001, fo, fr # Izogib deljenju z 0
+    if fr == 0 or n_o == 0: return 0.0001, fo, fr
     
-    rho_o = fo / n_o # Gostota
-    c_o = fo / fr    # Kompleksnost
-    
-    # Fo = (Co * rho_o) / (Ct * rhot) -> Ct=1, rhot=10
+    rho_o = fo / n_o
+    c_o = fo / fr
     fo_real = (c_o * rho_o) / 10
     return fo_real, fo, fr
 
