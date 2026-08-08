@@ -13,16 +13,28 @@ def reset_app():
     st.rerun()
 
 # ============================================================
-# 2. STOP-WORDS
+# 2. STOP-WORDS (MAŠILA)
 # ============================================================
 SLO_STOPWORDS = {
-    "se", "oh", "na", "potem", "in", "ter", "bi", "da", "pa", "že", "tudi", "iz", "za",
-    "še", "samo", "tako", "kot", "sem", "smo", "ste", "so", "je", "bil", "biti", "ali",
-    "v", "na", "pri", "o", "z", "s", "k", "h", "vse", "vsi", "tisti", "nekaj", "včasih",
-    "npr", "itd", "the", "and", "to", "of", "a", "is", "in", "it", "with", "some", "more",
-    "being", "able", "use", "make", "nice", "talk", "more", "family", "friends", "your",
-    "gre", "vsem", "tem", "zaradi", "nekaj", "pod", "med", "tudi", "kar", "naj", "ali",
-    "tistega", "tistem", "tistimi", "tistih", "tista", "tisto", "vsega", "vsemu", "vsem"
+    # Osnovni vezniki, delci in pomožni glagoli
+    "se", "si", "oh", "na", "potem", "in", "ter", "bi", "da", "pa", "že", "tudi", "iz", "za",
+    "še", "samo", "le", "tako", "kot", "sem", "smo", "ste", "so", "je", "bil", "biti", "ali",
+    "v", "na", "pri", "o", "z", "s", "k", "h", "vse", "vsi", "vsega", "vsemu", "vsem",
+    "tisti", "tista", "tisto", "tistih", "tistem", "tistimi", "nekaj", "včasih", "npr", "itd", "itn",
+    "ker", "ko", "kadar", "kam", "kjer", "kaj", "kdo", "kdaj", "zakaj", "kako", "vendar", "ampak",
+    "toda", "torej", "zato", "saj", "namreč", "zlasti", "predvsem", "sploh", "šele", "kar", "naj",
+    "ali", "gre", "marsikaj", "marsikdo", "nekdo", "nekateri", "nekatera", "nekatero",
+
+    # Predlogi
+    "pod", "med", "nad", "pred", "brez", "ob", "po", "skozi", "čez", "proti", "kljub", "zaradi",
+    "namesto", "razen", "okoli", "okrog", "vsem", "tem",
+
+    # Angleški strukturni izrazi (junk words)
+    "the", "and", "to", "of", "a", "is", "in", "it", "with", "some", "more", "being", "able",
+    "use", "make", "nice", "your", "this", "that", "from", "for", "are", "was", "were",
+
+    # OPOMBA: Besede "talk", "family" in "friends" so bile ODSTRANJENE s tega seznama,
+    # da jih sistem lahko prepozna in klasificira v Socialno enoto.
 }
 
 # ============================================================
@@ -77,7 +89,8 @@ CATEGORIES_MAP = {
         "grožn", "informac", "profesional", "uporabnik", "osebj", "človek", "friend",
         "family", "talk", "prijatelj", "družin", "pogovor", "pomoč", "ekipa", "prijaznost",
         "partnership", "spouse", "sodelovanje", "zaupan", "vodenj", "klima", "vzdušje",
-        "ignora", "nerazum", "posluš", "sektor", "direktor", "vodja", "pripadnost", "rivalstvo"
+        "ignora", "nerazum", "posluš", "sektor", "direktor", "vodja", "pripadnost", "rivalstvo",
+        "talk", "friends" # TO DODAJ TUKAJ
     ],
     "Health biological unit": [
         "zdrav", "bolniš", "bolezen", "spanj", "utrujen", "izčrpan", "higien",
