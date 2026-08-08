@@ -421,1173 +421,180 @@ def analyze_column(df, col):
 
 
 # ============================================================
-# 11. AGREGATNI Fo
+# 11. MATEMATIČNA LOGIKA (PETRIČEVA METODA)
 # ============================================================
 
 def calculate_fo_real_aggregate(classified, n_override):
-
     all_words = [w for w, _ in classified]
-
     fo = len(all_words)
-
     fr = len(set(all_words))
-
     if fr == 0 or n_override == 0:
-
         return 0.0001, fo, fr
-
     rho_o = fo / n_override
-
     c_o = fo / fr
-
     fo_real = (c_o * rho_o) / 10.0
-
     return fo_real, fo, fr
 
-
-# ============================================================
-# 12. KATEGORIJSKI FAKTORJI
-# ============================================================
-
-def compute_category_factors(
-    classified,
-    n_override,
-    weighting_mode="volume"
-):
-
+def compute_category_factors(classified, n_override, weighting_mode="volume"):
     words_by_cat = defaultdict(list)
-
     for word, category in classified:
-
         words_by_cat[category].append(word)
-
     result = {}
-
     for category in CATEGORIES_MAP.keys():
-
         words = words_by_cat.get(category, [])
-
         fE = len(words)
-
         frE = len(set(words))
-
         if weighting_mode == "concentration":
-
-            CE = (
-                fE / frE
-                if frE > 0
-                else 0.0001
-            )
-
+            CE = fE / frE if frE > 0 else 0.0001
         else:
-
             CE = 1.0
-
-        rho = (
-            fE / n_override
-            if n_override
-            else 0.0
-        )
-
+        rho = fE / n_override if n_override else 0.0
         F = (CE * rho) / 10.0
-
-        result[category] = {
-            "fE": fE,
-            "frE": frE,
-            "CE": CE,
-            "rho": rho,
-            "F": F
-        }
-
+        result[category] = {"fE": fE, "frE": frE, "CE": CE, "rho": rho, "F": F}
     return result
 
-
-# ============================================================
-# 13. OSNOVNI SIGMA ARGUMENT
-# ============================================================
-
 def sigma_argument(f_sf, f_pr, f_pf):
-
-    if f_pf <= 0:
-
-        f_pf = 0.0001
-
-    argument = (
-        f_sf * f_pr
-    ) / f_pf
-
+    if f_pf <= 0: f_pf = 0.0001
+    argument = (f_sf * f_pr) / f_pf
     return max(argument, 0.0)
 
-
 def sigma_deg(f_sf, f_pr, f_pf):
-
-    argument = sigma_argument(
-        f_sf,
-        f_pr,
-        f_pf
-    )
-
-    argument = min(argument, 1.0)
-
-    sigma_rad = math.asin(
-        math.sqrt(argument)
-    )
-
+    arg = sigma_argument(f_sf, f_pr, f_pf)
+    sigma_rad = math.asin(math.sqrt(min(arg, 1.0)))
     return math.degrees(sigma_rad)
 
-
-# ============================================================
-# 14. KATEGORIJSKI NAGIB
-#
-# Tukaj je glavna izboljšava.
-#
-# Najprej se izračuna osnovni Petričev argument.
-# Nato se upošteva strukturni koeficient.
-#
-# Social unit ima največji nagib.
-# ============================================================
-
-def compute_category_sigmas(
-    factors_sf,
-    factors_pf,
-    factors_pr,
-    sigma_total_argument,
-    is_summary
-):
-
+def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argument, is_summary):
     raw_scores = {}
-
-    raw_arguments = {}
-
     for category in CATEGORIES_MAP.keys():
-
         f_pf = factors_pf[category]["F"]
-
         f_sf = factors_sf[category]["F"]
-
         f_pr = factors_pr[category]["F"]
-
         if is_summary and f_sf > 0:
-
-            f_pr = min(
-                f_pr,
-                f_sf * 1.5
-            )
-
-        argument = sigma_argument(
-            f_sf,
-            f_pr,
-            f_pf
-        )
-
-        structural_weight = SLOPE_WEIGHTS[
-            category
-        ]
-
-        weighted_score = (
-            argument *
-            structural_weight
-        )
-
-        raw_arguments[category] = argument
-
+            f_pr = min(f_pr, f_sf * 1.5)
+        argument = sigma_argument(f_sf, f_pr, f_pf)
+        weighted_score = argument * SLOPE_WEIGHTS[category]
         raw_scores[category] = weighted_score
 
-    total_score = sum(
-        raw_scores.values()
-    )
-
+    total_score = sum(raw_scores.values())
     results = {}
-
     if total_score <= 0:
-
         for category in CATEGORIES_MAP.keys():
-
-            results[category] = {
-                "sigma": 0.0,
-                "slope_index": 0.0,
-                "weight_share": 0.0,
-                "raw_argument": 0.0,
-                "structural_weight": SLOPE_WEIGHTS[
-                    category
-                ]
-            }
-
+            results[category] = {"sigma": 0.0, "weight_share": 0.0}
         return results, 0.0
 
     for category in CATEGORIES_MAP.keys():
-
-        weighted_score = raw_scores[category]
-
-        share = (
-            weighted_score /
-            total_score
-        )
-
-        # Porazdelitev skupnega sigma argumenta.
-        scaled_argument = min(
-            sigma_total_argument * share,
-            1.0
-        )
-
-        sigma = math.degrees(
-            math.asin(
-                math.sqrt(
-                    scaled_argument
-                )
-            )
-        )
-
+        share = raw_scores[category] / total_score
+        scaled_argument = min(sigma_total_argument * share, 1.0)
+        sigma = math.degrees(math.asin(math.sqrt(scaled_argument)))
         results[category] = {
-
             "sigma": sigma,
-
-            "slope_index":
-                weighted_score,
-
-            "weight_share":
-                share,
-
-            "raw_argument":
-                raw_arguments[category],
-
-            "structural_weight":
-                SLOPE_WEIGHTS[category]
+            "weight_share": share
         }
-
     return results, total_score
 
-
-# ============================================================
-# 15. ENERGIJA
-# ============================================================
-
 def calculate_energy(sigma):
-
     W_I = 2500.0
-
-    W_EU = (
-        W_I -
-        (W_I * sigma / 90.0)
-    )
-
-    eta = (
-        W_EU / W_I
-    ) * 100.0
-
+    W_EU = W_I - (W_I * sigma / 90.0)
+    eta = (W_EU / W_I) * 100.0
     loss = W_I - W_EU
-
     return W_EU, eta, loss
 
-
 # ============================================================
-# 16. BARVA OCENE
-# ============================================================
-
-def rating_class(sigma):
-
-    if sigma <= 30:
-
-        return "stress-low"
-
-    if sigma <= 60:
-
-        return "stress-medium"
-
-    return "stress-high"
-
-
-# ============================================================
-# 17. HAUPTANWENDUNG
+# 12. GLAVNA STREAMLIT APLIKACIJA (UI)
 # ============================================================
 
 def main():
-
-    # --------------------------------------------------------
-    # SIDEBAR
-    # --------------------------------------------------------
-
     with st.sidebar:
-
-        st.markdown(
-            "## ⚙️ Nastavitve"
-        )
-
-        if st.button(
-            "🔄 Ponastavi aplikacijo",
-            use_container_width=True
-        ):
-
-            reset_app()
-
+        st.markdown("## ⚙️ Nastavitve")
+        if st.button("🔄 Ponastavi sejo", use_container_width=True): reset_app()
         st.divider()
-
-        st.markdown(
-            "### 📊 Raziskovalni parametri"
-        )
-
-        n_input = st.number_input(
-            "Število respondentov (N)",
-            min_value=1,
-            value=210,
-            step=1
-        )
-
-        is_summary = st.checkbox(
-            "Datoteka vsebuje POVZETEK",
-            value=True
-        )
-
+        n_input = st.number_input("Število respondentov (N)", min_value=1, value=210)
+        is_summary = st.checkbox("Datoteka vsebuje POVZETEK", value=True)
         st.divider()
-
-        st.markdown(
-            "### 🧮 Uteževanje"
-        )
-
-        weighting_label = st.radio(
-            "Način uteževanja",
-            [
-                "Volumen (frekvenca)",
-                "Koncentracija (ponovljivost)"
-            ]
-        )
-
-        weighting_mode = (
-            "volume"
-            if "Volumen" in weighting_label
-            else "concentration"
-        )
-
+        weighting_label = st.radio("Uteževanje", ["Volumen (frekvenca)", "Koncentracija (ponovljivost)"])
+        weighting_mode = "volume" if "Volumen" in weighting_label else "concentration"
         st.divider()
+        uploaded_file = st.file_uploader("📁 Naložite podatke", type=["txt", "csv", "xlsx"])
 
-        uploaded_file = st.file_uploader(
-            "📁 Naložite podatke",
-            type=[
-                "txt",
-                "csv",
-                "xlsx"
-            ]
-        )
-
-    # --------------------------------------------------------
-    # HEADER
-    # --------------------------------------------------------
-
-    st.markdown(
-        "# 📊 Petrič Stress Analysis Pro"
-    )
-
-    st.markdown(
-        """
-        **Psihosocialni barometer za klasifikacijo stresnih,
-        pozitivnih in intervencijskih dejavnikov.**
-        """
-    )
-
-    st.caption(
-        f"Znanstvena kalibracija • N = {n_input} • "
-        "Petričev model gostote, kompleksnosti in nagiba"
-    )
-
-    # --------------------------------------------------------
-    # UPLOAD
-    # --------------------------------------------------------
+    st.markdown("# 📊 Petrič Stress Analysis Pro")
 
     if not uploaded_file:
-
-        st.info(
-            "📁 Za začetek naložite datoteko "
-            "TXT, CSV ali XLSX.",
-            icon="ℹ️"
-        )
-
+        st.info("📁 Naložite datoteko za začetek analize.", icon="ℹ️")
         return
-
-    # --------------------------------------------------------
-    # READ FILE
-    # --------------------------------------------------------
 
     try:
-
-        filename = uploaded_file.name.lower()
-
-        if filename.endswith(".xlsx"):
-
-            df = pd.read_excel(
-                uploaded_file
-            )
-
-        elif filename.endswith(".txt"):
-
-            df = pd.read_csv(
-                uploaded_file,
-                sep="\t",
-                engine="python",
-                on_bad_lines="skip"
-            )
-
-        else:
-
-            df = pd.read_csv(
-                uploaded_file,
-                engine="python",
-                on_bad_lines="skip"
-            )
-
+        if uploaded_file.name.endswith(".xlsx"): df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith(".txt"): df = pd.read_csv(uploaded_file, sep="\t", engine="python", on_bad_lines="skip")
+        else: df = pd.read_csv(uploaded_file, engine="python", on_bad_lines="skip")
     except Exception as e:
-
-        st.error(
-            f"Napaka pri branju datoteke: {e}"
-        )
-
-        return
-
-    if df.empty:
-
-        st.warning(
-            "Datoteka ne vsebuje podatkov."
-        )
-
-        return
-
-    # --------------------------------------------------------
-    # DATA INFO
-    # --------------------------------------------------------
-
-    st.success(
-        f"✅ Uspešno naloženih {len(df)} vrstic."
-    )
+        st.error(f"Napaka pri branju: {e}"); return
 
     target_cols = df.columns.tolist()
-
-    if len(target_cols) == 0:
-
-        st.error(
-            "Datoteka nima uporabnih stolpcev."
-        )
-
-        return
-
-    # --------------------------------------------------------
-    # COLUMN SELECTION
-    # --------------------------------------------------------
-
     with st.sidebar:
+        st.markdown("### 🧩 Stolpci")
+        col_pf = st.selectbox("Pozitivni (PF)", target_cols, index=0)
+        col_sf = st.selectbox("Stresni (SF)", target_cols, index=min(1, len(target_cols)-1))
+        col_pr = st.selectbox("Predlogi (PR)", target_cols, index=min(2, len(target_cols)-1))
 
-        st.markdown(
-            "### 🧩 Vrste podatkov"
-        )
-
-        col_pf = st.selectbox(
-            "🟢 Pozitivni faktorji (PF)",
-            target_cols,
-            index=0
-        )
-
-        col_sf = st.selectbox(
-            "🔴 Stresni faktorji (SF)",
-            target_cols,
-            index=min(
-                1,
-                len(target_cols) - 1
-            )
-        )
-
-        col_pr = st.selectbox(
-            "🔵 Predlogi (PR)",
-            target_cols,
-            index=min(
-                2,
-                len(target_cols) - 1
-            )
-        )
-
-    role_cols = {
-        "PF": col_pf,
-        "SF": col_sf,
-        "PR": col_pr
-    }
-
-    # --------------------------------------------------------
-    # ANALYSIS
-    # --------------------------------------------------------
-
+    # ANALIZA
     analysis = {}
+    for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
+        cls, per_row, uncls = analyze_column(df, col)
+        analysis[role] = {"classified": cls, "per_row": per_row, "unclassified": uncls, "col_name": col}
 
-    for role, col in role_cols.items():
+    # GLOBALNI IZRAČUN
+    f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
+    f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"]["classified"], n_input)
+    f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"]["classified"], n_input)
+    if is_summary: f_pr_agg = min(f_pr_agg, f_sf_agg * 1.5)
+    sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
+    W_EU, eta, loss = calculate_energy(sigma_total)
 
-        classified, per_row, unclassified = (
-            analyze_column(
-                df,
-                col
-            )
-        )
+    # GLAVNE METRIKE
+    st.markdown("## 🎯 Skupni rezultati")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Stresna moč", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
+    m2.metric("Učinkovitost", f"{eta:.1f} %")
+    m3.metric("Izguba energije", f"{loss:.0f} Kcal")
+    m4.metric("Vzorec (N)", n_input)
+    st.progress(min(sigma_total / 90.0, 1.0))
 
-        analysis[role] = {
-
-            "col": col,
-
-            "classified":
-                classified,
-
-            "per_row":
-                per_row,
-
-            "unclassified":
-                unclassified
-        }
-
-    # ========================================================
-    # 18. GLOBALNI Fo
-    # ========================================================
-
-    f_pf_agg, pf_fo, pf_fr = (
-        calculate_fo_real_aggregate(
-            analysis["PF"]["classified"],
-            n_input
-        )
-    )
-
-    f_sf_agg, sf_fo, sf_fr = (
-        calculate_fo_real_aggregate(
-            analysis["SF"]["classified"],
-            n_input
-        )
-    )
-
-    f_pr_agg, pr_fo, pr_fr = (
-        calculate_fo_real_aggregate(
-            analysis["PR"]["classified"],
-            n_input
-        )
-    )
-
-    if is_summary:
-
-        f_pr_agg = min(
-            f_pr_agg,
-            f_sf_agg * 1.5
-        )
-
-    sigma_total = sigma_deg(
-        f_sf_agg,
-        f_pr_agg,
-        f_pf_agg
-    )
-
-    # ========================================================
-    # 19. ENERGY
-    # ========================================================
-
-    W_EU, eta, loss = (
-        calculate_energy(
-            sigma_total
-        )
-    )
-
-    # ========================================================
-    # 20. HERO METRICS
-    # ========================================================
-
-    st.markdown(
-        "## 🎯 Osrednji rezultat"
-    )
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">
-                    Stresna moč
-                </div>
-                <div class="metric-value">
-                    {sigma_total:.2f} °S
-                </div>
-                <div class="metric-description">
-                    {rate_sigma(sigma_total)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c2:
-
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">
-                    Učinkovitost
-                </div>
-                <div class="metric-value">
-                    {eta:.1f} %
-                </div>
-                <div class="metric-description">
-                    Energijska učinkovitost
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c3:
-
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">
-                    Izguba energije
-                </div>
-                <div class="metric-value">
-                    {loss:.0f}
-                </div>
-                <div class="metric-description">
-                    ocenjenih Kcal
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c4:
-
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-title">
-                    Respondenti
-                </div>
-                <div class="metric-value">
-                    {n_input}
-                </div>
-                <div class="metric-description">
-                    analizirani vzorec
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.progress(
-        min(
-            sigma_total / 90.0,
-            1.0
-        )
-    )
-
-    # ========================================================
-    # 21. Fo
-    # ========================================================
-
-    with st.expander(
-        "📐 Podrobnosti Petričevih faktorjev Fo"
-    ):
-
-        fo_df = pd.DataFrame({
-
-            "Vrsta": [
-                "PF – pozitivni",
-                "SF – stresni",
-                "PR – predlogi"
-            ],
-
-            "Fo": [
-                f_pf_agg,
-                f_sf_agg,
-                f_pr_agg
-            ],
-
-            "Frekvenca": [
-                pf_fo,
-                sf_fo,
-                pr_fo
-            ],
-
-            "Različne enote": [
-                pf_fr,
-                sf_fr,
-                pr_fr
-            ]
-        })
-
-        st.dataframe(
-            fo_df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-    # ========================================================
-    # 22. KATEGORIJSKI FAKTORJI
-    # ========================================================
-
-    factors_pf = compute_category_factors(
-        analysis["PF"]["classified"],
-        n_input,
-        weighting_mode
-    )
-
-    factors_sf = compute_category_factors(
-        analysis["SF"]["classified"],
-        n_input,
-        weighting_mode
-    )
-
-    factors_pr = compute_category_factors(
-        analysis["PR"]["classified"],
-        n_input,
-        weighting_mode
-    )
-
-    sig_total_arg = min(
-        sigma_argument(
-            f_sf_agg,
-            f_pr_agg,
-            f_pf_agg
-        ),
-        1.0
-    )
-
-    cat_sigmas, total_slope = (
-        compute_category_sigmas(
-            factors_sf,
-            factors_pf,
-            factors_pr,
-            sig_total_arg,
-            is_summary
-        )
-    )
-
-    # ========================================================
-    # 23. REZULTATI PO ENOTAH
-    # ========================================================
-
+    # RAZČLENITEV PO ENOTAH
     st.divider()
-
-    st.markdown(
-        "## 🧩 Stresna moč po znanstvenih enotah"
-    )
+    f_pf_cat = compute_category_factors(analysis["PF"]["classified"], n_input, weighting_mode)
+    f_sf_cat = compute_category_factors(analysis["SF"]["classified"], n_input, weighting_mode)
+    f_pr_cat = compute_category_factors(analysis["PR"]["classified"], n_input, weighting_mode)
+    
+    sig_total_arg = min(sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg), 1.0)
+    cat_sigmas, _ = compute_category_sigmas(f_sf_cat, f_pf_cat, f_pr_cat, sig_total_arg, is_summary)
 
     rows = []
-
-    for category, data in cat_sigmas.items():
-
+    for cat, data in cat_sigmas.items():
         rows.append({
-
-            "Enota":
-                CATEGORY_SHORT[category],
-
-            "Polno ime":
-                category,
-
-            "σ (°S)":
-                round(
-                    data["sigma"],
-                    2
-                ),
-
-            "Delež (%)":
-                round(
-                    data["weight_share"] * 100,
-                    1
-                ),
-
-            "Nagib":
-                round(
-                    data["slope_index"],
-                    5
-                ),
-
-            "Koeficient":
-                data["structural_weight"],
-
-            "Ocena":
-                rate_sigma(
-                    data["sigma"]
-                )
+            "Enota": CATEGORY_SHORT[cat], 
+            "σ (°S)": round(data["sigma"], 2), 
+            "Delež (%)": round(data["weight_share"]*100, 1), 
+            "Ocena": rate_sigma(data["sigma"])
         })
-
-    res_df = pd.DataFrame(
-        rows
-    ).sort_values(
-        by="Nagib",
-        ascending=False
-    ).reset_index(
-        drop=True
-    )
-
-    res_df.insert(
-        0,
-        "Rang",
-        range(
-            1,
-            len(res_df) + 1
-        )
-    )
-
-    # ========================================================
-    # 24. SOCIAL UNIT – HERO CARD
-    # ========================================================
-
-    social = cat_sigmas[
-        "Social unit"
-    ]
-
-    st.markdown(
-        f"""
-        <div class="social-card">
-            <div style="
-                font-size:0.85rem;
-                color:#9a3412;
-                font-weight:700;
-                text-transform:uppercase;
-                letter-spacing:1px;
-            ">
-                🔶 Najmočnejši strukturni nagib
-            </div>
-
-            <div style="
-                font-size:2.2rem;
-                font-weight:850;
-                margin-top:6px;
-            ">
-                Social unit
-            </div>
-
-            <div style="
-                font-size:1.25rem;
-                margin-top:5px;
-            ">
-                σ = <b>{social["sigma"]:.2f} °S</b>
-                &nbsp; | &nbsp;
-                delež = <b>{social["weight_share"]*100:.1f}%</b>
-            </div>
-
-            <div style="
-                margin-top:8px;
-                color:#7c2d12;
-            ">
-                Strukturni koeficient:
-                <b>{social["structural_weight"]:.2f}</b>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown("")
-
-    # ========================================================
-    # 25. TABELA
-    # ========================================================
-
-    st.dataframe(
-        res_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-
-            "σ (°S)": st.column_config.NumberColumn(
-                "Stresna moč °S",
-                format="%.2f"
-            ),
-
-            "Delež (%)": st.column_config.NumberColumn(
-                "Delež",
-                format="%.1f %%"
-            ),
-
-            "Nagib": st.column_config.NumberColumn(
-                "Strukturni nagib",
-                format="%.5f"
-            ),
-
-            "Koeficient": st.column_config.NumberColumn(
-                "Strukturni koeficient",
-                format="%.2f"
-            )
-        }
-    )
-
-    # ========================================================
-    # 26. GRAF NAGIBA
-    # ========================================================
-
-    st.markdown(
-        "### 📈 Primerjava strukturnega nagiba"
-    )
-
-    chart_df = res_df.copy()
-
-    fig = px.bar(
-        chart_df,
-        x="Enota",
-        y="Nagib",
-        text="Nagib",
-        title=(
-            "Strukturni nagib stresnih enot"
-        )
-    )
-
-    fig.update_traces(
-        texttemplate="%{text:.4f}",
-        textposition="outside"
-    )
-
-    fig.update_layout(
-        height=430,
-        margin=dict(
-            l=20,
-            r=20,
-            t=60,
-            b=30
-        ),
-        xaxis_title="",
-        yaxis_title="Strukturni nagib",
-        showlegend=False
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-    # ========================================================
-    # 27. GRAF STRESNE MOČI
-    # ========================================================
-
-    st.markdown(
-        "### 🔥 Stresna moč po enotah"
-    )
-
-    fig2 = px.bar(
-        res_df,
-        x="Enota",
-        y="σ (°S)",
-        text="σ (°S)",
-        title="Stresna moč po znanstvenih enotah"
-    )
-
-    fig2.update_traces(
-        texttemplate="%{text:.2f}°S",
-        textposition="outside"
-    )
-
-    fig2.update_layout(
-        height=430,
-        margin=dict(
-            l=20,
-            r=20,
-            t=60,
-            b=30
-        ),
-        xaxis_title="",
-        yaxis_title="Stresna moč °S",
-        showlegend=False
-    )
-
-    st.plotly_chart(
-        fig2,
-        use_container_width=True
-    )
-
-    # ========================================================
-    # 28. KVALITATIVNA ANALIZA
-    # ========================================================
-
-    st.divider()
-
-    st.markdown(
-        "## 🔍 Kvalitativna klasifikacija"
-    )
-
-    tabs = st.tabs([
-        "🟢 PF",
-        "🔴 SF",
-        "🔵 PR"
-    ])
-
-    for tab, role in zip(
-        tabs,
-        ["PF", "SF", "PR"]
-    ):
-
-        with tab:
-
-            freq_counter = Counter(
-                category
-                for _, category
-                in analysis[role]["classified"]
-            )
-
-            freq_rows = []
-
-            for category, count in (
-                freq_counter.most_common()
-            ):
-
-                freq_rows.append({
-
-                    "Enota":
-                        CATEGORY_SHORT.get(
-                            category,
-                            category
-                        ),
-
-                    "Frekvenca":
-                        count
-                })
-
-            if freq_rows:
-
-                freq_df = pd.DataFrame(
-                    freq_rows
-                )
-
-                st.dataframe(
-                    freq_df,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-            else:
-
-                st.info(
-                    "Za to področje ni bilo klasificiranih izrazov."
-                )
-
-    # ========================================================
-    # 29. NEKLASIFICIRANE BESEDE
-    # ========================================================
-
-    with st.expander(
-        "🧠 Pregled neklasificiranih izrazov"
-    ):
-
-        all_unclassified = []
-
-        for role in [
-            "PF",
-            "SF",
-            "PR"
-        ]:
-
-            all_unclassified.extend(
-                analysis[role]["unclassified"]
-            )
-
-        counter_unclassified = Counter(
-            all_unclassified
-        )
-
-        if counter_unclassified:
-
-            unclassified_df = pd.DataFrame(
-                counter_unclassified.most_common(50),
-                columns=[
-                    "Izraz",
-                    "Frekvenca"
-                ]
-            )
-
-            st.dataframe(
-                unclassified_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-            st.caption(
-                "Ti izrazi niso bili samodejno povezani "
-                "z nobeno znanstveno enoto. To je uporabno "
-                "za nadaljnje izboljševanje klasifikacijskega slovarja."
-            )
-
-        else:
-
-            st.success(
-                "Vsi relevantni izrazi so bili klasificirani."
-            )
-
-    # ========================================================
-    # 30. INTERPRETACIJA
-    # ========================================================
-
-    st.divider()
-
-    st.markdown(
-        "## 🧭 Interpretacija rezultata"
-    )
-
-    top_category = res_df.iloc[0]
-
-    st.markdown(
-        f"""
-        **Najmočnejši strukturni nagib:**  
-        ### {top_category["Enota"]}
-
-        Izračun kaže, da ima ta enota najvišji kombinirani
-        strukturni indeks, ki upošteva frekvenco oziroma
-        gostoto klasificiranih mnenj, njihovo raznolikost
-        ter strukturni koeficient enote.
-
-        Pri tem je **Social unit** kalibrirana kot najmočnejša
-        sistemska enota, ker socialni odnosi, konflikti,
-        komunikacija, vodenje, organizacijska klima,
-        pripadnost, pravičnost in statusni dejavniki lahko
-        vplivajo tudi na druge stresne domene.
-        """
-    )
-
-    st.info(
-        """
-        Znanstvena opomba: strukturni koeficient ni neposredna
-        empirična meritev iz posameznega vzorca, temveč kalibracijski
-        element modela. Empirični del rezultata še vedno določajo
-        dejanska gostota, frekvenca, raznolikost in kompleksnost
-        odgovorov.
-        """
-    )
-
-    # ========================================================
-    # 31. METODOLOŠKA OPOMBA
-    # ========================================================
-
-    with st.expander(
-        "📚 Metodološka osnova"
-    ):
-
-        st.markdown(
-            """
-            **Petričev model**
-
-            Analiza uporablja tri osnovne tipe informacij:
-
-            **SF** – negativni stresni dejavniki  
-            **PF** – pozitivni dejavniki  
-            **PR** – predlogi za zmanjšanje negativnih dejavnikov.
-
-            Kategorijski rezultat temelji na razmerju med
-            gostoto, raznolikostjo in kompleksnostjo dejavnikov.
-
-            Model uporablja tudi nelinearno transformacijo
-            z arcsin/sqrt pristopom, da se rezultat izrazi
-            v stopinjah stresne moči.
-
-            Za interpretacijo posameznih enot je dodatno uporabljen
-            strukturni nagib. Socialna enota ima najvišji koeficient,
-            vendar končni rezultat še vedno temelji na dejanskih
-            podatkih iz analiziranega vzorca.
-            """
-        )
-
-
-# ============================================================
-# 32. ZAGON
-# ============================================================
+    
+    res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
+    
+    # PRIKAZ TABELE IN GRAFA (brez Hero kartice)
+    st.markdown("### Porazdelitev po znanstvenih enotah")
+    col_left, col_right = st.columns([1, 1])
+    with col_left:
+        st.dataframe(res_df, use_container_width=True, hide_index=True)
+    with col_right:
+        st.plotly_chart(px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)", color_continuous_scale="Reds", height=300), use_container_width=True)
+
+    # KVALITATIVNI PREGLED
+    with st.expander("🔍 Podrobnosti klasifikacije besed"):
+        t1, t2, t3 = st.tabs(["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"])
+        for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
+            with tab:
+                freq = Counter(c for _, c in analysis[role]["classified"])
+                st.table(pd.DataFrame([{"Enota": CATEGORY_SHORT.get(k, k), "Frekvenca": v} for k, v in freq.items()]))
 
 if __name__ == "__main__":
     main()
-
 
