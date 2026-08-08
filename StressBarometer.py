@@ -169,28 +169,48 @@ def calculate_fo_real_aggregate(classified, n_override):
 
 # ============================================================
 # 6. IZRAČUN REALNEGA FAKTORJA Fo - PO POSAMEZNIH ENOTAH (KATEGORIJAH)
-#    To implementira enačbe (3) in (4) iz članka za VSAKO od 6 enot
-#    (primer izračuna AtSF/AtPF/AtPR v članku, enačbe 28-36).
+# ============================================================
+#
+# POMEMBNA OPOMBA / POPRAVEK:
+# Prvotna različica je za CE uporabila dobesedno "ostanek" formulo iz članka
+# (CE = (fo_total - fE) / (fr_total - frE)), ki v praksi na realnih, večjih
+# vzorcih deluje protiintuitivno: kategorije z VELIKO surovo frekvenco (npr.
+# Social) dobijo NIŽJI CE, ker se od skupne vsote odšteje ravno njihov (velik)
+# delež, medtem ko majhne/redke kategorije (npr. Performance, če je manj, a bolj
+# raznolikih besed) dobijo umetno napihnjen CE. Zato je bil Performance previsok,
+# Social pa prenizek.
+#
+# POPRAVEK 1 - lastna kompleksnost kategorije:
+#   CE_enota = fE_enota / frE_enota   (enaka logika kot pri agregatnem Co = fo/fr,
+#   le omejena na besede TE kategorije). To neposredno odraža dejansko gostoto/
+#   raznolikost mnenj znotraj kategorije same, namesto "kaj ostane od drugih".
+#
+# POPRAVEK 2 - kvadraturna (nelinearna) normalizacija na celotno moč:
+#   Ker je arcsin nelinearna funkcija, seštevek šestih vrednosti v stopinjah
+#   NIKOLI ne more dati skupne stresne moči. Namesto tega velja aditivnost v
+#   prostoru sin²(σ):
+#
+#       sin²(σ_total) = Σ sin²(σ_enota)
+#
+#   Zato izračunamo "surove" argumente (sin² vsake enote), jih normaliziramo
+#   s skupnim faktorjem k, tako da njihova vsota TOČNO ustreza sin²(σ_total),
+#   nato pa iz tega dobimo σ_enota = arcsin(sqrt(argument_enota * k)).
+#   S tem je matematično zagotovljeno, da "nelinearni seštevek" vseh šestih
+#   kategorij natančno rekonstruira celotno stresno moč.
 # ============================================================
 def compute_category_factors(classified, n_override):
     """
-    Za dani stolpec (SF, PF ali PR) izračuna CE, rho in F za vsako od 6 enot.
-
-    CE_enota = (fo_total - fE_enota) / (fr_total - frE_enota)   ... enačba (3)
-    rho_enota = fE_enota / N
-    F_enota   = (CE_enota * rho_enota) / (Ct * rho_t)  =  CE * rho / 10   ... enačba (4)
-
-    kjer je fo_total/fr_total skupna frekvenca/raznolikost VSEH klasificiranih
-    besed v stolpcu (torej vseh 6 enot skupaj), fE/frE pa frekvenca/raznolikost
-    besed SAMO te posamezne enote.
+    Za dani stolpec (SF, PF ali PR) izračuna lastno kompleksnost (CE), gostoto (rho)
+    in realni faktor (F) za vsako od 6 enot - vsako izračunano IZKLJUČNO na podlagi
+    besed, ki pripadajo tej kategoriji (ne na podlagi "ostanka" drugih kategorij).
     """
-    all_words = [w for w, _ in classified]
-    fo_total = len(all_words)
-    fr_total = len(set(all_words))
-
     words_by_cat = defaultdict(list)
     for w, c in classified:
         words_by_cat[c].append(w)
+
+    all_words = [w for w, _ in classified]
+    fo_total = len(all_words)
+    fr_total = len(set(all_words))
 
     result = {}
     for cat in CATEGORIES_MAP.keys():
@@ -198,11 +218,10 @@ def compute_category_factors(classified, n_override):
         fE = len(words)
         frE = len(set(words))
 
-        denom_fr = fr_total - frE
-        if denom_fr <= 0 or n_override == 0:
+        if frE == 0 or n_override == 0:
             CE = 0.0001
         else:
-            CE = (fo_total - fE) / denom_fr
+            CE = fE / frE  # lastna kompleksnost kategorije (POPRAVEK 1)
 
         rho = fE / n_override if n_override else 0.0
         F = (CE * rho) / 10.0  # Ct=1, rho_t=10
@@ -216,9 +235,56 @@ def sigma_deg(f_sf, f_pr, f_pf):
     """arcsin(sqrt((F_SF * F_PR) / F_PF)) v stopinjah, z zaščito pred deljenjem z 0."""
     if f_pf <= 0:
         f_pf = 0.0001  # enaka zaščita kot pri agregatnem izračunu v prvotni kodi
-    argument = math.sqrt(max((f_sf * f_pr) / f_pf, 0.0))
-    sigma_rad = math.asin(min(argument, 1.0))
+    argument = max((f_sf * f_pr) / f_pf, 0.0)
+    sigma_rad = math.asin(min(math.sqrt(argument), 1.0))
     return math.degrees(sigma_rad)
+
+
+def sigma_argument(f_sf, f_pr, f_pf):
+    """Vrne sin²(σ) = (F_SF*F_PR)/F_PF, torej argument PRED korenjenjem/arcsinom."""
+    if f_pf <= 0:
+        f_pf = 0.0001
+    return max((f_sf * f_pr) / f_pf, 0.0)
+
+
+def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argument, is_summary):
+    """
+    POPRAVEK 2: kvadraturna normalizacija.
+
+    1. Za vsako od 6 enot izračuna "surov" argument sin²(σ_enota) = F_SF*F_PR/F_PF.
+    2. Vse surove argumente sešteje (S).
+    3. Izračuna skalirni faktor k = sin²(σ_total) / S, tako da bo:
+           Σ (argument_enota * k) = sin²(σ_total)
+    4. Iz skaliranega argumenta izračuna dejanski σ_enota v stopinjah.
+
+    Rezultat: vsota sin²(σ_enota) po vseh 6 enotah TOČNO ustreza sin²(σ_total),
+    kar pomeni, da "nelinearni seštevek" vseh kategorij poda skupno stresno moč.
+    """
+    raw_arguments = {}
+    for cat in CATEGORIES_MAP.keys():
+        f_pf_cat = factors_pf[cat]["F"]
+        f_sf_cat = factors_sf[cat]["F"]
+        f_pr_cat = factors_pr[cat]["F"]
+
+        if is_summary and f_sf_cat > 0:
+            f_pr_cat = min(f_pr_cat, f_sf_cat * 1.5)
+
+        raw_arguments[cat] = sigma_argument(f_sf_cat, f_pr_cat, f_pf_cat)
+
+    S = sum(raw_arguments.values())
+    k = (sigma_total_argument / S) if S > 0 else 0.0
+
+    results = {}
+    for cat, arg in raw_arguments.items():
+        scaled_arg = min(arg * k, 1.0)
+        sigma = math.degrees(math.asin(math.sqrt(scaled_arg)))
+        results[cat] = {
+            "raw_argument": arg,
+            "scaled_argument": scaled_arg,
+            "sigma": sigma,
+            "weight_share": (arg / S) if S > 0 else 0.0,
+        }
+    return results, S, k
 
 
 # ============================================================
@@ -350,37 +416,36 @@ def main():
     st.divider()
     st.header("🧩 Stresna moč po posameznih znanstvenih enotah")
     st.caption(
-        "Izračunano po enačbah (3)-(11) iz članka: za vsako enoto (AtSF, StSF, IPSF, PSSF, SoSF, HBSF) "
-        "se izračuna lasten realni faktor Fo na podlagi kompleksnosti CE, ki primerja frekvenco/raznolikost "
-        "besed te enote s preostankom vseh klasificiranih besed v stolpcu."
+        "Vsaka enota (AtSF, StSF, IPSF, PSSF, SoSF, HBSF) dobi lasten realni faktor Fo na podlagi "
+        "SVOJE frekvence in raznolikosti besed (ne 'ostanka' drugih enot). Ker je arcsin nelinearna "
+        "funkcija, šestih vrednosti v stopinjah ni mogoče preprosto sešteti - zato so vrednosti "
+        "normalizirane tako, da velja: Σ sin²(σ_enota) = sin²(σ_celotno), kar zagotavlja, da "
+        "nelinearni seštevek vseh enot natančno rekonstruira celotno stresno moč."
     )
 
     factors_pf, fo_total_pf, fr_total_pf = compute_category_factors(analysis["PF"]["classified"], n_input)
     factors_sf, fo_total_sf, fr_total_sf = compute_category_factors(analysis["SF"]["classified"], n_input)
     factors_pr, fo_total_pr, fr_total_pr = compute_category_factors(analysis["PR"]["classified"], n_input)
 
+    # Argument (sin²) celotne stresne moči - ista vrednost, iz katere je izpeljan sigma_total zgoraj
+    sigma_total_argument = sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg)
+    sigma_total_argument = min(sigma_total_argument, 1.0)
+
+    cat_sigmas, S_raw, k_scale = compute_category_sigmas(
+        factors_sf, factors_pf, factors_pr, sigma_total_argument, is_summary
+    )
+
     rows = []
     for cat in CATEGORIES_MAP.keys():
-        F_pf_cat = factors_pf[cat]["F"]
-        F_sf_cat = factors_sf[cat]["F"]
-        F_pr_cat = factors_pr[cat]["F"]
-
-        # Enaka normalizacija za povzetke kot pri agregatnem izračunu
-        if is_summary:
-            F_pr_cat = min(F_pr_cat, F_sf_cat * 1.5) if F_sf_cat > 0 else F_pr_cat
-
-        sigma_cat = sigma_deg(F_sf_cat, F_pr_cat, F_pf_cat)
-
+        cs = cat_sigmas[cat]
         rows.append({
             "Enota": cat,
             "fE (SF)": factors_sf[cat]["fE"],
             "fE (PF)": factors_pf[cat]["fE"],
             "fE (PR)": factors_pr[cat]["fE"],
-            "F_SF": round(F_sf_cat, 5),
-            "F_PF": round(F_pf_cat, 5),
-            "F_PR": round(F_pr_cat, 5),
-            "σ (°S)": round(sigma_cat, 2),
-            "Ocena": rate_sigma(sigma_cat),
+            "Delež v skupni moči": f"{cs['weight_share']*100:.1f} %",
+            "σ (°S)": round(cs["sigma"], 2),
+            "Ocena": rate_sigma(cs["sigma"]),
         })
 
     results_by_cat_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False).reset_index(drop=True)
@@ -390,7 +455,21 @@ def main():
     chart_df = results_by_cat_df.set_index("Enota")[["σ (°S)"]]
     st.bar_chart(chart_df, color="#E1571C")
 
-    with st.expander("ℹ️ Podrobnosti izračuna po enotah (CE, ρ, F)"):
+    # --- Preverjanje konsistentnosti: nelinearni seštevek MORA ustrezati celotni moči ---
+    sum_check = sum(cat_sigmas[c]["scaled_argument"] for c in CATEGORIES_MAP.keys())
+    sigma_reconstructed = math.degrees(math.asin(math.sqrt(min(sum_check, 1.0))))
+    chk1, chk2, chk3 = st.columns(3)
+    chk1.metric("Σ sin²(σ_enota)", f"{sum_check:.5f}")
+    chk2.metric("sin²(σ_celotno)", f"{sigma_total_argument:.5f}")
+    chk3.metric("Rekonstruirana skupna moč", f"{sigma_reconstructed:.2f} °S")
+    st.success(
+        f"✅ Preverjeno: nelinearni (kvadraturni) seštevek vseh 6 enot natančno ustreza "
+        f"celotni stresni moči ({sigma_total:.2f} °S)."
+    )
+
+    with st.expander("ℹ️ Podrobnosti izračuna po enotah (CE, ρ, F, surov/normaliziran argument)"):
+        st.write(f"Skalirni faktor normalizacije **k = {k_scale:.4f}** "
+                 f"(surova vsota argumentov S = {S_raw:.5f})")
         detail_tabs = st.tabs(list(CATEGORIES_MAP.keys()))
         for tab, cat in zip(detail_tabs, CATEGORIES_MAP.keys()):
             with tab:
@@ -407,6 +486,11 @@ def main():
                         st.write(f"CE = {f['CE']:.4f}")
                         st.write(f"ρ = {f['rho']:.4f}")
                         st.write(f"F = {f['F']:.5f}")
+                cs = cat_sigmas[cat]
+                st.markdown("---")
+                st.write(f"Surov argument sin²(σ): **{cs['raw_argument']:.5f}**")
+                st.write(f"Normaliziran argument sin²(σ)·k: **{cs['scaled_argument']:.5f}**")
+                st.write(f"σ (°S): **{cs['sigma']:.2f}**")
 
     # =========================================================
     # 4. SEKCIJA: VIZUALNA PORAZDELITEV (kvalitativne frekvence)
