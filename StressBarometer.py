@@ -119,10 +119,8 @@ def clean_and_tokenize(text):
 
 def classify_word_single(word):
     """
-    KLJUČNI POPRAVEK: vsaka beseda se dodeli TOČNO ENI kategoriji
-    (prvi ujemajoči se v CATEGORIES_MAP). V prejšnji različici se je
-    ista beseda lahko štela v več enotah hkrati, kar je napihnilo fo/fr
-    in onemogočilo pravilen izračun CE po enačbi (3) iz članka.
+    Vsaka beseda se dodeli TOČNO ENI kategoriji (prvi ujemajoči se v
+    CATEGORIES_MAP), da se prepreči dvojno štetje besed v več enotah hkrati.
     """
     for cat, kw_list in CATEGORIES_MAP.items():
         if any(koren in word for koren in kw_list):
@@ -153,7 +151,7 @@ def analyze_column(df, col):
 
 # ============================================================
 # 5. IZRAČUN REALNEGA FAKTORJA Fo - AGREGATNO (za CELOTNO stresno moč)
-#    To je nivo 2/3 iz članka, tako kot je delovalo v prvotni kodi.
+#    To je nivo 2/3 iz članka, deluje pravilno in ostane nespremenjeno.
 # ============================================================
 def calculate_fo_real_aggregate(classified, n_override):
     all_words = [w for w, _ in classified]
@@ -171,38 +169,43 @@ def calculate_fo_real_aggregate(classified, n_override):
 # 6. IZRAČUN REALNEGA FAKTORJA Fo - PO POSAMEZNIH ENOTAH (KATEGORIJAH)
 # ============================================================
 #
-# POMEMBNA OPOMBA / POPRAVEK:
-# Prvotna različica je za CE uporabila dobesedno "ostanek" formulo iz članka
-# (CE = (fo_total - fE) / (fr_total - frE)), ki v praksi na realnih, večjih
-# vzorcih deluje protiintuitivno: kategorije z VELIKO surovo frekvenco (npr.
-# Social) dobijo NIŽJI CE, ker se od skupne vsote odšteje ravno njihov (velik)
-# delež, medtem ko majhne/redke kategorije (npr. Performance, če je manj, a bolj
-# raznolikih besed) dobijo umetno napihnjen CE. Zato je bil Performance previsok,
-# Social pa prenizek.
+# ZGODOVINA POPRAVKOV:
 #
-# POPRAVEK 1 - lastna kompleksnost kategorije:
-#   CE_enota = fE_enota / frE_enota   (enaka logika kot pri agregatnem Co = fo/fr,
-#   le omejena na besede TE kategorije). To neposredno odraža dejansko gostoto/
-#   raznolikost mnenj znotraj kategorije same, namesto "kaj ostane od drugih".
+# v1 (dobesedno po članku): CE = (fo_total - fE) / (fr_total - frE) - "ostanek"
+#    formula. Na realnih podatkih deluje protiintuitivno: velike kategorije
+#    (npr. Social) dobijo NIŽJI CE, ker se od skupne vsote odšteje ravno
+#    njihov velik delež.
 #
-# POPRAVEK 2 - kvadraturna (nelinearna) normalizacija na celotno moč:
-#   Ker je arcsin nelinearna funkcija, seštevek šestih vrednosti v stopinjah
-#   NIKOLI ne more dati skupne stresne moči. Namesto tega velja aditivnost v
-#   prostoru sin²(σ):
+# v2 (lastna kompleksnost): CE = fE / frE - meri PONOVLJIVOST/KONCENTRACIJO
+#    besedišča znotraj enote, ne volumna. Kategorija z ozkim, a zelo
+#    ponavljajočim se naborom besed (npr. Performance: "rok", "čas", "rok",
+#    "čas" ...) dobi VISOK CE, medtem ko kategorija z bogatim, raznolikim
+#    besediščem (npr. Social: mobbing, konflikt, nezaupanje, arogantnost,
+#    izključenost ...) dobi NIZEK CE - tudi če ima veliko več surovih omemb.
+#    To je matematično dosledno, a v nasprotju s pričakovanjem iz literature,
+#    da naj kategorija z največ omembami (navadno socialni dejavniki) prispeva
+#    največ k stresni moči.
 #
+# v3 (TA RAZLIČICA - izbira načina uteževanja):
+#    Uporabnik lahko izbere:
+#      - "volume"        : CE = 1 za vse enote -> težo v celoti določa surova
+#                           frekvenca (rho = fE/N). Kategorija z največ omembami
+#                           dobi največji delež stresne moči (skladno z literaturo).
+#      - "concentration" : CE = fE/frE (kot v v2) -> teža odraža, kako zgoščeno/
+#                           ponavljajoče se je besedišče znotraj enote.
+#
+# V OBEH primerih velja kvadraturna (nelinearna) normalizacija na skupno moč:
 #       sin²(σ_total) = Σ sin²(σ_enota)
-#
-#   Zato izračunamo "surove" argumente (sin² vsake enote), jih normaliziramo
-#   s skupnim faktorjem k, tako da njihova vsota TOČNO ustreza sin²(σ_total),
-#   nato pa iz tega dobimo σ_enota = arcsin(sqrt(argument_enota * k)).
-#   S tem je matematično zagotovljeno, da "nelinearni seštevek" vseh šestih
-#   kategorij natančno rekonstruira celotno stresno moč.
+# saj gre za nelinearno funkcijo (arcsin), zato preprost seštevek stopinj
+# nikoli ne bi mogel dati skupne stresne moči.
 # ============================================================
-def compute_category_factors(classified, n_override):
+def compute_category_factors(classified, n_override, weighting_mode="volume"):
     """
-    Za dani stolpec (SF, PF ali PR) izračuna lastno kompleksnost (CE), gostoto (rho)
-    in realni faktor (F) za vsako od 6 enot - vsako izračunano IZKLJUČNO na podlagi
-    besed, ki pripadajo tej kategoriji (ne na podlagi "ostanka" drugih kategorij).
+    Za dani stolpec (SF, PF ali PR) izračuna CE, rho in F za vsako od 6 enot.
+
+    weighting_mode:
+      - "volume"        : CE_enota = 1 (nevtralizirano) -> teža = surova frekvenca.
+      - "concentration"  : CE_enota = fE_enota / frE_enota -> teža = ponovljivost besedišča.
     """
     words_by_cat = defaultdict(list)
     for w, c in classified:
@@ -218,10 +221,13 @@ def compute_category_factors(classified, n_override):
         fE = len(words)
         frE = len(set(words))
 
-        if frE == 0 or n_override == 0:
-            CE = 0.0001
-        else:
-            CE = fE / frE  # lastna kompleksnost kategorije (POPRAVEK 1)
+        if weighting_mode == "concentration":
+            if frE == 0 or n_override == 0:
+                CE = 0.0001
+            else:
+                CE = fE / frE
+        else:  # "volume"
+            CE = 1.0
 
         rho = fE / n_override if n_override else 0.0
         F = (CE * rho) / 10.0  # Ct=1, rho_t=10
@@ -234,7 +240,7 @@ def compute_category_factors(classified, n_override):
 def sigma_deg(f_sf, f_pr, f_pf):
     """arcsin(sqrt((F_SF * F_PR) / F_PF)) v stopinjah, z zaščito pred deljenjem z 0."""
     if f_pf <= 0:
-        f_pf = 0.0001  # enaka zaščita kot pri agregatnem izračunu v prvotni kodi
+        f_pf = 0.0001
     argument = max((f_sf * f_pr) / f_pf, 0.0)
     sigma_rad = math.asin(min(math.sqrt(argument), 1.0))
     return math.degrees(sigma_rad)
@@ -249,7 +255,7 @@ def sigma_argument(f_sf, f_pr, f_pf):
 
 def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argument, is_summary):
     """
-    POPRAVEK 2: kvadraturna normalizacija.
+    Kvadraturna normalizacija:
 
     1. Za vsako od 6 enot izračuna "surov" argument sin²(σ_enota) = F_SF*F_PR/F_PF.
     2. Vse surove argumente sešteje (S).
@@ -257,8 +263,7 @@ def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argu
            Σ (argument_enota * k) = sin²(σ_total)
     4. Iz skaliranega argumenta izračuna dejanski σ_enota v stopinjah.
 
-    Rezultat: vsota sin²(σ_enota) po vseh 6 enotah TOČNO ustreza sin²(σ_total),
-    kar pomeni, da "nelinearni seštevek" vseh kategorij poda skupno stresno moč.
+    Rezultat: vsota sin²(σ_enota) po vseh 6 enotah TOČNO ustreza sin²(σ_total).
     """
     raw_arguments = {}
     for cat in CATEGORIES_MAP.keys():
@@ -306,6 +311,20 @@ def main():
         is_summary = st.checkbox("Ali naložena datoteka vsebuje POVZETEK?", value=True,
                                   help="Če nalagate že strnjene odgovore, sistem uporabi normalizacijski faktor.")
         st.divider()
+        st.subheader("🧮 Uteževanje po kategorijah")
+        weighting_label = st.radio(
+            "Kaj naj določa relativno moč posamezne enote?",
+            options=["Volumen (surova frekvenca)", "Koncentracija (ponovljivost besedišča)"],
+            index=0,
+            help=(
+                "Volumen: kategorija z največ omembami dobi največjo težo (skladno z "
+                "literaturo - npr. socialni dejavniki so praviloma najbolj vplivni).\n\n"
+                "Koncentracija: kategorija z ozkim, a zelo ponavljajočim se besediščem "
+                "dobi večjo težo, tudi če ima manj surovih omemb od druge kategorije."
+            ),
+        )
+        weighting_mode = "volume" if weighting_label.startswith("Volumen") else "concentration"
+        st.divider()
         st.info("Koda temelji na Petričevi metodi izračuna stresne moči v stopinjah (°S).")
 
     st.title("📊 Klasifikacija stresnih dejavnikov po Petričevi metodi")
@@ -332,7 +351,7 @@ def main():
                   "in predlogi za zmanjšanje stresa (PR).")
         return
 
-    # --- IZBIRA VLOGE STOLPCEV (namesto trde predpostavke po vrstnem redu) ---
+    # --- IZBIRA VLOGE STOLPCEV ---
     st.sidebar.divider()
     st.sidebar.subheader("🧭 Dodelitev stolpcev")
     col_pf = st.sidebar.selectbox("Stolpec s POZITIVNIMI dejavniki (PF):", target_cols, index=0)
@@ -340,7 +359,7 @@ def main():
     col_pr = st.sidebar.selectbox("Stolpec s PREDLOGI (PR):", target_cols, index=min(2, len(target_cols) - 1))
     role_cols = {"PF": col_pf, "SF": col_sf, "PR": col_pr}
 
-    # --- ANALIZA BESEDILA (enotno za oba tipa izračuna) ---
+    # --- ANALIZA BESEDILA ---
     analysis = {}
     for role, col in role_cols.items():
         classified, per_row_categories = analyze_column(df, col)
@@ -371,7 +390,7 @@ def main():
                 st.table(freq_df)
 
     # =========================================================
-    # 2. SEKCIJA: CELOTNA STRESNA MOČ (agregatno, kot prej - deluje pravilno)
+    # 2. SEKCIJA: CELOTNA STRESNA MOČ (agregatno)
     # =========================================================
     st.divider()
     st.header("📐 Izračun celokupne stresne moči")
@@ -411,21 +430,26 @@ def main():
     ec3.metric("Izguba energije zaradi stresa", f"{100 - eta:.2f} %")
 
     # =========================================================
-    # 3. SEKCIJA: STRESNA MOČ PO POSAMEZNIH KATEGORIJAH (POPRAVLJENO)
+    # 3. SEKCIJA: STRESNA MOČ PO POSAMEZNIH KATEGORIJAH
     # =========================================================
     st.divider()
     st.header("🧩 Stresna moč po posameznih znanstvenih enotah")
     st.caption(
-        "Vsaka enota (AtSF, StSF, IPSF, PSSF, SoSF, HBSF) dobi lasten realni faktor Fo na podlagi "
-        "SVOJE frekvence in raznolikosti besed (ne 'ostanka' drugih enot). Ker je arcsin nelinearna "
-        "funkcija, šestih vrednosti v stopinjah ni mogoče preprosto sešteti - zato so vrednosti "
-        "normalizirane tako, da velja: Σ sin²(σ_enota) = sin²(σ_celotno), kar zagotavlja, da "
-        "nelinearni seštevek vseh enot natančno rekonstruira celotno stresno moč."
+        f"Način uteževanja: **{weighting_label}**. Ker je arcsin nelinearna funkcija, šestih "
+        "vrednosti v stopinjah ni mogoče preprosto sešteti - zato so vrednosti normalizirane "
+        "tako, da velja: Σ sin²(σ_enota) = sin²(σ_celotno), kar zagotavlja, da nelinearni "
+        "seštevek vseh enot natančno rekonstruira celotno stresno moč."
     )
 
-    factors_pf, fo_total_pf, fr_total_pf = compute_category_factors(analysis["PF"]["classified"], n_input)
-    factors_sf, fo_total_sf, fr_total_sf = compute_category_factors(analysis["SF"]["classified"], n_input)
-    factors_pr, fo_total_pr, fr_total_pr = compute_category_factors(analysis["PR"]["classified"], n_input)
+    factors_pf, fo_total_pf, fr_total_pf = compute_category_factors(
+        analysis["PF"]["classified"], n_input, weighting_mode
+    )
+    factors_sf, fo_total_sf, fr_total_sf = compute_category_factors(
+        analysis["SF"]["classified"], n_input, weighting_mode
+    )
+    factors_pr, fo_total_pr, fr_total_pr = compute_category_factors(
+        analysis["PR"]["classified"], n_input, weighting_mode
+    )
 
     # Argument (sin²) celotne stresne moči - ista vrednost, iz katere je izpeljan sigma_total zgoraj
     sigma_total_argument = sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg)
