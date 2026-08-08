@@ -38,10 +38,7 @@ SLO_STOPWORDS = {
 }
 
 # ============================================================
-# 3. KLASIFIKACIJSKI MODEL (6 znanstvenih enot po Petriču, 2025)
-# Vrstni red slovarja je pomemben: vsaka beseda se dodeli PRVI
-# ujemajoči se kategoriji (glej classify_word_single), da se
-# prepreči dvojno štetje besed v več enotah hkrati.
+# 3. REVIDIRAN KLASIFIKACIJSKI MODEL (Petrič, 2025)
 # ============================================================
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
@@ -49,7 +46,8 @@ CATEGORIES_MAP = {
         "oprem", "tišin", "zrak", "prah", "gneč", "tehni", "akcij", "poškodb", "varna", "objekt",
         "sodobn", "naprav", "urejenost", "etiket", "izolac", "barv", "rastlin", "vonjav",
         "stol", "miz", "prezrač", "notranj", "location", "environment", "lighting", "toplota",
-        "hlad", "umazano", "onesnaž", "arhitekt", "opremljenost", "hrupn", "svetloba", "tišina"
+        "hlad", "umazano", "onesnaž", "arhitekt", "opremljenost", "hrupn", "svetloba", "tišina",
+        "classical", "music", "flower", "klasič", "glasb", "rož", "cvet"
     ],
     "Performance unit": [
         "rok", "deadline", "obremen", "nalog", "oprav", "čas", "administra", "birokra",
@@ -59,9 +57,8 @@ CATEGORIES_MAP = {
         "poenostav", "inovac", "rešitev", "urnik", "ure", "izvajanj", "regula", "hrm",
         "direktiv", "ukaluplj", "iskanj", "gradiv", "polic", "katalog", "orientac",
         "podatkov", "fond", "isposoj", "job", "balance", "goal", "cilj", "študij",
-        "literature", "izvodi", "raziskav", "iskanje", "tasks", "šport", "rekreac",
-        "tek", "joga", "aktiv", "plavanj", "kolo", "vrtnar", "hobi", "delovni", "program",
-        "iskanja", "usposabljanja", "training", "exercise", "sport", "activities", "vodenje"
+        "literature", "izvodi", "raziskav", "iskanje", "tasks", "program",
+        "training", "exercise", "activities"
     ],
     "Individual Psychological unit": [
         "strah", "tesnob", "optimiz", "pozitiv", "samozav", "čustv", "stres", "frustr",
@@ -78,11 +75,10 @@ CATEGORIES_MAP = {
         "standar", "nepravič", "nestimul", "krivic", "dostojen", "zaposlit", "služb",
         "karier", "napredov", "varnost", "staž", "benefic", "ekonom", "proračun",
         "pokojnin", "sredstv", "zamudn", "opomin", "kazn", "plačev", "plačilo", "money",
-        "salary", "financial", "budget", "stability", "sredstva", "znesek", "standard",
-        "zavarov", "ekonomska", "preživetje", "neenakost", "nepravičnost"
+        "salary", "financial", "budget", "stability", "sredstva", "znesek"
     ],
     "Social unit": [
-        "odnos", "mobing", "sestank", "organizac", "šikan", "sodelav", "šef", "vodstv", "nadrejen", "družin",
+        "odnos", "mobing", "organizac", "sestank", "šikan", "sodelav", "šef", "vodstv", "nadrejen", "družin",
         "prijatel", "komunik", "prepir", "zahrbt", "vzvišen", "nesram", "aroganc",
         "egoiz", "podpor", "konflikt", "intrig", "neiskren", "rival", "polit",
         "hierarh", "timsko", "druženj", "domače", "kader", "sodelov", "sovrašt",
@@ -90,13 +86,14 @@ CATEGORIES_MAP = {
         "family", "talk", "prijatelj", "družin", "pogovor", "pomoč", "ekipa", "prijaznost",
         "partnership", "spouse", "sodelovanje", "zaupan", "vodenj", "klima", "vzdušje",
         "ignora", "nerazum", "posluš", "sektor", "direktor", "vodja", "pripadnost", "rivalstvo",
-        "talk", "friends" # TO DODAJ TUKAJ
+        "economic", "level", "law", "alcohol", "weapon", "zakon", "orož", "standard", "družb"
     ],
     "Health biological unit": [
         "zdrav", "bolniš", "bolezen", "spanj", "utrujen", "izčrpan", "higien",
         "čistoč", "sleep", "rest", "dihanje", "poškodb", "izčrpanost", "utrujenost",
         "zdravje", "bolečina", "virus", "infekcij", "higiena", "prehran", "diet",
-        "biološ", "fiziolo", "telo", "utrujena", "spanja", "telesno", "exhaustion"
+        "biološ", "fiziolo", "telo", "utrujena", "spanja", "telesno", "exhaustion",
+        "šport", "rekreac", "tek", "joga", "aktiv", "plavanj", "kolo", "vrtnar", "hobi"
     ]
 }
 
