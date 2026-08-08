@@ -5,8 +5,9 @@ import math
 from collections import Counter, defaultdict
 import plotly.express as px
 
+
 # ============================================================
-# 1. NASTAVITVE STRANI
+# 1. NASTAVITVE
 # ============================================================
 
 st.set_page_config(
@@ -16,8 +17,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
 # ============================================================
-# 2. PONASTAVITEV SEJE
+# 2. PONASTAVITEV
 # ============================================================
 
 def reset_app():
@@ -25,16 +27,32 @@ def reset_app():
         del st.session_state[key]
     st.rerun()
 
+
 # ============================================================
 # 3. ESTETSKI CSS
 # ============================================================
 
 st.markdown("""
 <style>
-.main { background-color: #f7f9fc; }
-.block-container { padding-top: 1.5rem; padding-bottom: 3rem; }
-h1 { font-weight: 800; letter-spacing: -0.5px; }
-h2, h3 { font-weight: 700; }
+
+.main {
+    background-color: #f7f9fc;
+}
+
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 3rem;
+}
+
+h1 {
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+h2, h3 {
+    font-weight: 700;
+}
+
 .metric-card {
     background: white;
     border-radius: 16px;
@@ -43,6 +61,7 @@ h2, h3 { font-weight: 700; }
     box-shadow: 0 4px 14px rgba(0,0,0,0.05);
     min-height: 145px;
 }
+
 .metric-title {
     color: #64748b;
     font-size: 0.85rem;
@@ -50,24 +69,66 @@ h2, h3 { font-weight: 700; }
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
 .metric-value {
     font-size: 2rem;
     font-weight: 800;
     margin-top: 5px;
 }
+
 .metric-description {
     color: #64748b;
     font-size: 0.85rem;
     margin-top: 5px;
 }
-.stress-high { color: #dc2626; font-weight: 800; }
-.stress-medium { color: #ea580c; font-weight: 700; }
-.stress-low { color: #16a34a; font-weight: 700; }
+
+.social-card {
+    background: linear-gradient(135deg, #fff7ed, #ffffff);
+    border: 2px solid #f97316;
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 6px 20px rgba(249,115,22,0.12);
+}
+
+.section-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #e5e9f0;
+    margin-bottom: 15px;
+}
+
+.rank-number {
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+
+.small-muted {
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.stress-high {
+    color: #dc2626;
+    font-weight: 800;
+}
+
+.stress-medium {
+    color: #ea580c;
+    font-weight: 700;
+}
+
+.stress-low {
+    color: #16a34a;
+    font-weight: 700;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
+
 # ============================================================
-# 4. STOPWORDS (MAŠILA)
+# 4. STOPWORDS
 # ============================================================
 
 SLO_STOPWORDS = {
@@ -83,49 +144,46 @@ SLO_STOPWORDS = {
     "marsikdo", "nekdo", "nekateri", "nekatera", "nekatero", "pod",
     "med", "nad", "pred", "brez", "ob", "po", "skozi", "čez",
     "proti", "kljub", "zaradi", "namesto", "razen", "okoli", "okrog",
-    "tem", "več",
+    "tem",
+
     "the", "and", "to", "of", "a", "is", "it", "with", "some",
     "more", "being", "able", "use", "make", "nice", "your", "this",
     "that", "from", "for", "are", "was", "were"
 }
 
+
 # ============================================================
-# 5. ZNANSTVENA KLASIFIKACIJA (Petrič, 2025)
+# 5. ZNANSTVENA KLASIFIKACIJA
+#
+# Petrič (2025):
+# - attentive physical
+# - performance
+# - individual psychological
+# - partial social
+# - social
+# - health-biological
+#
+# V aplikaciji sta partial social + social združena v SOCIAL UNIT,
+# ker je to trenutna uporabniška logika sistema.
 # ============================================================
 
 CATEGORIES_MAP = {
-    "Social unit": [
-        # Kontekstualni dodatki
-        "delovnem", "mestu", "dobr", "obveznost", "okolje",
-        # Interpersonalni odnosi
-        "odnos", "odnosih", "odnosov", "mobing", "šikan",
-        "sodelav", "sodelovanje", "sodelov", "šef", "vodstv",
-        "nadrejen", "družin", "prijatel", "komunik", "pogovor",
-        "prepir", "zahrbt", "vzvišen", "nesram", "aroganc",
-        "egoiz", "podpor", "konflikt", "intrig", "neiskren",
-        "rival", "polit", "hierarh", "timsko", "druženj",
-        "domače", "kader", "sovrašt", "grožn", "profesional",
-        "uporabnik", "osebj", "človek", "friend", "family",
-        "talk", "prijatelj", "partnership", "spouse",
-        "zaupan", "vodenj", "klima", "vzdušje", "ignor",
-        "nerazum", "posluš", "sektor", "direktor", "vodja",
-        "pripadnost", "rivalstvo", "friends",
-        "organizac", "organizaciji", "organizacijo",
-        "sestank", "meeting", "team", "teamwork",
-        "management", "leader", "leadership",
-        # Status / Finance (prej Partial Social)
-        "plač", "dohod", "denar", "finanč", "nagrad", "status",
-        "priznan", "revšč", "standar", "nepravič", "nestimul",
-        "krivic", "dostojen", "zaposlit", "služb", "karier",
-        "napredov", "varnost", "staž", "benefic", "ekonom",
-        "proračun", "pokojnin", "sredstv", "zamudn", "opomin",
-        "kazn", "plačev", "plačilo", "money", "salary",
-        "financial", "budget", "stability", "znesek", "družb", 
-        "law", "zakon", "orož", "weapon", "alcohol", "economic", 
-        "level", "standard"
+
+    "Attentive (physical) unit": [
+
+        "hrup", "svetlob", "razsvetlj", "vroč", "mraz", "vrem",
+        "prostor", "pisarn", "ergonom", "oprem", "tišin", "zrak",
+        "prah", "gneč", "tehni", "poškodb", "varna", "objekt",
+        "sodobn", "naprav", "urejenost", "etiket", "izolac",
+        "barv", "rastlin", "vonjav", "stol", "miz", "prezrač",
+        "notranj", "location", "environment", "lighting", "toplota",
+        "hlad", "umazano", "onesnaž", "arhitekt", "opremljenost",
+        "hrupn", "svetloba", "tišina", "classical", "music",
+        "flower", "klasič", "glasb", "rož", "cvet", "flowers"
     ],
 
     "Performance unit": [
+
         "rok", "deadline", "obremen", "nalog", "oprav", "čas",
         "administra", "birokra", "obrazc", "poročil",
         "postopk", "navodil", "veščin", "hitenj", "naglic",
@@ -138,10 +196,11 @@ CATEGORIES_MAP = {
         "balance", "goal", "cilj", "študij", "literature",
         "izvodi", "raziskav", "iskanje", "tasks", "program",
         "training", "exercise", "activities", "šport", "rekreac",
-        "tek", "joga", "plavanj", "kolo", "dela", "delo"
+        "tek", "joga", "plavanj", "kolo"
     ],
 
     "Individual Psychological unit": [
+
         "strah", "tesnob", "samozav", "čustv", "stres",
         "frustr", "mir", "negotov", "nervoz", "panik", "nemoč",
         "skrb", "napetos", "psih", "travm", "osebno",
@@ -155,19 +214,56 @@ CATEGORIES_MAP = {
         "praznina", "osebnost", "samokontrol", "vera", "mirnost"
     ],
 
-    "Attentive (physical) unit": [
-        "hrup", "svetlob", "razsvetlj", "vroč", "mraz", "vrem",
-        "prostor", "pisarn", "ergonom", "oprem", "tišin", "zrak",
-        "prah", "gneč", "tehni", "poškodb", "varna", "objekt",
-        "sodobn", "naprav", "urejenost", "etiket", "izolac",
-        "barv", "rastlin", "vonjav", "stol", "miz", "prezrač",
-        "notranj", "location", "environment", "lighting", "toplota",
-        "hlad", "umazano", "onesnaž", "arhitekt", "opremljenost",
-        "hrupn", "svetloba", "tišina", "classical", "music",
-        "flower", "klasič", "glasb", "rož", "cvet", "flowers"
+    # ========================================================
+    # SOCIAL UNIT
+    #
+    # NAMERNO NAJVIŠJI STRUKTURNI NAGIB
+    #
+    # Vključuje social + partial-social področja.
+    # ========================================================
+
+    "Social unit": [
+
+        # interpersonalni odnosi
+        "odnos", "odnosih", "odnosov", "mobing", "šikan",
+        "sodelav", "sodelovanje", "sodelov", "šef", "vodstv",
+        "nadrejen", "družin", "prijatel", "komunik", "pogovor",
+        "prepir", "zahrbt", "vzvišen", "nesram", "aroganc",
+        "egoiz", "podpor", "konflikt", "intrig", "neiskren",
+        "rival", "polit", "hierarh", "timsko", "druženj",
+        "domače", "kader", "sovrašt", "grožn", "profesional",
+        "uporabnik", "osebj", "človek", "friend", "family",
+        "talk", "prijatelj", "partnership", "spouse",
+        "zaupan", "vodenj", "klima", "vzdušje", "ignor",
+        "nerazum", "posluš", "sektor", "direktor", "vodja",
+        "pripadnost", "rivalstvo", "friends",
+
+        # organizacijski/socialni odnosi
+        "organizac", "organizaciji", "organizacijo",
+        "sestank", "meeting", "meetings", "team", "teamwork",
+        "management", "leader", "leadership", "manager",
+
+        # partial-social / status / pravičnost
+        "plač", "dohod", "denar", "finanč", "nagrad", "status",
+        "priznan", "revšč", "standar", "nepravič", "nestimul",
+        "krivic", "dostojen", "zaposlit", "služb", "karier",
+        "napredov", "varnost", "staž", "benefic", "ekonom",
+        "proračun", "pokojnin", "sredstv", "zamudn", "opomin",
+        "kazn", "plačev", "plačilo", "money", "salary",
+        "financial", "budget", "stability", "znesek",
+
+        # širši družbeni kontekst
+        "družb", "law", "zakon", "orož", "weapon", "alcohol",
+        "economic", "level", "standard",
+
+        # neposredni socialni stresorji
+        "mobbing", "harassment", "bullying", "conflict",
+        "overcrowding", "crowding", "injustice", "punishment",
+        "reward", "recognition", "support", "trust"
     ],
 
     "Health biological unit": [
+
         "zdrav", "bolniš", "bolezen", "spanj", "utrujen",
         "izčrpan", "higien", "čistoč", "sleep", "rest",
         "dihanje", "izčrpanost", "utrujenost", "zdravje",
@@ -177,17 +273,28 @@ CATEGORIES_MAP = {
     ]
 }
 
+
 # ============================================================
-# 6. STRUKTURNI PARAMETRI
+# 6. STRUKTURNI NAGIBI
+#
+# Osnovna znanstvena logika:
+# večja gostota + raznolikost + kompleksnost = večji nagib.
+#
+# Social unit dobi najvišji STRUKTURNI KOEFICIENT.
+#
+# To ni nadomestilo za empirične podatke, ampak kalibracijski
+# prior, ki upošteva sistemsko/medosebno propagacijo socialnih
+# stresorjev, opisano v članku.
 # ============================================================
 
 SLOPE_WEIGHTS = {
-    "Social unit": 1.50,
+    "Attentive (physical) unit": 0.85,
     "Performance unit": 1.05,
     "Individual Psychological unit": 1.00,
-    "Health biological unit": 0.90,
-    "Attentive (physical) unit": 0.85
+    "Social unit": 1.30,
+    "Health biological unit": 0.90
 }
+
 
 CATEGORY_SHORT = {
     "Attentive (physical) unit": "Attentive",
@@ -196,6 +303,11 @@ CATEGORY_SHORT = {
     "Social unit": "Social",
     "Health biological unit": "Health"
 }
+
+
+# ============================================================
+# 7. RATING SCALE
+# ============================================================
 
 RATING_SCALE = [
     (15.04, "Zelo nizka"),
@@ -206,23 +318,49 @@ RATING_SCALE = [
     (90.01, "Zelo visoka")
 ]
 
+
 def rate_sigma(sigma):
+
     for threshold, label in RATING_SCALE:
-        if sigma <= threshold: return label
+
+        if sigma <= threshold:
+            return label
+
     return "Zelo visoka"
 
+
 # ============================================================
-# 7. POMOŽNE FUNKCIJE OBDELAVE
+# 8. TOKENIZACIJA
 # ============================================================
 
 def clean_and_tokenize(text):
-    if not isinstance(text, str): return []
+
+    if not isinstance(text, str):
+        return []
+
     text = text.lower()
+
     text = re.sub(r"[^\w\s]", " ", text)
+
     words = text.split()
-    return [w for w in words if w not in SLO_STOPWORDS and len(w) > 2]
+
+    return [
+        w for w in words
+        if w not in SLO_STOPWORDS
+        and len(w) > 2
+    ]
+
+
+# ============================================================
+# 9. KLASIFIKACIJA BESEDE
+# ============================================================
 
 def classify_word_single(word):
+
+    # Social unit ima prednost pred bolj splošnimi kategorijami.
+    # To je pomembno pri besedah kot:
+    # sestanek, vodstvo, organizacija, sodelavec itd.
+
     priority_order = [
         "Social unit",
         "Performance unit",
@@ -230,36 +368,68 @@ def classify_word_single(word):
         "Health biological unit",
         "Attentive (physical) unit"
     ]
+
     for cat in priority_order:
+
         kw_list = CATEGORIES_MAP[cat]
+
         if any(koren in word for koren in kw_list):
             return cat
+
     return None
 
-def analyze_column(df, col):
-    classified, per_row, unclassified = [], [], []
-    for row in df[col].dropna():
-        kws = clean_and_tokenize(row)
-        row_cats = []
-        for kw in kws:
-            cat = classify_word_single(kw)
-            if cat:
-                classified.append((kw, cat))
-                row_cats.append(cat)
-            else:
-                unclassified.append(kw)
-        per_row.append(row_cats)
-    return classified, per_row, unclassified
 
 # ============================================================
-# 8. MATEMATIČNA LOGIKA (PETRIČEVA METODA)
+# 10. ANALIZA STOLPCA
+# ============================================================
+
+def analyze_column(df, col):
+
+    classified = []
+
+    per_row_categories = []
+
+    unclassified_words = []
+
+    for row in df[col].dropna():
+
+        kws = clean_and_tokenize(row)
+
+        row_cats = []
+
+        for kw in kws:
+
+            cat = classify_word_single(kw)
+
+            if cat:
+
+                classified.append((kw, cat))
+
+                row_cats.append(cat)
+
+            else:
+
+                unclassified_words.append(kw)
+
+        per_row_categories.append(row_cats)
+
+    return (
+        classified,
+        per_row_categories,
+        unclassified_words
+    )
+
+
+# ============================================================
+# 11. MATEMATIČNA LOGIKA (PETRIČEVA METODA)
 # ============================================================
 
 def calculate_fo_real_aggregate(classified, n_override):
     all_words = [w for w, _ in classified]
     fo = len(all_words)
     fr = len(set(all_words))
-    if fr == 0 or n_override == 0: return 0.0001, fo, fr
+    if fr == 0 or n_override == 0:
+        return 0.0001, fo, fr
     rho_o = fo / n_override
     c_o = fo / fr
     fo_real = (c_o * rho_o) / 10.0
@@ -272,17 +442,19 @@ def compute_category_factors(classified, n_override, weighting_mode="volume"):
     result = {}
     for category in CATEGORIES_MAP.keys():
         words = words_by_cat.get(category, [])
-        fE, frE = len(words), len(set(words))
+        fE = len(words)
+        frE = len(set(words))
         if weighting_mode == "concentration":
             CE = fE / frE if frE > 0 else 0.0001
-        else: CE = 1.0
+        else:
+            CE = 1.0
         rho = fE / n_override if n_override else 0.0
         F = (CE * rho) / 10.0
         result[category] = {"fE": fE, "frE": frE, "CE": CE, "rho": rho, "F": F}
     return result
 
 def sigma_argument(f_sf, f_pr, f_pf):
-    f_pf = max(f_pf, 0.005) # Stabilizacija imenovalca
+    if f_pf <= 0: f_pf = 0.0001
     argument = (f_sf * f_pr) / f_pf
     return max(argument, 0.0)
 
@@ -297,9 +469,11 @@ def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argu
         f_pf = factors_pf[category]["F"]
         f_sf = factors_sf[category]["F"]
         f_pr = factors_pr[category]["F"]
-        if is_summary and f_sf > 0: f_pr = min(f_pr, f_sf * 1.5)
-        arg = sigma_argument(f_sf, f_pr, f_pf)
-        raw_scores[category] = arg * SLOPE_WEIGHTS[category]
+        if is_summary and f_sf > 0:
+            f_pr = min(f_pr, f_sf * 1.5)
+        argument = sigma_argument(f_sf, f_pr, f_pf)
+        weighted_score = argument * SLOPE_WEIGHTS[category]
+        raw_scores[category] = weighted_score
 
     total_score = sum(raw_scores.values())
     results = {}
@@ -312,7 +486,10 @@ def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argu
         share = raw_scores[category] / total_score
         scaled_argument = min(sigma_total_argument * share, 1.0)
         sigma = math.degrees(math.asin(math.sqrt(scaled_argument)))
-        results[category] = {"sigma": sigma, "weight_share": share}
+        results[category] = {
+            "sigma": sigma,
+            "weight_share": share
+        }
     return results, total_score
 
 def calculate_energy(sigma):
@@ -323,7 +500,7 @@ def calculate_energy(sigma):
     return W_EU, eta, loss
 
 # ============================================================
-# 9. UPORABNIŠKI VMESNIK (MAIN)
+# 12. GLAVNA STREAMLIT APLIKACIJA (UI)
 # ============================================================
 
 def main():
@@ -340,7 +517,6 @@ def main():
         uploaded_file = st.file_uploader("📁 Naložite podatke", type=["txt", "csv", "xlsx"])
 
     st.markdown("# 📊 Petrič Stress Analysis Pro")
-    st.caption(f"Kalibracija: N = {n_input} • Model nagiba in gostote • Socialna prioriteta")
 
     if not uploaded_file:
         st.info("📁 Naložite datoteko za začetek analize.", icon="ℹ️")
@@ -360,44 +536,63 @@ def main():
         col_sf = st.selectbox("Stresni (SF)", target_cols, index=min(1, len(target_cols)-1))
         col_pr = st.selectbox("Predlogi (PR)", target_cols, index=min(2, len(target_cols)-1))
 
-    analysis = {r: analyze_column(df, c) for r, c in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]}
-    
-    f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"][0], n_input)
-    f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"][0], n_input)
-    f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"][0], n_input)
+    # ANALIZA
+    analysis = {}
+    for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
+        cls, per_row, uncls = analyze_column(df, col)
+        analysis[role] = {"classified": cls, "per_row": per_row, "unclassified": uncls, "col_name": col}
+
+    # GLOBALNI IZRAČUN
+    f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
+    f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"]["classified"], n_input)
+    f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"]["classified"], n_input)
     if is_summary: f_pr_agg = min(f_pr_agg, f_sf_agg * 1.5)
     sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
     W_EU, eta, loss = calculate_energy(sigma_total)
 
+    # GLAVNE METRIKE
     st.markdown("## 🎯 Skupni rezultati")
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Stresna moč", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
     m2.metric("Učinkovitost", f"{eta:.1f} %")
-    m3.metric("Izguba", f"{loss:.0f} Kcal")
-    m4.metric("Vzorec", n_input)
+    m3.metric("Izguba energije", f"{loss:.0f} Kcal")
+    m4.metric("Vzorec (N)", n_input)
     st.progress(min(sigma_total / 90.0, 1.0))
 
+    # RAZČLENITEV PO ENOTAH
     st.divider()
-    cat_sigmas, _ = compute_category_sigmas(
-        compute_category_factors(analysis["SF"][0], n_input, weighting_mode),
-        compute_category_factors(analysis["PF"][0], n_input, weighting_mode),
-        compute_category_factors(analysis["PR"][0], n_input, weighting_mode),
-        min(sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg), 1.0), is_summary
-    )
+    f_pf_cat = compute_category_factors(analysis["PF"]["classified"], n_input, weighting_mode)
+    f_sf_cat = compute_category_factors(analysis["SF"]["classified"], n_input, weighting_mode)
+    f_pr_cat = compute_category_factors(analysis["PR"]["classified"], n_input, weighting_mode)
+    
+    sig_total_arg = min(sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg), 1.0)
+    cat_sigmas, _ = compute_category_sigmas(f_sf_cat, f_pf_cat, f_pr_cat, sig_total_arg, is_summary)
 
-    rows = [{"Enota": CATEGORY_SHORT[c], "σ (°S)": round(d["sigma"], 2), "Delež (%)": round(d["weight_share"]*100, 1), "Ocena": rate_sigma(d["sigma"])} for c, d in cat_sigmas.items()]
+    rows = []
+    for cat, data in cat_sigmas.items():
+        rows.append({
+            "Enota": CATEGORY_SHORT[cat], 
+            "σ (°S)": round(data["sigma"], 2), 
+            "Delež (%)": round(data["weight_share"]*100, 1), 
+            "Ocena": rate_sigma(data["sigma"])
+        })
+    
     res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
     
+    # PRIKAZ TABELE IN GRAFA (brez Hero kartice)
     st.markdown("### Porazdelitev po znanstvenih enotah")
-    cl, cr = st.columns(2)
-    cl.dataframe(res_df, use_container_width=True, hide_index=True)
-    cr.plotly_chart(px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)", color_continuous_scale="Reds", height=300), use_container_width=True)
+    col_left, col_right = st.columns([1, 1])
+    with col_left:
+        st.dataframe(res_df, use_container_width=True, hide_index=True)
+    with col_right:
+        st.plotly_chart(px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)", color_continuous_scale="Reds", height=300), use_container_width=True)
 
-    with st.expander("🔍 Podrobnosti klasifikacije"):
+    # KVALITATIVNI PREGLED
+    with st.expander("🔍 Podrobnosti klasifikacije besed"):
         t1, t2, t3 = st.tabs(["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"])
         for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
             with tab:
-                freq = Counter(c for _, c in analysis[role][0])
+                freq = Counter(c for _, c in analysis[role]["classified"])
                 st.table(pd.DataFrame([{"Enota": CATEGORY_SHORT.get(k, k), "Frekvenca": v} for k, v in freq.items()]))
 
 if __name__ == "__main__":
