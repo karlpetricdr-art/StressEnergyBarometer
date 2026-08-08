@@ -53,8 +53,8 @@ CATEGORIES_MAP = {
     ],
     "Performance unit": [
         "rok", "deadline", "obremen", "nalog", "oprav", "čas", "administra", "birokra",
-        "obrazc", "poročil", "sestank", "postopk", "navodil", "veščin", "hitenj",
-        "naglic", "stisk", "preobremen", "neizkušn", "organizac", "učinkovit",
+        "obrazc", "poročil", "postopk", "navodil", "veščin", "hitenj",
+        "naglic", "stisk", "preobremen", "neizkušn", "učinkovit",
         "biro", "togi", "rutin", "nujne", "izobraž", "usposab", "optimiz", "proces",
         "poenostav", "inovac", "rešitev", "urnik", "ure", "izvajanj", "regula", "hrm",
         "direktiv", "ukaluplj", "iskanj", "gradiv", "polic", "katalog", "orientac",
@@ -82,7 +82,7 @@ CATEGORIES_MAP = {
         "zavarov", "ekonomska", "preživetje", "neenakost", "nepravičnost"
     ],
     "Social unit": [
-        "odnos", "mobing", "šikan", "sodelav", "šef", "vodstv", "nadrejen", "družin",
+        "odnos", "mobing", "sestank", "organizac", "šikan", "sodelav", "šef", "vodstv", "nadrejen", "družin",
         "prijatel", "komunik", "prepir", "zahrbt", "vzvišen", "nesram", "aroganc",
         "egoiz", "podpor", "konflikt", "intrig", "neiskren", "rival", "polit",
         "hierarh", "timsko", "druženj", "domače", "kader", "sodelov", "sovrašt",
