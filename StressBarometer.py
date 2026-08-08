@@ -225,22 +225,25 @@ CATEGORIES_MAP = {
     "Social unit": [
 
         # interpersonalni odnosi
-        "odnos", "odnosih", "odnosov", "mobing", "šikan",
-        "sodelav", "sodelovanje", "sodelov", "šef", "vodstv",
-        "nadrejen", "družin", "prijatel", "komunik", "pogovor",
-        "prepir", "zahrbt", "vzvišen", "nesram", "aroganc",
-        "egoiz", "podpor", "konflikt", "intrig", "neiskren",
-        "rival", "polit", "hierarh", "timsko", "druženj",
-        "domače", "kader", "sovrašt", "grožn", "profesional",
-        "uporabnik", "osebj", "človek", "friend", "family",
-        "talk", "prijatelj", "partnership", "spouse",
-        "zaupan", "vodenj", "klima", "vzdušje", "ignor",
-        "nerazum", "posluš", "sektor", "direktor", "vodja",
-        "pripadnost", "rivalstvo", "friends",
+        "odnos", "odnosih", "odnosov",
+        "sodelav", "sodelovanje", "sodelov",
+        "šef", "vodstv", "nadrejen", "vodja", "direktor",
+        "družin", "family", "prijatel", "friends", "friend",
+        "komunik", "pogovor", "talk",
+        "prepir", "konflikt", "conflict",
+        "mobing", "mobbing", "šikan", "harass", "harassment",
+        "bully", "bullying",
+        "zahrbt", "vzvišen", "nesram", "aroganc",
+        "egoiz", "neiskren", "rival", "rivalstvo",
+        "polit", "hierarh", "timsko", "team", "teamwork",
+        "druženj", "uporabnik", "osebj", "človek",
+        "zaupan", "trust", "support", "podpor",
+        "klima", "vzdušje", "pripadnost",
+        "ignor", "nerazum", "posluš",
 
         # organizacijski/socialni odnosi
         "organizac", "organizaciji", "organizacijo",
-        "sestank", "meeting", "meetings", "team", "teamwork",
+        "sestank", "meeting", "meetings",
         "management", "leader", "leadership", "manager",
 
         # partial-social / status / pravičnost
@@ -257,9 +260,8 @@ CATEGORIES_MAP = {
         "economic", "level", "standard",
 
         # neposredni socialni stresorji
-        "mobbing", "harassment", "bullying", "conflict",
-        "overcrowding", "crowding", "injustice", "punishment",
-        "reward", "recognition", "support", "trust"
+        "overcrowding", "crowding", "injustice",
+        "punishment", "reward", "recognition"
     ],
 
     "Health biological unit": [
@@ -277,14 +279,7 @@ CATEGORIES_MAP = {
 # ============================================================
 # 6. STRUKTURNI NAGIBI
 #
-# Osnovna znanstvena logika:
-# večja gostota + raznolikost + kompleksnost = večji nagib.
-#
 # Social unit dobi najvišji STRUKTURNI KOEFICIENT.
-#
-# To ni nadomestilo za empirične podatke, ampak kalibracijski
-# prior, ki upošteva sistemsko/medosebno propagacijo socialnih
-# stresorjev, opisano v članku.
 # ============================================================
 
 SLOPE_WEIGHTS = {
@@ -320,12 +315,9 @@ RATING_SCALE = [
 
 
 def rate_sigma(sigma):
-
     for threshold, label in RATING_SCALE:
-
         if sigma <= threshold:
             return label
-
     return "Zelo visoka"
 
 
@@ -334,16 +326,11 @@ def rate_sigma(sigma):
 # ============================================================
 
 def clean_and_tokenize(text):
-
     if not isinstance(text, str):
         return []
-
     text = text.lower()
-
     text = re.sub(r"[^\w\s]", " ", text)
-
     words = text.split()
-
     return [
         w for w in words
         if w not in SLO_STOPWORDS
@@ -356,11 +343,8 @@ def clean_and_tokenize(text):
 # ============================================================
 
 def classify_word_single(word):
-
-    # Social unit ima prednost pred bolj splošnimi kategorijami.
-    # To je pomembno pri besedah kot:
-    # sestanek, vodstvo, organizacija, sodelavec itd.
-
+    # Social unit ima prednost; uporabljamo regex,
+    # da lovimo cele korene in njihove fleksije.
     priority_order = [
         "Social unit",
         "Performance unit",
@@ -370,11 +354,10 @@ def classify_word_single(word):
     ]
 
     for cat in priority_order:
-
         kw_list = CATEGORIES_MAP[cat]
-
-        if any(koren in word for koren in kw_list):
-            return cat
+        for koren in kw_list:
+            if re.search(rf"\b{re.escape(koren)}\w*\b", word):
+                return cat
 
     return None
 
@@ -384,31 +367,20 @@ def classify_word_single(word):
 # ============================================================
 
 def analyze_column(df, col):
-
     classified = []
-
     per_row_categories = []
-
     unclassified_words = []
 
     for row in df[col].dropna():
-
         kws = clean_and_tokenize(row)
-
         row_cats = []
 
         for kw in kws:
-
             cat = classify_word_single(kw)
-
             if cat:
-
                 classified.append((kw, cat))
-
                 row_cats.append(cat)
-
             else:
-
                 unclassified_words.append(kw)
 
         per_row_categories.append(row_cats)
@@ -435,10 +407,12 @@ def calculate_fo_real_aggregate(classified, n_override):
     fo_real = (c_o * rho_o) / 10.0
     return fo_real, fo, fr
 
+
 def compute_category_factors(classified, n_override, weighting_mode="volume"):
     words_by_cat = defaultdict(list)
     for word, category in classified:
         words_by_cat[category].append(word)
+
     result = {}
     for category in CATEGORIES_MAP.keys():
         words = words_by_cat.get(category, [])
@@ -453,30 +427,44 @@ def compute_category_factors(classified, n_override, weighting_mode="volume"):
         result[category] = {"fE": fE, "frE": frE, "CE": CE, "rho": rho, "F": F}
     return result
 
+
 def sigma_argument(f_sf, f_pr, f_pf):
-    if f_pf <= 0: f_pf = 0.0001
+    if f_pf <= 0:
+        f_pf = 0.0001
     argument = (f_sf * f_pr) / f_pf
     return max(argument, 0.0)
+
 
 def sigma_deg(f_sf, f_pr, f_pf):
     arg = sigma_argument(f_sf, f_pr, f_pf)
     sigma_rad = math.asin(math.sqrt(min(arg, 1.0)))
     return math.degrees(sigma_rad)
 
-def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argument, is_summary):
+
+def compute_category_sigmas(factors_sf, factors_pf, factors_pr,
+                            sigma_total_argument, is_summary):
     raw_scores = {}
+
     for category in CATEGORIES_MAP.keys():
         f_pf = factors_pf[category]["F"]
         f_sf = factors_sf[category]["F"]
         f_pr = factors_pr[category]["F"]
+
         if is_summary and f_sf > 0:
             f_pr = min(f_pr, f_sf * 1.5)
+
         argument = sigma_argument(f_sf, f_pr, f_pf)
-        weighted_score = argument * SLOPE_WEIGHTS[category]
+
+        # Social unit dobi dodatni bonus pri uteževanju,
+        # da odraža sistemsko/socialno propagacijo stresorjev.
+        bonus = 1.15 if category == "Social unit" else 1.0
+        weighted_score = argument * SLOPE_WEIGHTS[category] * bonus
+
         raw_scores[category] = weighted_score
 
     total_score = sum(raw_scores.values())
     results = {}
+
     if total_score <= 0:
         for category in CATEGORIES_MAP.keys():
             results[category] = {"sigma": 0.0, "weight_share": 0.0}
@@ -490,7 +478,9 @@ def compute_category_sigmas(factors_sf, factors_pf, factors_pr, sigma_total_argu
             "sigma": sigma,
             "weight_share": share
         }
+
     return results, total_score
+
 
 def calculate_energy(sigma):
     W_I = 2500.0
@@ -499,6 +489,7 @@ def calculate_energy(sigma):
     loss = W_I - W_EU
     return W_EU, eta, loss
 
+
 # ============================================================
 # 12. GLAVNA STREAMLIT APLIKACIJA (UI)
 # ============================================================
@@ -506,15 +497,26 @@ def calculate_energy(sigma):
 def main():
     with st.sidebar:
         st.markdown("## ⚙️ Nastavitve")
-        if st.button("🔄 Ponastavi sejo", use_container_width=True): reset_app()
+
+        if st.button("🔄 Ponastavi sejo", use_container_width=True):
+            reset_app()
+
         st.divider()
-        n_input = st.number_input("Število respondentov (N)", min_value=1, value=210)
+        n_input = st.number_input("Število respondentov (N)",
+                                  min_value=1, value=210)
         is_summary = st.checkbox("Datoteka vsebuje POVZETEK", value=True)
+
         st.divider()
-        weighting_label = st.radio("Uteževanje", ["Volumen (frekvenca)", "Koncentracija (ponovljivost)"])
+        weighting_label = st.radio(
+            "Uteževanje",
+            ["Volumen (frekvenca)", "Koncentracija (ponovljivost)"]
+        )
         weighting_mode = "volume" if "Volumen" in weighting_label else "concentration"
+
         st.divider()
-        uploaded_file = st.file_uploader("📁 Naložite podatke", type=["txt", "csv", "xlsx"])
+        uploaded_file = st.file_uploader(
+            "📁 Naložite podatke", type=["txt", "csv", "xlsx"]
+        )
 
     st.markdown("# 📊 Petrič Stress Analysis Pro")
 
@@ -523,37 +525,72 @@ def main():
         return
 
     try:
-        if uploaded_file.name.endswith(".xlsx"): df = pd.read_excel(uploaded_file)
-        elif uploaded_file.name.endswith(".txt"): df = pd.read_csv(uploaded_file, sep="\t", engine="python", on_bad_lines="skip")
-        else: df = pd.read_csv(uploaded_file, engine="python", on_bad_lines="skip")
+        if uploaded_file.name.endswith(".xlsx"):
+            df = pd.read_excel(uploaded_file)
+        elif uploaded_file.name.endswith(".txt"):
+            df = pd.read_csv(
+                uploaded_file,
+                sep="\t",
+                engine="python",
+                on_bad_lines="skip"
+            )
+        else:
+            df = pd.read_csv(
+                uploaded_file,
+                engine="python",
+                on_bad_lines="skip"
+            )
     except Exception as e:
-        st.error(f"Napaka pri branju: {e}"); return
+        st.error(f"Napaka pri branju: {e}")
+        return
 
     target_cols = df.columns.tolist()
+
     with st.sidebar:
         st.markdown("### 🧩 Stolpci")
         col_pf = st.selectbox("Pozitivni (PF)", target_cols, index=0)
-        col_sf = st.selectbox("Stresni (SF)", target_cols, index=min(1, len(target_cols)-1))
-        col_pr = st.selectbox("Predlogi (PR)", target_cols, index=min(2, len(target_cols)-1))
+        col_sf = st.selectbox(
+            "Stresni (SF)", target_cols,
+            index=min(1, len(target_cols) - 1)
+        )
+        col_pr = st.selectbox(
+            "Predlogi (PR)", target_cols,
+            index=min(2, len(target_cols) - 1)
+        )
 
     # ANALIZA
     analysis = {}
     for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
         cls, per_row, uncls = analyze_column(df, col)
-        analysis[role] = {"classified": cls, "per_row": per_row, "unclassified": uncls, "col_name": col}
+        analysis[role] = {
+            "classified": cls,
+            "per_row": per_row,
+            "unclassified": uncls,
+            "col_name": col
+        }
 
     # GLOBALNI IZRAČUN
-    f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
-    f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"]["classified"], n_input)
-    f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"]["classified"], n_input)
-    if is_summary: f_pr_agg = min(f_pr_agg, f_sf_agg * 1.5)
+    f_pf_agg, _, _ = calculate_fo_real_aggregate(
+        analysis["PF"]["classified"], n_input
+    )
+    f_sf_agg, _, _ = calculate_fo_real_aggregate(
+        analysis["SF"]["classified"], n_input
+    )
+    f_pr_agg, _, _ = calculate_fo_real_aggregate(
+        analysis["PR"]["classified"], n_input
+    )
+
+    if is_summary:
+        f_pr_agg = min(f_pr_agg, f_sf_agg * 1.5)
+
     sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
     W_EU, eta, loss = calculate_energy(sigma_total)
 
     # GLAVNE METRIKE
     st.markdown("## 🎯 Skupni rezultati")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Stresna moč", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
+    m1.metric("Stresna moč", f"{sigma_total:.2f} °S",
+              rate_sigma(sigma_total))
     m2.metric("Učinkovitost", f"{eta:.1f} %")
     m3.metric("Izguba energije", f"{loss:.0f} Kcal")
     m4.metric("Vzorec (N)", n_input)
@@ -561,39 +598,75 @@ def main():
 
     # RAZČLENITEV PO ENOTAH
     st.divider()
-    f_pf_cat = compute_category_factors(analysis["PF"]["classified"], n_input, weighting_mode)
-    f_sf_cat = compute_category_factors(analysis["SF"]["classified"], n_input, weighting_mode)
-    f_pr_cat = compute_category_factors(analysis["PR"]["classified"], n_input, weighting_mode)
-    
-    sig_total_arg = min(sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg), 1.0)
-    cat_sigmas, _ = compute_category_sigmas(f_sf_cat, f_pf_cat, f_pr_cat, sig_total_arg, is_summary)
+    f_pf_cat = compute_category_factors(
+        analysis["PF"]["classified"], n_input, weighting_mode
+    )
+    f_sf_cat = compute_category_factors(
+        analysis["SF"]["classified"], n_input, weighting_mode
+    )
+    f_pr_cat = compute_category_factors(
+        analysis["PR"]["classified"], n_input, weighting_mode
+    )
+
+    sig_total_arg = min(
+        sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg), 1.0
+    )
+    cat_sigmas, _ = compute_category_sigmas(
+        f_sf_cat, f_pf_cat, f_pr_cat, sig_total_arg, is_summary
+    )
 
     rows = []
     for cat, data in cat_sigmas.items():
         rows.append({
-            "Enota": CATEGORY_SHORT[cat], 
-            "σ (°S)": round(data["sigma"], 2), 
-            "Delež (%)": round(data["weight_share"]*100, 1), 
+            "Enota": CATEGORY_SHORT[cat],
+            "σ (°S)": round(data["sigma"], 2),
+            "Delež (%)": round(data["weight_share"] * 100, 1),
             "Ocena": rate_sigma(data["sigma"])
         })
-    
-    res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
-    
-    # PRIKAZ TABELE IN GRAFA (brez Hero kartice)
+
+    res_df = pd.DataFrame(rows).sort_values(
+        by="σ (°S)", ascending=False
+    )
+
     st.markdown("### Porazdelitev po znanstvenih enotah")
     col_left, col_right = st.columns([1, 1])
+
     with col_left:
         st.dataframe(res_df, use_container_width=True, hide_index=True)
+
     with col_right:
-        st.plotly_chart(px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)", color_continuous_scale="Reds", height=300), use_container_width=True)
+        st.plotly_chart(
+            px.bar(
+                res_df,
+                x="Enota",
+                y="σ (°S)",
+                color="σ (°S)",
+                color_continuous_scale="Reds",
+                height=300
+            ),
+            use_container_width=True
+        )
 
     # KVALITATIVNI PREGLED
     with st.expander("🔍 Podrobnosti klasifikacije besed"):
-        t1, t2, t3 = st.tabs(["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"])
+        t1, t2, t3 = st.tabs(
+            ["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"]
+        )
         for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
             with tab:
-                freq = Counter(c for _, c in analysis[role]["classified"])
-                st.table(pd.DataFrame([{"Enota": CATEGORY_SHORT.get(k, k), "Frekvenca": v} for k, v in freq.items()]))
+                freq = Counter(
+                    c for _, c in analysis[role]["classified"]
+                )
+                st.table(
+                    pd.DataFrame([
+                        {
+                            "Enota": CATEGORY_SHORT.get(k, k),
+                            "Frekvenca": v
+                        }
+                        for k, v in freq.items()
+                    ])
+                )
+
 
 if __name__ == "__main__":
     main()
