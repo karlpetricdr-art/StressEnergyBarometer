@@ -278,7 +278,7 @@ def analyze_column(df, col):
                 unclassified_words.append(kw)
         per_row_categories.append(row_cats)
     return classified, per_row_categories, unclassified_words
-    # ============================================================
+# ============================================================
 # 11. MATEMATIČNA LOGIKA (PETRIČEVA METODA)
 # ============================================================
 
@@ -361,7 +361,7 @@ def calculate_energy(sigma):
     return W_EU, eta, loss
 
 # ============================================================
-# 12. GLAVNA STREAMLIT APLIKACIJA
+# 12. GLAVNA STREAMLIT APLIKACIJA (UI)
 # ============================================================
 
 def main():
@@ -378,7 +378,6 @@ def main():
         uploaded_file = st.file_uploader("📁 Naložite podatke", type=["txt", "csv", "xlsx"])
 
     st.markdown("# 📊 Petrič Stress Analysis Pro")
-    st.caption(f"Kalibracija: N = {n_input} • Model nagiba in gostote • Socialna prioriteta")
 
     if not uploaded_file:
         st.info("📁 Naložite datoteko za začetek analize.", icon="ℹ️")
@@ -404,7 +403,7 @@ def main():
         cls, per_row, uncls = analyze_column(df, col)
         analysis[role] = {"classified": cls, "per_row": per_row, "unclassified": uncls, "col_name": col}
 
-    # IZRAČUN
+    # GLOBALNI IZRAČUN
     f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
     f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"]["classified"], n_input)
     f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"]["classified"], n_input)
@@ -412,18 +411,19 @@ def main():
     sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
     W_EU, eta, loss = calculate_energy(sigma_total)
 
-    # PRIKAZ METRIK
-    st.markdown("## 🎯 Osrednji rezultat")
+    # GLAVNE METRIKE
+    st.markdown("### 🎯 Skupna stresna moč")
     m1, m2, m3, m4 = st.columns(4)
-    m1.markdown(f'<div class="metric-card"><div class="metric-title">Stresna moč</div><div class="metric-value">{sigma_total:.2f} °S</div><div class="metric-description">{rate_sigma(sigma_total)}</div></div>', unsafe_allow_html=True)
-    m2.markdown(f'<div class="metric-card"><div class="metric-title">Učinkovitost</div><div class="metric-value">{eta:.1f} %</div><div class="metric-description">Energijska bilanca</div></div>', unsafe_allow_html=True)
-    m3.markdown(f'<div class="metric-card"><div class="metric-title">Izguba</div><div class="metric-value">{loss:.0f}</div><div class="metric-description">Kcal / dan</div></div>', unsafe_allow_html=True)
-    m4.markdown(f'<div class="metric-card"><div class="metric-title">Vzorec</div><div class="metric-value">{n_input}</div><div class="metric-description">Respondenti</div></div>', unsafe_allow_html=True)
+    m1.metric("Stresna moč", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
+    m2.metric("Učinkovitost", f"{eta:.1f} %")
+    m3.metric("Izguba energije", f"{loss:.0f} Kcal")
+    m4.metric("Vzorec (N)", n_input)
     st.progress(min(sigma_total / 90.0, 1.0))
 
-    # REZULTATI PO ENOTAH
+    # RAZČLENITEV PO ENOTAH
     st.divider()
-    st.markdown("## 🧩 Razčlenitev po znanstvenih enotah")
+    st.markdown("### 🧩 Razčlenitev po znanstvenih enotah")
+    
     f_pf_cat = compute_category_factors(analysis["PF"]["classified"], n_input, weighting_mode)
     f_sf_cat = compute_category_factors(analysis["SF"]["classified"], n_input, weighting_mode)
     f_pr_cat = compute_category_factors(analysis["PR"]["classified"], n_input, weighting_mode)
@@ -433,20 +433,30 @@ def main():
 
     rows = []
     for cat, data in cat_sigmas.items():
-        rows.append({"Enota": CATEGORY_SHORT[cat], "σ (°S)": round(data["sigma"], 2), "Delež (%)": round(data["weight_share"]*100, 1), "Ocena": rate_sigma(data["sigma"])})
+        rows.append({
+            "Enota": CATEGORY_SHORT[cat], 
+            "σ (°S)": round(data["sigma"], 2), 
+            "Delež (%)": round(data["weight_share"]*100, 1), 
+            "Koeficient": SLOPE_WEIGHTS[cat],
+            "Ocena": rate_sigma(data["sigma"])
+        })
     
     res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
     
-    # SOCIAL HERO CARD
-    social_data = cat_sigmas["Social unit"]
-    st.markdown(f'<div class="social-card"><div style="font-size:0.85rem; color:#9a3412; font-weight:700; text-transform:uppercase;">Najmočnejši strukturni nagib</div><div style="font-size:2.2rem; font-weight:850;">Social unit</div><div style="font-size:1.25rem;">σ = <b>{social_data["sigma"]:.2f} °S</b> | Delež = <b>{social_data["weight_share"]*100:.1f}%</b></div></div>', unsafe_allow_html=True)
-    
-    st.dataframe(res_df, use_container_width=True, hide_index=True)
-    st.plotly_chart(px.bar(res_df, x="Enota", y="σ (°S)", text="σ (°S)", title="Stresna moč po enotah"), use_container_width=True)
+    # KOMPAKTEN VPOGLED NAMESTO VELIKE KARTICE
+    top_cat = res_df.iloc[0]
+    st.info(f"**Ključni vpogled:** Največji vpliv na skupni stres ima **{top_cat['Enota']}** ({top_cat['σ (°S)']} °S), kar predstavlja {top_cat['Delež (%)']}% celotne stresne obremenitve.")
+
+    # TABELA IN GRAF
+    c_tab, c_graph = st.columns([1, 1])
+    with c_tab:
+        st.dataframe(res_df, use_container_width=True, hide_index=True)
+    with c_graph:
+        st.plotly_chart(px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)", color_continuous_scale="OrRd", height=300), use_container_width=True)
 
     # KVALITATIVNI PREGLED
-    with st.expander("🔍 Pregled klasificiranih besed po sklopih"):
-        t1, t2, t3 = st.tabs(["🟢 PF", "🔴 SF", "🔵 PR"])
+    with st.expander("🔍 Podrobnosti klasifikacije"):
+        t1, t2, t3 = st.tabs(["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"])
         for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
             with tab:
                 freq = Counter(c for _, c in analysis[role]["classified"])
