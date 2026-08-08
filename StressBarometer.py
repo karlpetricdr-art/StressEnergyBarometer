@@ -18,12 +18,14 @@ SLO_STOPWORDS = {
     "tisti", "nekaj", "včasih", "npr", "itd", "the", "and", "to", "of", "a", "is", "in", "it", "gre", "vse"
 }
 
-# --- 3. ZNANSTVENO RAZŠIRJEN KLASIFIKACIJSKI MODEL (MNZ/POL/JU SPECIFIČEN) ---
+# --- 3. CELOTEN ZNANSTVENO RAZŠIRJEN KLASIFIKACIJSKI MODEL ---
+# Vključuje MNZ, Policijo, JU in specifične knjižnične termine
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
-        "hrup", "svetlob", "vroč", "mraz", "vrem", "prostor", "pisarn", "ergonom", "oprem", 
-        "tišin", "zrak", "prah", "gneč", "tehni", "akcij", "poškodb", "varna", "objekt", 
-        "sodobn", "naprav", "urejenost"
+        "hrup", "svetlob", "razsvetlj", "vroč", "mraz", "vrem", "prostor", "pisarn", "ergonom", 
+        "oprem", "tišin", "zrak", "prah", "gneč", "tehni", "akcij", "poškodb", "varna", "objekt", 
+        "sodobn", "naprav", "urejenost", "etiket", "izolac", "barv", "rastlin", "vonjav", 
+        "stol", "miz", "prezrač", "čistoč", "higien"
     ],
     "Performance unit": [
         "rok", "deadline", "obremen", "nalog", "oprav", "čas", "administra", "birokra", 
@@ -31,31 +33,31 @@ CATEGORIES_MAP = {
         "naglic", "stisk", "preobremen", "neizkušn", "strokov", "organizac", "učinkovit", 
         "biro", "togi", "rutin", "nujne", "izobraž", "usposab", "optimiz", "proces", 
         "poenostav", "inovac", "rešitev", "urnik", "ure", "izvajanj", "regula", "hrm", 
-        "direktiv", "ukaluplj"
+        "direktiv", "ukaluplj", "iskanj", "gradiv", "polic", "katalog", "orientac", "iskanj"
     ],
     "Individual Psychological unit": [
         "strah", "tesnob", "optimiz", "pozitiv", "samozav", "čustv", "stres", "frustr", 
         "mir", "negotov", "nervoz", "panik", "nemoč", "skrb", "napetos", "psih", "travm", 
         "osebno", "samopodob", "nasil", "negativ", "dušev", "žalost", "ogroženost", 
-        "zaupan", "klima", "razmišlj", "nelagod"
+        "zaupan", "klima", "razmišlj", "nelagod", "zadovolj", "psihi", "tesnob"
     ],
     "Partial social unit": [
         "plač", "dohod", "denar", "finanč", "nagrad", "status", "priznan", "revšč", 
         "standar", "nepravič", "nestimul", "krivic", "dostojen", "zaposlit", "služb", 
         "karier", "napredov", "varnost", "staž", "benefic", "ekonom", "proračun", 
-        "pokojnin", "sredstv"
+        "pokojnin", "sredstv", "zamudn", "opomin", "kazn", "plačev", "finanč"
     ],
     "Social unit": [
         "odnos", "mobing", "šikan", "sodelav", "šef", "vodstv", "nadrejen", "družin", 
         "prijatel", "komunik", "prepir", "zahrbt", "vzvišen", "nesram", "aroganc", 
         "egoiz", "podpor", "konflikt", "intrig", "neiskren", "rival", "polit", 
         "hierarh", "timsko", "druženj", "domače", "kader", "sodelov", "tovar", 
-        "sovrašt", "grožn", "informac", "profesional"
+        "sovrašt", "grožn", "informac", "profesional", "uporabnik", "osebj", "človek"
     ],
     "Health biological unit": [
         "zdrav", "bolniš", "bolezen", "šport", "aktiv", "prehran", "diet", "spanj", 
         "utrujen", "joga", "medit", "izčrpan", "sprošč", "počit", "dopust", "rekreac", 
-        "hoja", "izlet", "narav", "masaž", "tek", "vrt", "nočno", "fizič"
+        "hoja", "izlet", "narav", "masaž", "tek", "vrt", "nočno", "fizič", "higien", "čistoč"
     ]
 }
 
@@ -63,11 +65,9 @@ CATEGORIES_MAP = {
 
 def clean_and_tokenize(text):
     if not isinstance(text, str): return []
-    # Odstranimo ločila in pretvorimo v male črke
     text = text.lower()
     text = re.sub(r'[^\w\s]', ' ', text)
     words = text.split()
-    # Filtriramo mašila in prekratke besede
     keywords = [w for w in words if w not in SLO_STOPWORDS and len(w) > 2]
     return keywords
 
@@ -76,7 +76,6 @@ def classify_keywords(keywords):
     for word in keywords:
         word_lower = word.lower()
         for cat, kw_list in CATEGORIES_MAP.items():
-            # Preverimo, če se kateri od korenov nahaja v besedi (vsebuje koren)
             if any(koren in word_lower for koren in kw_list):
                 found_categories.append(cat)
     return found_categories
@@ -87,9 +86,11 @@ def calculate_fo_real(df, col, n_o):
         kws = clean_and_tokenize(row)
         for kw in kws:
             kw_lower = kw.lower()
+            found = False
             for cat, kw_list in CATEGORIES_MAP.items():
                 if any(koren in kw_lower for koren in kw_list): 
                     all_keywords_in_cat.append(kw)
+                    found = True
                     break 
     
     fo = len(all_keywords_in_cat)
@@ -106,6 +107,7 @@ def calculate_fo_real(df, col, n_o):
 def main():
     st.set_page_config(page_title="Stress Analysis Pro", page_icon="📊", layout="wide")
     
+    # Reset gumb v sidebarju
     with st.sidebar:
         st.header("Nastavitve")
         if st.button("🔄 Ponastavi aplikacijo", use_container_width=True):
@@ -123,6 +125,7 @@ def main():
     if uploaded_file:
         sep = '\t' if uploaded_file.name.endswith('.txt') else ','
         try:
+            # Uporabimo engine='python' in on_bad_lines='skip' za stabilnost
             df = pd.read_csv(uploaded_file, sep=sep, engine='python', on_bad_lines='skip')
             n_o = len(df)
             st.success(f"Datoteka uspešno naložena. Analiziramo **{n_o}** respondentov.", icon="✅")
@@ -155,7 +158,7 @@ def main():
                     fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
                     results[col] = freq_df
 
-            # 2. IZRAČUN CELOKUPNE STRESNE MOČI
+            # 2. IZRAČUN CELOKUPNE STRESNE MOČI (°S)
             st.divider()
             st.header("📐 Izračun celokupne stresne moči")
             
@@ -165,6 +168,7 @@ def main():
                 f_pr = fo_real_factors[target_cols[2]]["val"]
                 
                 try:
+                    # Petričeva formula: sqrt((F_oSF * F_oPR) / F_oPF)
                     argument = math.sqrt((f_sf * f_pr) / f_pf)
                     sigma_rad = math.asin(min(argument, 1.0))
                     sigma_deg = math.degrees(sigma_rad)
@@ -181,31 +185,31 @@ def main():
                             elif sigma_deg <= 45.04:
                                 st.warning("Stopnja: Srednja")
                             else:
-                                st.error("Stopnja: Visoka")
+                                st.error("Stopnja: Višja / Visoka")
                         
                         with res_c2:
                             st.write("**Realni faktorji ($F_o$):**")
                             st.markdown(f"""
-                            - Stresni ($F_{{oSF}}$): **{f_sf:.4f}**
-                            - Pozitivni ($F_{{oPF}}$): **{f_pf:.4f}**
-                            - Predlogi ($F_{{oPR}}$): **{f_pr:.4f}**
-                            """)
+                            - Stresni ($F_{{oSF}}$): **{f_sf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[1]]['fo']})</small>
+                            - Pozitivni ($F_{{oPF}}$): **{f_pf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[0]]['fo']})</small>
+                            - Predlogi ($F_{{oPR}}$): **{f_pr:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[2]]['fo']})</small>
+                            """, unsafe_allow_html=True)
                             st.progress(min(sigma_deg / 90, 1.0))
-                            st.caption("Barometer: 0°S - 90°S")
+                            st.caption("Psihosocialni barometer stresa (0°S - 90°S)")
                 except Exception as e:
                     st.error(f"Napaka pri izračunu: {e}")
 
-            # 3. GRAFI
+            # 3. GRAFIČNI PRIKAZ
             st.divider()
             st.header("📈 Porazdelitev po enotah")
-            final_tabs = st.tabs([f"📊 {c}" for c in target_cols[:3]])
+            final_tabs = st.tabs([f"📊 {target_cols[0]}", f"📊 {target_cols[1]}", f"📊 {target_cols[2]}"])
             for i, tab in enumerate(final_tabs):
                 with tab:
-                    st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'))
+                    st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'), color="#1C83E1")
         except Exception as e:
-            st.error(f"Napaka: {e}")
+            st.error(f"Napaka pri obdelavi datoteke: {e}")
     else:
-        st.info("Naložite datoteko za začetek.")
+        st.info("Naložite datoteko za začetek analize.", icon="ℹ️")
 
 if __name__ == "__main__":
     main()
