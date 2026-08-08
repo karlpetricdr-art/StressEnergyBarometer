@@ -18,36 +18,41 @@ SLO_STOPWORDS = {
     "tisti", "nekaj", "včasih", "npr", "itd", "the", "and", "to", "of", "a", "is", "in", "it"
 }
 
-# --- 3. RAZŠIRJEN KLASIFIKACIJSKI MODEL ---
+# --- 3. RAZŠIRJEN KLASIFIKACIJSKI MODEL (Dopolnjen s specifičnimi slovenskimi izrazi) ---
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
-        "hrup", "noise", "svetloba", "light", "lightning", "vročina", "mraz", "cold", "weather", 
-        "vreme", "prostori", "office", "pisarna", "ergonomija", "equipment", "oprema", "tišina", "silence", "zrak"
+        "hrup", "noise", "svetlob", "light", "lightning", "vroč", "mraz", "cold", "weather", 
+        "vrem", "prostor", "pisarn", "ergonom", "oprem", "tišin", "zrak", "prah", "gneč", 
+        "urejenost", "tehni", "stanovan", "mesto", "hrupn"
     ],
     "Performance unit": [
-        "roki", "deadlines", "obremenitev", "workload", "naloge", "tasks", "čas", "time", "administration", 
-        "birokracija", "birokrat", "informacije", "information", "skills", "znanje", "delovni čas", "urgency",
-        "hitenje", "naglica", "stiska", "preobremenjenost", "neizkušenost", "administrativni"
+        "rok", "deadline", "obremen", "nalog", "oprav", "čas", "time", "administra", 
+        "birokra", "obrazc", "poročil", "sestank", "postopk", "navodil", "znanj", 
+        "veščin", "hitenj", "naglic", "stisk", "preobremen", "neizkušn", "strokov",
+        "organizac", "učinkovit", "biro", "togi", "rutin", "nujne", "tehni", "izobraž"
     ],
     "Individual Psychological unit": [
-        "strah", "fear", "anxiety", "tesnoba", "optimism", "pozitivno", "self-confidence", "samozavest", 
-        "emotions", "čustva", "stres", "stress", "frustracija", "frustration", "peace", "mir",
-        "negotovost", "nervoza", "panika", "nemoč", "skrb", "napetost"
+        "strah", "tesnob", "optimiz", "pozitiv", "samozav", "čustv", "stres", 
+        "frustr", "mir", "negotov", "nervoz", "panik", "nemoč", "skrb", "napetos", 
+        "psih", "travm", "osebno", "samopodob", "nasil", "negativ", "dušev", "žalost",
+        "ogroženost", "negotov"
     ],
     "Partial social unit": [
-        "plača", "salary", "denar", "money", "finance", "nagrada", "reward", "status", "recognition", 
-        "priznanje", "poverty", "revščina", "standard", "inequality", "nepravičnost", "nestimulativen",
-        "krivica", "dostojen", "plačilo", "finančna"
+        "plač", "dohod", "denar", "finanč", "nagrad", "status", "priznan", 
+        "revšč", "standar", "nepravič", "nestimul", "krivic", "dostojen", 
+        "zaposlit", "služb", "karier", "napredov", "varnost", "staž", "benefic",
+        "ekonom", "proračun", "pokojnin"
     ],
     "Social unit": [
-        "odnosi", "relationships", "mobing", "mobbing", "bullying", "harassment", "sodelavci", "colleagues", 
-        "šef", "boss", "družina", "family", "prijatelji", "friends", "komunikacija", "communication", "prepir",
-        "zahrbtnost", "vzvišenost", "nesramnost", "aroganca", "egoizem", "podpora"
+        "odnos", "mobing", "šikan", "sodelav", "šef", "vodstv", "nadrejen", 
+        "družin", "prijatel", "komunik", "prepir", "zahrbt", "vzvišen", 
+        "nesram", "aroganc", "egoiz", "podpor", "zaup", "konflikt", "intrig", 
+        "neiskren", "rival", "polit", "hierarh", "timsko", "druženj", "domače"
     ],
     "Health biological unit": [
-        "zdravje", "health", "bolezen", "illness", "šport", "sports", "exercise", "prehrana", "diet", 
-        "spanje", "sleep", "utrujenost", "tiredness", "joga", "yoga", "meditacija", "meditation",
-        "izčrpanost", "dihanje", "sproščanje", "počitek", "dopust"
+        "zdrav", "bolniš", "bolezen", "šport", "aktiv", "prehran", "diet", 
+        "spanj", "utrujen", "joga", "medit", "izčrpan", "sprošč", "počit", 
+        "dopust", "rekreac", "hoja", "izlet", "narav", "spanje", "masaž", "tek", "vrt"
     ]
 }
 
@@ -64,8 +69,10 @@ def clean_and_tokenize(text):
 def classify_keywords(keywords):
     found_categories = []
     for word in keywords:
+        word_lower = word.lower()
         for cat, kw_list in CATEGORIES_MAP.items():
-            if any(kw in word for kw in kw_list):
+            # Preverimo, če se kateri od korenov nahaja v besedi
+            if any(koren in word_lower for koren in kw_list):
                 found_categories.append(cat)
     return found_categories
 
@@ -74,9 +81,12 @@ def calculate_fo_real(df, col, n_o):
     for row in df[col].dropna():
         kws = clean_and_tokenize(row)
         for kw in kws:
+            kw_lower = kw.lower()
+            found = False
             for cat, kw_list in CATEGORIES_MAP.items():
-                if any(kw.startswith(k.lower()[:5]) for k in kw_list): 
+                if any(koren in kw_lower for koren in kw_list): 
                     all_keywords_in_cat.append(kw)
+                    found = True
                     break 
     
     fo = len(all_keywords_in_cat)
@@ -110,90 +120,94 @@ def main():
     
     if uploaded_file:
         sep = '\t' if uploaded_file.name.endswith('.txt') else ','
-        df = pd.read_csv(uploaded_file, sep=sep)
-        n_o = len(df)
-        st.success(f"Datoteka uspešno naložena. Analiziramo odgovore za **{n_o}** respondentov.", icon="✅")
-        
-        target_cols = df.columns.tolist()
-        results = {}
-        fo_real_factors = {}
-
-        # 1. ANALIZA PO KATEGORIJAH
-        st.header("🔍 Kvalitativna analiza po sklopih")
-        for col in target_cols[:3]:
-            with st.expander(f"Podrobnosti za sklop: {col}", expanded=True):
-                df[f'keywords_{col}'] = df[col].apply(clean_and_tokenize)
-                df[f'units_{col}'] = df[f'keywords_{col}'].apply(classify_keywords)
-                
-                all_units = [unit for sublist in df[f'units_{col}'].tolist() for unit in sublist]
-                unit_counts = Counter(all_units)
-                
-                freq_df = pd.DataFrame(unit_counts.items(), columns=['Klasifikacijska enota', 'Frekvenca']).sort_values(by='Frekvenca', ascending=False)
-                
-                c1, c2 = st.columns([2, 1])
-                with c1:
-                    st.caption("Klasificirani podatki (prvih 10 vrstic):")
-                    st.dataframe(df[[col, f'units_{col}']].head(10), use_container_width=True)
-                with c2:
-                    st.caption("Frekvence znanstvenih enot:")
-                    st.table(freq_df)
-                
-                fo_real, fo_val, fr_val = calculate_fo_real(df, col, n_o)
-                fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
-                results[col] = freq_df
-
-        # 2. IZRAČUN CELOKUPNE STRESNE MOČI (°S)
-        st.divider()
-        st.header("📐 Izračun celokupne stresne moči")
-        
-        if len(target_cols) >= 3:
-            f_pf = fo_real_factors[target_cols[0]]["val"]
-            f_sf = fo_real_factors[target_cols[1]]["val"]
-            f_pr = fo_real_factors[target_cols[2]]["val"]
+        try:
+            # Uporabimo engine='python' in on_bad_lines='skip' za preprečevanje ParserError
+            df = pd.read_csv(uploaded_file, sep=sep, engine='python', on_bad_lines='skip')
+            n_o = len(df)
+            st.success(f"Datoteka uspešno naložena. Analiziramo odgovore za **{n_o}** respondentov.", icon="✅")
             
-            try:
-                argument = math.sqrt((f_sf * f_pr) / f_pf)
-                sigma_rad = math.asin(min(argument, 1.0))
-                sigma_deg = math.degrees(sigma_rad)
-                
-                # Estetski prikaz rezultata
-                with st.container(border=True):
-                    res_c1, res_c2 = st.columns([1, 1.5])
-                    with res_c1:
-                        st.metric(label="CELOKUPNA STRESNA MOČ", value=f"{sigma_deg:.2f} °S")
-                        
-                        # Interpretacija stopnje
-                        if sigma_deg <= 15.04:
-                            st.info("Stopnja: Zelo nizka (Very low)")
-                        elif sigma_deg <= 30.04:
-                            st.info("Stopnja: Nizka (Low)")
-                        elif sigma_deg <= 45.04:
-                            st.warning("Stopnja: Srednja (Medium)")
-                        else:
-                            st.error("Stopnja: Višja / Visoka (High)")
+            target_cols = df.columns.tolist()
+            results = {}
+            fo_real_factors = {}
 
-                        if 30.0 <= sigma_deg <= 39.0:
-                            st.success("Rezultat je znotraj realnega znanstvenega razpona.", icon="🎯")
+            # 1. ANALIZA PO KATEGORIJAH
+            st.header("🔍 Kvalitativna analiza po sklopih")
+            for col in target_cols[:3]:
+                with st.expander(f"Podrobnosti za sklop: {col}", expanded=True):
+                    df[f'keywords_{col}'] = df[col].apply(clean_and_tokenize)
+                    df[f'units_{col}'] = df[f'keywords_{col}'].apply(classify_keywords)
                     
-                    with res_c2:
-                        st.write("**Realni faktorji ($F_o$):**")
-                        st.markdown(f"""
-                        - $F_{{oSF}}$ (Stresni): **{f_sf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[1]]['fo']})</small>
-                        - $F_{{oPF}}$ (Pozitivni): **{f_pf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[0]]['fo']})</small>
-                        - $F_{{oPR}}$ (Predlogi): **{f_pr:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[2]]['fo']})</small>
-                        """, unsafe_allow_html=True)
-                        st.progress(min(sigma_deg / 90, 1.0))
-                        st.caption("Psihosocialni barometer stresa (0°S - 90°S)")
-            except Exception as e:
-                st.error(f"Napaka pri matematičnem izračunu: {e}")
+                    all_units = [unit for sublist in df[f'units_{col}'].tolist() for unit in sublist]
+                    unit_counts = Counter(all_units)
+                    
+                    freq_df = pd.DataFrame(unit_counts.items(), columns=['Klasifikacijska enota', 'Frekvenca']).sort_values(by='Frekvenca', ascending=False)
+                    
+                    c1, c2 = st.columns([2, 1])
+                    with c1:
+                        st.caption("Klasificirani podatki (prvih 10 vrstic):")
+                        st.dataframe(df[[col, f'units_{col}']].head(10), use_container_width=True)
+                    with c2:
+                        st.caption("Frekvence znanstvenih enot:")
+                        st.table(freq_df)
+                    
+                    fo_real, fo_val, fr_val = calculate_fo_real(df, col, n_o)
+                    fo_real_factors[col] = {"val": fo_real, "fo": fo_val, "fr": fr_val}
+                    results[col] = freq_df
 
-        # 3. GRAFIČNI PRIKAZ
-        st.divider()
-        st.header("📈 Frekvenčna porazdelitev")
-        final_tabs = st.tabs([f"📊 {target_cols[0]}", f"📊 {target_cols[1]}", f"📊 {target_cols[2]}"])
-        for i, tab in enumerate(final_tabs):
-            with tab:
-                st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'), color="#1C83E1")
+            # 2. IZRAČUN CELOKUPNE STRESNE MOČI (°S)
+            st.divider()
+            st.header("📐 Izračun celokupne stresne moči")
+            
+            if len(target_cols) >= 3:
+                f_pf = fo_real_factors[target_cols[0]]["val"]
+                f_sf = fo_real_factors[target_cols[1]]["val"]
+                f_pr = fo_real_factors[target_cols[2]]["val"]
+                
+                try:
+                    argument = math.sqrt((f_sf * f_pr) / f_pf)
+                    sigma_rad = math.asin(min(argument, 1.0))
+                    sigma_deg = math.degrees(sigma_rad)
+                    
+                    # Estetski prikaz rezultata
+                    with st.container(border=True):
+                        res_c1, res_c2 = st.columns([1, 1.5])
+                        with res_c1:
+                            st.metric(label="CELOKUPNA STRESNA MOČ", value=f"{sigma_deg:.2f} °S")
+                            
+                            # Interpretacija stopnje
+                            if sigma_deg <= 15.04:
+                                st.info("Stopnja: Zelo nizka (Very low)")
+                            elif sigma_deg <= 30.04:
+                                st.info("Stopnja: Nizka (Low)")
+                            elif sigma_deg <= 45.04:
+                                st.warning("Stopnja: Srednja (Medium)")
+                            else:
+                                st.error("Stopnja: Višja / Visoka (High)")
+
+                            if 30.0 <= sigma_deg <= 39.0:
+                                st.success("Rezultat je znotraj realnega znanstvenega razpona.", icon="🎯")
+                        
+                        with res_c2:
+                            st.write("**Realni faktorji ($F_o$):**")
+                            st.markdown(f"""
+                            - $F_{{oSF}}$ (Stresni): **{f_sf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[1]]['fo']})</small>
+                            - $F_{{oPF}}$ (Pozitivni): **{f_pf:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[0]]['fo']})</small>
+                            - $F_{{oPR}}$ (Predlogi): **{f_pr:.4f}** <small>(zadetkov: {fo_real_factors[target_cols[2]]['fo']})</small>
+                            """, unsafe_allow_html=True)
+                            st.progress(min(sigma_deg / 90, 1.0))
+                            st.caption("Psihosocialni barometer stresa (0°S - 90°S)")
+                except Exception as e:
+                    st.error(f"Napaka pri matematičnem izračunu: {e}")
+
+            # 3. GRAFIČNI PRIKAZ
+            st.divider()
+            st.header("📈 Frekvenčna porazdelitev")
+            final_tabs = st.tabs([f"📊 {target_cols[0]}", f"📊 {target_cols[1]}", f"📊 {target_cols[2]}"])
+            for i, tab in enumerate(final_tabs):
+                with tab:
+                    st.bar_chart(results[target_cols[i]].set_index('Klasifikacijska enota'), color="#1C83E1")
+        except Exception as e:
+            st.error(f"Napaka pri obdelavi datoteke: {e}")
     else:
         st.info("Naložite datoteko v stranskem meniju za začetek analize.", icon="ℹ️")
 
