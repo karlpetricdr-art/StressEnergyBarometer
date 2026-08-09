@@ -365,11 +365,15 @@ def build_full_classification_model(allowed_short_names):
 
 
 def classify_everything_single_call(client, model_name, df, col_pf, col_sf, col_pr,
-                                      allowed_short_names, max_output_tokens=65536,
-                                      max_retries=2):
+                                      allowed_short_names, max_output_tokens=32768,
+                                      max_retries=1):
     """Obdela CELOTEN nabor podatkov (vse vrstice PF+SF+PR, npr. 200 respondentov)
-    v ENEM API klicu, kot eno homogeno množico. Hitreje kot paketno procesiranje,
-    a lahko odpove pri zelo velikih naborih (limit izhodnih tokenov)."""
+    v ENEM API klicu, kot eno homogeno množico. Hitreje kot paketno procesiranje.
+
+    Odporno na 400 INVALID_ARGUMENT: poskusi zaporedoma z manj zahtevnimi
+    nastavitvami (brez thinking_config, brez strogega response_schema), da
+    najde konfiguracijo, ki jo izbrani model dejansko podpira.
+    """
     full_model = build_full_classification_model(allowed_short_names)
     system_instruction = build_system_instruction(allowed_short_names, whole_set_mode=True)
 
@@ -382,61 +386,90 @@ def classify_everything_single_call(client, model_name, df, col_pf, col_sf, col_
         lines.append(f"[PR-{idx}] {v}")
     payload = "\n".join(lines)
 
-    config = types.GenerateContentConfig(
-        system_instruction=system_instruction,
-        response_mime_type="application/json",
-        response_schema=full_model,
-        temperature=0.1,
-        max_output_tokens=max_output_tokens,
-    )
-    if model_name.startswith("gemini"):
-        try:
-            config.thinking_config = types.ThinkingConfig(thinking_budget=0)
-        except Exception:
-            pass
+    schema_json_hint = """
+Odgovori IZKLJUČNO z veljavnim JSON objektom (brez ```json ograd, brez
+dodatnega besedila) v natanko tej obliki:
+{"rows": [{"role": "PF|SF|PR", "row_id": <int>, "items": [{"phrase": "...", "category": "..."}]}]}
+"""
 
-    last_err = None
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model=model_name, contents=payload, config=config
-            )
-            raw = response.text
-            raw = re.sub(r"^```json|```$", "", raw.strip(), flags=re.MULTILINE).strip()
-            data = json.loads(raw)
+    def make_config(use_thinking, use_schema, tokens):
+        kwargs = dict(
+            system_instruction=system_instruction + (schema_json_hint if not use_schema else ""),
+            temperature=0.1,
+            max_output_tokens=tokens,
+        )
+        if use_schema:
+            kwargs["response_mime_type"] = "application/json"
+            kwargs["response_schema"] = full_model
+        else:
+            kwargs["response_mime_type"] = "application/json"
+        cfg = types.GenerateContentConfig(**kwargs)
+        if use_thinking and model_name.startswith("gemini"):
+            try:
+                cfg.thinking_config = types.ThinkingConfig(thinking_budget=0)
+            except Exception:
+                pass
+        return cfg
 
-            buckets = {
-                "PF": {"classified": [], "per_row": defaultdict(list), "col_name": col_pf},
-                "SF": {"classified": [], "per_row": defaultdict(list), "col_name": col_sf},
-                "PR": {"classified": [], "per_row": defaultdict(list), "col_name": col_pr},
-            }
-            for row in data.get("rows", []):
-                role = row.get("role")
-                rid = row.get("row_id")
-                if role not in buckets:
-                    continue
-                items = []
-                for item in row.get("items", []):
-                    cat_short = item.get("category")
-                    phrase = item.get("phrase", "").strip()
-                    if not phrase or cat_short == "None" or cat_short not in SHORT_TO_FULL:
+    # Zaporedje poskusov od "najhitrejši/najstrožji" do "najbolj kompatibilen"
+    attempt_plans = [
+        {"use_thinking": True, "use_schema": True, "tokens": max_output_tokens},
+        {"use_thinking": False, "use_schema": True, "tokens": max_output_tokens},
+        {"use_thinking": False, "use_schema": False, "tokens": max_output_tokens},
+        {"use_thinking": False, "use_schema": False, "tokens": min(max_output_tokens, 8192)},
+    ]
+
+    errors_log = []
+    for plan in attempt_plans:
+        for attempt in range(max_retries + 1):
+            try:
+                config = make_config(plan["use_thinking"], plan["use_schema"], plan["tokens"])
+                response = client.models.generate_content(
+                    model=model_name, contents=payload, config=config
+                )
+                raw = response.text
+                if raw is None:
+                    raise ValueError("Model ni vrnil besedila (morda prekinjen zaradi max_output_tokens).")
+                raw = re.sub(r"^```json|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+                data = json.loads(raw)
+
+                buckets = {
+                    "PF": {"classified": [], "per_row": defaultdict(list), "col_name": col_pf},
+                    "SF": {"classified": [], "per_row": defaultdict(list), "col_name": col_sf},
+                    "PR": {"classified": [], "per_row": defaultdict(list), "col_name": col_pr},
+                }
+                for row in data.get("rows", []):
+                    role = row.get("role")
+                    rid = row.get("row_id")
+                    if role not in buckets:
                         continue
-                    items.append((phrase.lower(), SHORT_TO_FULL[cat_short]))
-                buckets[role]["classified"].extend(items)
-                buckets[role]["per_row"][rid] = [c for _, c in items]
+                    items = []
+                    for item in row.get("items", []):
+                        cat_short = item.get("category")
+                        phrase = str(item.get("phrase", "")).strip()
+                        if not phrase or cat_short == "None" or cat_short not in SHORT_TO_FULL:
+                            continue
+                        items.append((phrase.lower(), SHORT_TO_FULL[cat_short]))
+                    buckets[role]["classified"].extend(items)
+                    buckets[role]["per_row"][rid] = [c for _, c in items]
 
-            for role in buckets:
-                buckets[role]["per_row"] = list(buckets[role]["per_row"].values())
-            return buckets
-        except Exception as e:
-            last_err = e
-            time.sleep(2.0 * (attempt + 1))
+                for role in buckets:
+                    buckets[role]["per_row"] = list(buckets[role]["per_row"].values())
+                return buckets
+            except Exception as e:
+                errors_log.append(
+                    f"[thinking={plan['use_thinking']}, schema={plan['use_schema']}, "
+                    f"tokens={plan['tokens']}] {e}"
+                )
+                time.sleep(1.0)
 
     st.error(
-        f"En-klicna obdelava celotnega nabora ni uspela ({last_err}). "
-        "Preklopi na 'Paketno procesiranje' v stranski vrstici za bolj zanesljivo "
-        "(a počasnejšo) obdelavo, ali zmanjšaj število vrstic."
+        "En-klicna obdelava celotnega nabora ni uspela po vseh poskusih. "
+        "Preklopi na 'Paketno procesiranje' v stranski vrstici, ali zmanjšaj "
+        "'Max izhodnih tokenov'. Podrobnosti napak po poskusih:"
     )
+    for line in errors_log:
+        st.code(line)
     return None
 
 
@@ -619,6 +652,7 @@ def main():
         model_name = None
         batch_size = 15
         processing_mode = "single_call"
+        max_output_tokens = 32768
 
         if classification_mode.startswith("AI"):
             api_key = st.text_input(
@@ -643,8 +677,15 @@ def main():
             )
             processing_mode = "single_call" if processing_label.startswith("En sam") else "batched"
 
+            max_output_tokens = 32768
             if processing_mode == "batched":
                 batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
+            else:
+                max_output_tokens = st.select_slider(
+                    "Max izhodnih tokenov (zmanjšaj, če javi napako 400)",
+                    options=[4096, 8192, 16384, 32768, 65536],
+                    value=32768
+                )
 
         st.divider()
         st.markdown("### 🧭 Katere enote naj bodo zajete?")
@@ -723,7 +764,8 @@ def main():
                 "v enem klicu, kot eno množico ..."
             ):
                 buckets = classify_everything_single_call(
-                    client, model_name, df, col_pf, col_sf, col_pr, included_shorts
+                    client, model_name, df, col_pf, col_sf, col_pr, included_shorts,
+                    max_output_tokens=max_output_tokens
                 )
             if buckets is None:
                 return
