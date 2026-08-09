@@ -689,19 +689,47 @@ def main():
     else:
         st.caption("There are no classified expressions to display in the treemap.")
 
-    # ---------------- QUALITATIVE REVIEW ----------------
+        # ---------------- QUALITATIVE REVIEW ----------------
     with st.expander("🔍 Classification details for words/phrases"):
-        t1, t2, t3 = st.tabs(["🟢 Positive", "🔴 Stress-related", "🔵 Suggestions"])
+        t1, t2, t3 = st.tabs(
+            ["🟢 Positive", "🔴 Stress-related", "🔵 Suggestions"]
+        )
+
         for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
             with tab:
-                freq = Counter(c for _, c in analysis[role]["classified"])
-                st.table(pd.DataFrame([
-                    {"Unit": CATEGORY_SHORT.get(k, k), "Frequency": v}
-                    for k, v in freq.items()
-                ]))
+                freq = Counter(
+                    category
+                    for _, category in analysis[role]["classified"]
+                )
+
+                st.table(
+                    pd.DataFrame([
+                        {
+                            "Unit": CATEGORY_SHORT.get(category, category),
+                            "Frequency": count
+                        }
+                        for category, count in freq.items()
+                    ])
+                )
+
                 st.markdown("**Examples of classified phrases:**")
                 sample = analysis[role]["classified"][:40]
+
                 if sample:
+                    sample_df = pd.DataFrame([
+                        {
+                            "Phrase": phrase,
+                            "Unit": CATEGORY_SHORT[category]
+                        }
+                        for phrase, category in sample
+                    ])
+
                     st.dataframe(
-                        pd.DataFrame(
-                            [{"Phrase": w, "Unit": CATEGORY_SHORT[c]}
+                        sample_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+
+if __name__ == "__main__":
+    main()
