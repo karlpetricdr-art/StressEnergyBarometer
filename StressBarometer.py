@@ -263,20 +263,12 @@ def build_classification_models(allowed_short_names):
     return ClassifiedItem, RowClassification, BatchClassification
 
 
-def build_system_instruction(allowed_short_names, whole_set_mode=False):
+def build_system_instruction(allowed_short_names):
     defs_text = "\n".join(
         f"- {CATEGORY_SHORT[full]}: {CATEGORY_DEFINITIONS[full]}"
         for full in CATEGORIES_MAP.keys()
         if CATEGORY_SHORT[full] in allowed_short_names
     )
-    cohort_note = ""
-    if whole_set_mode:
-        cohort_note = """
-Vsi vhodni podatki skupaj predstavljajo EN sam vzorec/kohorto (npr. javni
-uslužbenci ali drug del družbe) - obravnavaj jih kot eno homogeno množico
-mnenj, ne kot ločene posamezne primere. Kljub temu moraš vsako vrstico
-obdelati posamično in ohraniti njeno oznako vloge (PF/SF/PR) in row_id, da
-je mogoče rezultate nazaj združiti."""
     return f"""Si strokovnjak za klasifikacijo odgovorov v raziskavi o stresu
 javnih uslužbencev (metodologija Petrič, 2025). Za vsako vrstico besedila
 prepoznaj posamezne smiselne izraze/fraze, ki predstavljajo mnenje, stresor,
@@ -289,8 +281,7 @@ naslednjih znanstvenih enot:
 Če izraz ne sodi v nobeno od zgornjih enot ali je preveč splošen/nesmiseln,
 mu dodeli kategorijo "None". Vrni izraze v izvirnem jeziku besedila (ne
 prevajaj). Bodi izčrpen - zajemi vse smiselne izraze v vrstici, ne le
-enega. Obdelaj VSE vrstice, ki so ti podane - nobene ne izpusti.
-{cohort_note}"""
+enega."""
 
 
 @st.cache_resource(show_spinner=False)
@@ -343,146 +334,6 @@ def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
 def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
-
-
-def build_full_classification_model(allowed_short_names):
-    """Shema za en API klic za en sklop vrstic (ena vloga: PF, SF ali PR)."""
-    allowed = tuple(allowed_short_names) + ("None",)
-
-    class ClassifiedItem(BaseModel):
-        phrase: str
-        category: Literal[allowed]
-
-    class RowClassification(BaseModel):
-        row_id: int
-        items: List[ClassifiedItem]
-
-    class RowsClassification(BaseModel):
-        rows: List[RowClassification]
-
-    return RowsClassification
-
-
-def _attempt_classify_call(client, model_name, rows, allowed_short_names,
-                            schema_model, max_output_tokens, use_schema=True):
-    """En sam API klic za dan seznam (row_id, text). Vrne dict row_id -> [(phrase, cat), ...].
-    Vrže izjemo, če klic ali parsanje JSON-a ne uspe (npr. prekinjen/prevelik odgovor)."""
-    system_instruction = build_system_instruction(allowed_short_names, whole_set_mode=True)
-    payload = "\n".join(f"[{rid}] {text}" for rid, text in rows)
-
-    kwargs = dict(
-        system_instruction=system_instruction,
-        temperature=0.1,
-        max_output_tokens=max_output_tokens,
-        response_mime_type="application/json",
-    )
-    if use_schema:
-        kwargs["response_schema"] = schema_model
-    else:
-        kwargs["system_instruction"] += (
-            '\n\nOdgovori IZKLJUČNO z veljavnim JSON objektom (brez ```json ograd) '
-            'v obliki: {"rows": [{"row_id": <int>, "items": [{"phrase": "...", "category": "..."}]}]}'
-        )
-
-    config = types.GenerateContentConfig(**kwargs)
-    response = client.models.generate_content(model=model_name, contents=payload, config=config)
-    raw = response.text
-    if raw is None:
-        raise ValueError("Prazen odgovor modela (verjetno prekinjen zaradi dolžine).")
-    raw = re.sub(r"^```json|```$", "", raw.strip(), flags=re.MULTILINE).strip()
-    data = json.loads(raw)  # lahko vrže json.JSONDecodeError, če je odgovor prekinjen
-
-    result = {}
-    for row in data.get("rows", []):
-        rid = row.get("row_id")
-        items = []
-        for item in row.get("items", []):
-            cat_short = item.get("category")
-            phrase = str(item.get("phrase", "")).strip()
-            if not phrase or cat_short == "None" or cat_short not in SHORT_TO_FULL:
-                continue
-            items.append((phrase.lower(), SHORT_TO_FULL[cat_short]))
-        result[rid] = items
-    return result
-
-
-def classify_rows_adaptive(client, model_name, rows, allowed_short_names, schema_model,
-                            max_output_tokens, status_placeholder, depth=0, max_depth=8):
-    """Poskusi razvrstiti dan seznam vrstic v ENEM klicu. Če je odgovor
-    prekinjen (JSON se ne da parsati), vrstice razpolovi in poskusi vsako
-    polovico posebej - dokler ne uspe ali doseže min. velikost paketa."""
-    if not rows:
-        return {}
-
-    n = len(rows)
-    status_placeholder.info(f"🤖 Klic za {n} vrstic ...")
-
-    for use_schema in (True, False):
-        for attempt in range(2):
-            try:
-                return _attempt_classify_call(
-                    client, model_name, rows, allowed_short_names,
-                    schema_model, max_output_tokens, use_schema=use_schema
-                )
-            except json.JSONDecodeError:
-                # Odgovor je bil prekinjen - to je znak, da je paket prevelik.
-                break  # nima smisla ponavljati enako veliko zahtevo, pojdi na delitev
-            except Exception as e:
-                msg = str(e)
-                if "429" in msg or "503" in msg or "UNAVAILABLE" in msg or "RESOURCE_EXHAUSTED" in msg:
-                    time.sleep(2.0 * (attempt + 1))
-                    continue
-                break  # druga vrsta napake (npr. 400) - poskusi drugo shemo/delitev
-
-    if n == 1 or depth >= max_depth:
-        status_placeholder.warning(f"⚠️ Vrstic(a) {rows[0][0] if n==1 else ''} ni bilo mogoče razvrstiti - preskočeno.")
-        return {}
-
-    mid = n // 2
-    left = classify_rows_adaptive(client, model_name, rows[:mid], allowed_short_names,
-                                   schema_model, max_output_tokens, status_placeholder,
-                                   depth + 1, max_depth)
-    right = classify_rows_adaptive(client, model_name, rows[mid:], allowed_short_names,
-                                    schema_model, max_output_tokens, status_placeholder,
-                                    depth + 1, max_depth)
-    left.update(right)
-    return left
-
-
-def classify_everything_single_call(client, model_name, df, col_pf, col_sf, col_pr,
-                                      allowed_short_names, max_output_tokens=32768,
-                                      max_retries=1):
-    """Obdela ves nabor (PF, SF, PR) - za vsako vlogo poskusi EN klic za vse
-    njene vrstice naenkrat (cel nabor kot ena množica); če odgovor modela
-    prekorači dolžino, se ta vloga samodejno in adaptivno razdeli na manjše
-    dele, dokler klici ne uspejo."""
-    schema_model = build_full_classification_model(allowed_short_names)
-
-    buckets = {}
-    status = st.empty()
-    for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
-        rows = [(int(i), str(v)) for i, v in df[col].dropna().items()]
-        result = classify_rows_adaptive(
-            client, model_name, rows, allowed_short_names, schema_model,
-            max_output_tokens, status
-        )
-        classified = []
-        per_row = []
-        for rid, _ in rows:
-            items = result.get(rid, [])
-            classified.extend(items)
-            per_row.append([c for _, c in items])
-        buckets[role] = {"classified": classified, "per_row": per_row, "col_name": col}
-    status.empty()
-
-    total_classified = sum(len(buckets[r]["classified"]) for r in buckets)
-    if total_classified == 0:
-        st.error(
-            "Noben API klic ni uspel - preveri API ključ, izbrani model in poskusi "
-            "znova, ali preklopi na 'Paketno procesiranje'."
-        )
-        return None
-    return buckets
 
 
 def run_ai_classification(client, model_name, df, col, allowed_short_names,
@@ -663,8 +514,6 @@ def main():
         api_key = None
         model_name = None
         batch_size = 15
-        processing_mode = "single_call"
-        max_output_tokens = 32768
 
         if classification_mode.startswith("AI"):
             api_key = st.text_input(
@@ -672,32 +521,7 @@ def main():
                 help="Brezplačen ključ dobiš na https://aistudio.google.com/apikey"
             )
             model_name = st.selectbox("Model", AVAILABLE_MODELS, index=0)
-
-            processing_label = st.radio(
-                "Način obdelave",
-                [
-                    "En sam klic (najhitreje - cel nabor kot ena množica)",
-                    "Paketno procesiranje (bolj zanesljivo pri zelo velikih naborih)"
-                ],
-                help=(
-                    "'En sam klic' poskusi za vsako vlogo (PF/SF/PR) vse njene "
-                    "vrstice obdelati v enem klicu - to je najhitreje. Če je "
-                    "odgovor modela prekinjen zaradi dolžine, se ta del "
-                    "samodejno in adaptivno razpolovi ter poskusi znova, dokler "
-                    "ne uspe - brez ročnega nastavljanja velikosti paketa."
-                )
-            )
-            processing_mode = "single_call" if processing_label.startswith("En sam") else "batched"
-
-            max_output_tokens = 32768
-            if processing_mode == "batched":
-                batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
-            else:
-                max_output_tokens = st.select_slider(
-                    "Max izhodnih tokenov (zmanjšaj, če javi napako 400)",
-                    options=[4096, 8192, 16384, 32768, 65536],
-                    value=32768
-                )
+            batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
 
         st.divider()
         st.markdown("### 🧭 Katere enote naj bodo zajete?")
@@ -764,34 +588,15 @@ def main():
 
     if classification_mode.startswith("AI"):
         client = get_client(api_key)
-
-        if processing_mode == "single_call":
-            n_rows_total = (
-                df[col_pf].dropna().shape[0]
-                + df[col_sf].dropna().shape[0]
-                + df[col_pr].dropna().shape[0]
+        for role, col, label in [
+            ("PF", col_pf, "🔵 Klasificiram pozitivne dejavnike ..."),
+            ("SF", col_sf, "🔴 Klasificiram stresne dejavnike ..."),
+            ("PR", col_pr, "🟢 Klasificiram predloge ...")
+        ]:
+            cls, per_row = run_ai_classification(
+                client, model_name, df, col, included_shorts, batch_size, label
             )
-            with st.spinner(
-                f"🤖 Model obdeluje vseh {n_rows_total} vrstic (PF+SF+PR) "
-                "v enem klicu, kot eno množico ..."
-            ):
-                buckets = classify_everything_single_call(
-                    client, model_name, df, col_pf, col_sf, col_pr, included_shorts,
-                    max_output_tokens=max_output_tokens
-                )
-            if buckets is None:
-                return
-            analysis = buckets
-        else:
-            for role, col, label in [
-                ("PF", col_pf, "🔵 Klasificiram pozitivne dejavnike ..."),
-                ("SF", col_sf, "🔴 Klasificiram stresne dejavnike ..."),
-                ("PR", col_pr, "🟢 Klasificiram predloge ...")
-            ]:
-                cls, per_row = run_ai_classification(
-                    client, model_name, df, col, included_shorts, batch_size, label
-                )
-                analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
+            analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
     else:
         for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
             cls, per_row = run_offline_classification(df, col, included_shorts)
@@ -906,5 +711,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
