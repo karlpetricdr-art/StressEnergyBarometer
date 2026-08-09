@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 
 # ============================================================
-# 1. PAGE SETTINGS
+# PAGE SETTINGS
 # ============================================================
 
 st.set_page_config(
@@ -34,7 +34,7 @@ def reset_app():
 
 
 # ============================================================
-# 2. CSS
+# CSS
 # ============================================================
 
 st.markdown(
@@ -71,21 +71,6 @@ st.markdown(
         color: #64748b;
         font-size: 0.82rem;
     }
-
-    .stress-high {
-        color: #dc2626;
-        font-weight: 800;
-    }
-
-    .stress-medium {
-        color: #ea580c;
-        font-weight: 700;
-    }
-
-    .stress-low {
-        color: #16a34a;
-        font-weight: 700;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -93,11 +78,8 @@ st.markdown(
 
 
 # ============================================================
-# 3. STOPWORDS
+# STOPWORDS
 # ============================================================
-
-# These stopwords are intentionally retained in Slovenian because
-# the application is designed to analyse Slovenian input text.
 
 SLO_STOPWORDS = {
     "se", "si", "oh", "na", "potem", "in", "ter", "bi", "da", "pa",
@@ -112,14 +94,16 @@ SLO_STOPWORDS = {
     "marsikdo", "nekdo", "nekateri", "nekatera", "nekatero", "pod",
     "med", "nad", "pred", "brez", "ob", "po", "skozi", "čez",
     "proti", "kljub", "zaradi", "namesto", "razen", "okoli", "okrog",
-    "tem", "the", "and", "to", "of", "a", "is", "it", "with", "some",
+    "tem",
+
+    "the", "and", "to", "of", "a", "is", "it", "with", "some",
     "more", "being", "able", "use", "make", "nice", "your", "this",
     "that", "from", "for", "are", "was", "were"
 }
 
 
 # ============================================================
-# 4. SCIENTIFIC CLASSIFICATION
+# SCIENTIFIC CATEGORIES
 # ============================================================
 
 CATEGORY_SHORT = {
@@ -172,83 +156,82 @@ CATEGORY_DEFINITIONS = {
 }
 
 
-# This dictionary is used by the offline classifier.
-# Slovenian roots and English terms are intentionally included.
+# Slovenian roots are retained because the input text is expected
+# to be predominantly Slovenian.
 
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
         "hrup", "svetlob", "razsvetlj", "vroč", "mraz", "vrem",
         "prostor", "pisarn", "ergonom", "oprem", "tišin", "zrak",
         "prah", "gneč", "tehni", "poškodb", "varna", "objekt",
-        "sodobn", "naprav", "urejenost", "etiket", "izolac",
-        "barv", "rastlin", "vonjav", "stol", "miz", "prezrač",
-        "notranj", "location", "environment", "lighting", "toplota",
-        "hlad", "umazano", "onesnaž", "arhitekt", "opremljenost",
+        "sodobn", "naprav", "urejenost", "izolac", "barv",
+        "rastlin", "vonjav", "stol", "miz", "prezrač", "notranj",
+        "location", "environment", "lighting", "toplota", "hlad",
+        "umazano", "onesnaž", "arhitekt", "opremljenost",
         "hrupn", "svetloba", "tišina", "classical", "music",
         "flower", "klasič", "glasb", "rož", "cvet", "flowers"
     ],
 
     "Performance unit": [
         "rok", "deadline", "obremen", "nalog", "oprav", "čas",
-        "administra", "birokra", "obrazc", "poročil",
-        "postopk", "navodil", "veščin", "hitenj", "naglic",
-        "stisk", "preobremen", "neizkušn", "učinkovit",
-        "biro", "togi", "rutin", "nujne", "izobraž",
-        "usposab", "proces", "poenostav", "inovac", "rešitev",
-        "urnik", "ure", "izvajanj", "regula", "hrm", "direktiv",
-        "ukaluplj", "iskanj", "gradiv", "polic", "katalog",
-        "orientac", "podatkov", "fond", "izposoj", "job",
-        "balance", "goal", "cilj", "študij", "literature",
-        "izvodi", "raziskav", "iskanje", "tasks", "program",
-        "training", "exercise", "activities", "šport", "rekreac",
-        "tek", "joga", "plavanj", "kolo"
+        "administra", "birokra", "obrazc", "poročil", "postopk",
+        "navodil", "veščin", "hitenj", "naglic", "stisk",
+        "preobremen", "neizkušn", "učinkovit", "biro", "togi",
+        "rutin", "nujne", "izobraž", "usposab", "proces",
+        "poenostav", "inovac", "rešitev", "urnik", "ure",
+        "izvajanj", "regula", "direktiv", "ukaluplj", "iskanj",
+        "gradiv", "podatkov", "job", "balance", "goal", "cilj",
+        "študij", "literature", "izvodi", "raziskav", "tasks",
+        "program", "training", "exercise", "activities", "šport",
+        "rekreac", "tek", "joga", "plavanj", "kolo"
     ],
 
     "Individual Psychological unit": [
-        "strah", "tesnob", "samozav", "čustv", "stres",
-        "frustr", "mir", "negotov", "nervoz", "panik", "nemoč",
-        "skrb", "napetos", "psih", "travm", "osebno",
-        "samopodob", "nasil", "negativ", "dušev", "žalost",
-        "ogroženost", "nelagod", "zadovolj", "psihi", "nemir",
-        "choice", "life", "memory", "spomin", "art", "umetnos",
-        "irrational", "uncertain", "uncertainty", "peace",
-        "feeling", "hope", "values", "vrednot", "ponižanj",
-        "identitet", "dopust", "izlet", "potovan", "journey",
-        "sprošč", "relax", "medit", "dihan", "narav", "spomini",
-        "praznina", "osebnost", "samokontrol", "vera", "mirnost"
+        "strah", "tesnob", "samozav", "čustv", "stres", "frustr",
+        "mir", "negotov", "nervoz", "panik", "nemoč", "skrb",
+        "napetos", "psih", "travm", "osebno", "samopodob",
+        "nasil", "negativ", "dušev", "žalost", "ogroženost",
+        "nelagod", "zadovolj", "nemir", "choice", "life",
+        "memory", "spomin", "art", "umetnos", "irrational",
+        "uncertain", "uncertainty", "peace", "feeling", "hope",
+        "values", "vrednot", "ponižanj", "identitet", "dopust",
+        "izlet", "potovan", "journey", "sprošč", "relax",
+        "medit", "dihan", "narav", "spomini", "praznina",
+        "osebnost", "samokontrol", "vera", "mirnost"
     ],
 
     "Social unit": [
-        "odnos", "odnosih", "odnosov", "sodelav", "sodelovanje",
-        "sodelov", "šef", "vodstv", "nadrejen", "vodja", "direktor",
-        "družin", "family", "prijatel", "friends", "friend",
-        "komunik", "pogovor", "talk", "prepir", "konflikt",
-        "conflict", "mobing", "mobbing", "šikan", "harass",
-        "harassment", "bully", "bullying", "zahrbt", "vzvišen",
-        "nesram", "aroganc", "egoiz", "neiskren", "rival",
-        "rivalstvo", "polit", "hierarh", "timsko", "team",
-        "teamwork", "druženj", "uporabnik", "osebj", "človek",
-        "zaupan", "trust", "support", "podpor", "klima", "vzdušje",
+        "odnos", "sodelav", "sodelovanje", "sodelov", "šef",
+        "vodstv", "nadrejen", "vodja", "direktor", "družin",
+        "family", "prijatel", "friends", "friend", "komunik",
+        "pogovor", "talk", "prepir", "konflikt", "conflict",
+        "mobing", "mobbing", "šikan", "harass", "harassment",
+        "bully", "bullying", "zahrbt", "vzvišen", "nesram",
+        "aroganc", "egoiz", "neiskren", "rival", "rivalstvo",
+        "polit", "hierarh", "timsko", "team", "teamwork",
+        "druženj", "uporabnik", "osebj", "človek", "zaupan",
+        "trust", "support", "podpor", "klima", "vzdušje",
         "pripadnost", "ignor", "nerazum", "posluš", "organizac",
         "sestank", "meeting", "meetings", "management", "leader",
-        "leadership", "manager", "plač", "dohod", "denar", "finanč",
-        "nagrad", "status", "priznan", "revšč", "standar", "nepravič",
-        "nestimul", "krivic", "dostojen", "zaposlit", "služb",
-        "karier", "napredov", "varnost", "staž", "benefic",
-        "ekonom", "proračun", "pokojnin", "sredstv", "zamudn",
-        "opomin", "kazn", "plačev", "plačilo", "money", "salary",
-        "financial", "budget", "stability", "znesek", "družb",
-        "law", "zakon", "orož", "weapon", "alcohol", "economic",
+        "leadership", "manager", "plač", "dohod", "denar",
+        "finanč", "nagrad", "status", "priznan", "revšč",
+        "standar", "nepravič", "nestimul", "krivic", "dostojen",
+        "zaposlit", "služb", "karier", "napredov", "varnost",
+        "staž", "benefic", "ekonom", "proračun", "pokojnin",
+        "sredstv", "zamudn", "opomin", "kazn", "plačev",
+        "plačilo", "money", "salary", "financial", "budget",
+        "stability", "znesek", "družb", "law", "zakon", "economic",
         "level", "standard", "overcrowding", "crowding",
         "injustice", "punishment", "reward", "recognition"
     ],
 
     "Health biological unit": [
-        "zdrav", "bolniš", "bolezen", "spanj", "utrujen", "izčrpan",
-        "higien", "čistoč", "sleep", "rest", "dihanje", "izčrpanost",
-        "utrujenost", "zdravje", "bolečina", "virus", "infekcij",
-        "higiena", "prehran", "diet", "biološ", "fiziolo", "telo",
-        "utrujena", "spanja", "telesno", "exhaustion"
+        "zdrav", "bolniš", "bolezen", "spanj", "utrujen",
+        "izčrpan", "higien", "čistoč", "sleep", "rest", "dihanje",
+        "izčrpanost", "utrujenost", "zdravje", "bolečina", "virus",
+        "infekcij", "higiena", "prehran", "diet", "biološ",
+        "fiziolo", "telo", "utrujena", "spanja", "telesno",
+        "exhaustion"
     ]
 }
 
@@ -276,11 +259,12 @@ def rate_sigma(sigma):
     for threshold, label in RATING_SCALE:
         if sigma <= threshold:
             return label
+
     return "Very high"
 
 
 # ============================================================
-# 5. GOOGLE MODELS
+# GOOGLE MODELS
 # ============================================================
 
 AVAILABLE_MODELS = [
@@ -290,20 +274,22 @@ AVAILABLE_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
     "gemma-4-26b-a4b-it",
-    "gemma-4-31b-it",
+    "gemma-4-31b-it"
 ]
 
 
 # ============================================================
-# 6. STRUCTURED AI OUTPUT
+# AI STRUCTURED OUTPUT
 # ============================================================
 
 def build_classification_models(allowed_short_names):
-    allowed = tuple(allowed_short_names) + ("None",)
+    allowed_categories = tuple(
+        allowed_short_names
+    ) + ("None",)
 
     class ClassifiedItem(BaseModel):
         phrase: str
-        category: Literal[allowed]
+        category: Literal[allowed_categories]
 
     class RowClassification(BaseModel):
         row_id: int
@@ -321,7 +307,8 @@ def build_classification_models(allowed_short_names):
 
 def build_system_instruction(allowed_short_names):
     definitions_text = "\n".join(
-        f"- {CATEGORY_SHORT[full]}: {CATEGORY_DEFINITIONS[full]}"
+        f"- {CATEGORY_SHORT[full]}: "
+        f"{CATEGORY_DEFINITIONS[full]}"
         for full in CATEGORIES_MAP.keys()
         if CATEGORY_SHORT[full] in allowed_short_names
     )
@@ -334,15 +321,17 @@ For each text row, identify meaningful expressions or phrases that represent
 an opinion, stressor, positive factor, or suggestion. A row may contain several
 expressions separated by commas, semicolons, or the word "and".
 
-Classify every expression into exactly one of the following scientific units:
+Classify every expression into exactly one of these scientific units:
 
 {definitions_text}
 
 If an expression does not belong to any unit, or is too general or meaningless,
 assign the category "None".
 
-Return the expressions in the original language of the text. Do not translate
-them. Be comprehensive and identify all meaningful expressions in each row.
+Return phrases in the original language of the input text.
+Do not translate them.
+
+Be comprehensive and identify all meaningful expressions in each row.
 """
 
 
@@ -386,13 +375,19 @@ def classify_batch_with_ai(
                 config=config
             )
 
-            raw = response.text
+            raw = response.text.strip()
 
             raw = re.sub(
-                r"^```json|```$",
+                r"^```json",
                 "",
-                raw.strip(),
-                flags=re.MULTILINE
+                raw,
+                flags=re.IGNORECASE
+            )
+
+            raw = re.sub(
+                r"```$",
+                "",
+                raw
             ).strip()
 
             data = json.loads(raw)
@@ -405,11 +400,13 @@ def classify_batch_with_ai(
                     category_short = item.get("category")
                     phrase = item.get("phrase", "").strip()
 
-                    if (
-                        not phrase
-                        or category_short == "None"
-                        or category_short not in SHORT_TO_FULL
-                    ):
+                    if not phrase:
+                        continue
+
+                    if category_short == "None":
+                        continue
+
+                    if category_short not in SHORT_TO_FULL:
                         continue
 
                     result[row_id].append(
@@ -434,8 +431,8 @@ def classify_batch_with_ai(
 
 
 def chunk_list(items, size):
-    for index in range(0, len(items), size):
-        yield items[index:index + size]
+    for start in range(0, len(items), size):
+        yield items[start:start + size]
 
 
 def run_ai_classification(
@@ -448,7 +445,9 @@ def run_ai_classification(
     progress_label
 ):
     row_class_model, _, batch_class_model = (
-        build_classification_models(allowed_short_names)
+        build_classification_models(
+            allowed_short_names
+        )
     )
 
     rows_text = [
@@ -482,6 +481,7 @@ def run_ai_classification(
             items = result.get(row_id, [])
 
             classified.extend(items)
+
             per_row_categories.append(
                 [category for _, category in items]
             )
@@ -497,7 +497,7 @@ def run_ai_classification(
 
 
 # ============================================================
-# 7. OFFLINE CLASSIFICATION
+# OFFLINE CLASSIFICATION
 # ============================================================
 
 def clean_and_tokenize(text):
@@ -569,7 +569,7 @@ def run_offline_classification(
 
 
 # ============================================================
-# 8. MATHEMATICAL LOGIC
+# MATHEMATICAL CALCULATIONS
 # ============================================================
 
 def calculate_fo_real_aggregate(classified, n_override):
@@ -605,7 +605,10 @@ def compute_category_factors(
     result = {}
 
     for category in active_categories:
-        words = words_by_category.get(category, [])
+        words = words_by_category.get(
+            category,
+            []
+        )
 
         frequency = len(words)
         unique_frequency = len(set(words))
@@ -764,7 +767,7 @@ def calculate_energy(sigma):
 
 
 # ============================================================
-# 9. STANDARD VISUALIZATIONS
+# HEATMAP
 # ============================================================
 
 def create_category_heatmap(analysis):
@@ -777,7 +780,7 @@ def create_category_heatmap(analysis):
     rows = []
 
     for role, role_label in role_labels.items():
-        category_counts = Counter(
+        counts = Counter(
             CATEGORY_SHORT.get(category, category)
             for _, category in analysis[role]["classified"]
         )
@@ -786,7 +789,7 @@ def create_category_heatmap(analysis):
             rows.append({
                 "Role": role_label,
                 "Scientific unit": category,
-                "Frequency": category_counts.get(category, 0)
+                "Frequency": counts.get(category, 0)
             })
 
     heatmap_df = pd.DataFrame(rows)
@@ -806,6 +809,10 @@ def create_category_heatmap(analysis):
     )
 
 
+# ============================================================
+# SANKEY DIAGRAM
+# ============================================================
+
 def create_sankey_diagram(analysis):
     role_labels = {
         "PF": "Positive factors",
@@ -815,6 +822,7 @@ def create_sankey_diagram(analysis):
 
     role_names = list(role_labels.values())
     category_names = list(CATEGORY_SHORT.values())
+
     labels = role_names + category_names
 
     label_to_index = {
@@ -827,12 +835,12 @@ def create_sankey_diagram(analysis):
     values = []
 
     for role, role_label in role_labels.items():
-        category_counts = Counter(
+        counts = Counter(
             CATEGORY_SHORT.get(category, category)
             for _, category in analysis[role]["classified"]
         )
 
-        for category, count in category_counts.items():
+        for category, count in counts.items():
             if category not in label_to_index:
                 continue
 
@@ -880,34 +888,14 @@ def create_sankey_diagram(analysis):
 
 
 # ============================================================
-# 10. CRITICAL NETWORK DIAGRAM
+# CRITICAL NETWORK DIAGRAM
 # ============================================================
 
 def create_critical_network(
     analysis,
-    category_sigmas,
     top_n_phrases=35
 ):
-    """
-    Network structure:
-
-        Response type -> Scientific unit -> Phrase
-
-    Blue nodes:
-        response types
-
-    Orange nodes:
-        scientific units
-
-    Red nodes:
-        stress-related phrases
-
-    Green nodes:
-        positive-factor phrases
-
-    Purple nodes:
-        suggestions
-    """
+    graph = nx.Graph()
 
     role_labels = {
         "PF": "Positive factors",
@@ -915,7 +903,6 @@ def create_critical_network(
         "PR": "Suggestions"
     }
 
-    graph = nx.Graph()
     phrase_counter = Counter()
     category_counter = Counter()
 
@@ -926,7 +913,10 @@ def create_critical_network(
             role_label,
             node_type="role",
             label=role_label,
-            size=max(25, len(classified) * 2)
+            size=max(
+                25,
+                len(classified) * 2
+            )
         )
 
         for phrase, category in classified:
@@ -940,23 +930,19 @@ def create_critical_network(
                 category
             )
 
-            key = (
+            phrase_key = (
                 role_label,
                 phrase,
                 category_label
             )
 
-            phrase_counter[key] += 1
+            phrase_counter[phrase_key] += 1
             category_counter[category_label] += 1
 
             graph.add_node(
                 category_label,
                 node_type="category",
-                label=category_label,
-                size=max(
-                    25,
-                    category_counter[category_label] * 4
-                )
+                label=category_label
             )
 
             phrase_id = (
@@ -971,7 +957,7 @@ def create_critical_network(
                 label=phrase,
                 role=role_label,
                 category=category_label,
-                frequency=phrase_counter[key]
+                frequency=phrase_counter[phrase_key]
             )
 
             graph.add_edge(
@@ -983,7 +969,7 @@ def create_critical_network(
             graph.add_edge(
                 category_label,
                 phrase_id,
-                weight=phrase_counter[key]
+                weight=phrase_counter[phrase_key]
             )
 
     phrase_nodes = [
@@ -992,7 +978,7 @@ def create_critical_network(
         if data.get("node_type") == "phrase"
     ]
 
-    phrase_nodes_sorted = sorted(
+    phrase_nodes = sorted(
         phrase_nodes,
         key=lambda node: graph.nodes[node].get(
             "frequency",
@@ -1002,13 +988,16 @@ def create_critical_network(
     )
 
     retained_phrases = set(
-        phrase_nodes_sorted[:top_n_phrases]
+        phrase_nodes[:top_n_phrases]
     )
 
     nodes_to_remove = [
         node
-        for node in phrase_nodes
-        if node not in retained_phrases
+        for node in graph.nodes()
+        if (
+            graph.nodes[node].get("node_type") == "phrase"
+            and node not in retained_phrases
+        )
     ]
 
     graph.remove_nodes_from(nodes_to_remove)
@@ -1021,7 +1010,7 @@ def create_critical_network(
 
     graph.remove_nodes_from(isolated_nodes)
 
-    if len(graph.nodes) == 0:
+    if graph.number_of_nodes() == 0:
         return None
 
     positions = nx.spring_layout(
@@ -1039,8 +1028,17 @@ def create_critical_network(
         x0, y0 = positions[source_node]
         x1, y1 = positions[target_node]
 
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
+        edge_x.extend([
+            x0,
+            x1,
+            None
+        ])
+
+        edge_y.extend([
+            y0,
+            y1,
+            None
+        ])
 
     edge_trace = go.Scatter(
         x=edge_x,
@@ -1075,6 +1073,7 @@ def create_critical_network(
 
         elif node_type == "category":
             color = "#f59e0b"
+
             size = max(
                 25,
                 category_counter.get(label, 1) * 4
@@ -1164,7 +1163,7 @@ def create_critical_network(
 
 
 # ============================================================
-# 11. MAIN STREAMLIT APPLICATION
+# MAIN APPLICATION
 # ============================================================
 
 def main():
@@ -1195,8 +1194,7 @@ def main():
         if classification_mode.startswith("AI"):
             api_key = st.text_input(
                 "Google AI API key",
-                type="password",
-                help="Enter your Google AI API key."
+                type="password"
             )
 
             model_name = st.selectbox(
@@ -1206,10 +1204,10 @@ def main():
             )
 
             batch_size = st.slider(
-                "Batch size (rows per API call)",
-                5,
-                40,
-                15
+                "Batch size",
+                min_value=5,
+                max_value=40,
+                value=15
             )
 
         st.divider()
@@ -1275,19 +1273,26 @@ def main():
 
         uploaded_file = st.file_uploader(
             "📁 Upload data",
-            type=["txt", "csv", "xlsx"]
+            type=[
+                "txt",
+                "csv",
+                "xlsx"
+            ]
         )
 
-    st.markdown("# 📊 Petrič Stress Analysis Pro")
+    st.markdown(
+        "# 📊 Petrič Stress Analysis Pro"
+    )
 
     st.caption(
-        "Classification with Google Gemini/Gemma models · "
-        "Five scientific units · Social = social + partial social"
+        "Classification with Gemini/Gemma models · "
+        "Five scientific units · "
+        "Social = social + partial social"
     )
 
     if not uploaded_file:
         st.info(
-            "📁 Upload a data file to begin the analysis.",
+            "📁 Upload a data file to begin.",
             icon="ℹ️"
         )
         return
@@ -1295,14 +1300,13 @@ def main():
     if classification_mode.startswith("AI"):
         if not api_key:
             st.warning(
-                "⚠️ Enter your Google AI API key "
-                "in the sidebar."
+                "⚠️ Enter your Google AI API key."
             )
             return
 
         if model_name == AVAILABLE_MODELS[0]:
             st.warning(
-                "⚠️ Select a model in the sidebar."
+                "⚠️ Select an AI model."
             )
             return
 
@@ -1310,7 +1314,9 @@ def main():
         filename = uploaded_file.name.lower()
 
         if filename.endswith(".xlsx"):
-            dataframe = pd.read_excel(uploaded_file)
+            dataframe = pd.read_excel(
+                uploaded_file
+            )
 
         elif filename.endswith(".txt"):
             dataframe = pd.read_csv(
@@ -1335,7 +1341,7 @@ def main():
 
     if dataframe.empty:
         st.error(
-            "The uploaded file does not contain any data."
+            "The uploaded file is empty."
         )
         return
 
@@ -1377,7 +1383,7 @@ def main():
     if classification_mode.startswith("AI"):
         client = get_client(api_key)
 
-        classification_jobs = [
+        jobs = [
             (
                 "PF",
                 col_pf,
@@ -1395,7 +1401,7 @@ def main():
             )
         ]
 
-        for role, column, progress_label in classification_jobs:
+        for role, column, progress_label in jobs:
             classified, per_row = run_ai_classification(
                 client=client,
                 model_name=model_name,
@@ -1413,13 +1419,13 @@ def main():
             }
 
     else:
-        offline_jobs = [
+        jobs = [
             ("PF", col_pf),
             ("SF", col_sf),
             ("PR", col_pr)
         ]
 
-        for role, column in offline_jobs:
+        for role, column in jobs:
             classified, per_row = run_offline_classification(
                 dataframe=dataframe,
                 column=column,
@@ -1463,7 +1469,7 @@ def main():
         f_pf_aggregate
     )
 
-    remaining_energy, efficiency, energy_loss = calculate_energy(
+    _, efficiency, energy_loss = calculate_energy(
         sigma_total
     )
 
@@ -1501,7 +1507,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # CATEGORY CALCULATIONS
+    # CATEGORY ANALYSIS
     # --------------------------------------------------------
 
     st.divider()
@@ -1563,13 +1569,15 @@ def main():
             )
         })
 
-    result_df = pd.DataFrame(result_rows).sort_values(
+    result_df = pd.DataFrame(
+        result_rows
+    ).sort_values(
         by="Sigma (°S)",
         ascending=False
     )
 
     # --------------------------------------------------------
-    # DISTRIBUTION BY SCIENTIFIC UNIT
+    # DISTRIBUTION CHARTS
     # --------------------------------------------------------
 
     st.markdown(
@@ -1593,7 +1601,7 @@ def main():
                 y="Sigma (°S)",
                 color="Sigma (°S)",
                 color_continuous_scale="Reds",
-                height=300,
+                height=320,
                 title="Stress intensity by scientific unit"
             )
 
@@ -1609,7 +1617,7 @@ def main():
                 values="Sigma (°S)",
                 color="Sigma (°S)",
                 color_continuous_scale="RdYlGn_r",
-                height=350,
+                height=360,
                 title="Stress distribution by scientific unit"
             )
 
@@ -1619,7 +1627,7 @@ def main():
             )
 
     # --------------------------------------------------------
-    # ROLE AND CATEGORY TREEMAP
+    # ROLE/CATEGORY TREEMAP
     # --------------------------------------------------------
 
     st.markdown(
@@ -1635,12 +1643,12 @@ def main():
     }
 
     for role, role_label in role_labels.items():
-        frequency = Counter(
+        category_counts = Counter(
             category
             for _, category in analysis[role]["classified"]
         )
 
-        for category, count in frequency.items():
+        for category, count in category_counts.items():
             tree_rows.append({
                 "Role": role_label,
                 "Scientific unit": CATEGORY_SHORT.get(
@@ -1655,7 +1663,10 @@ def main():
 
         role_treemap = px.treemap(
             tree_df,
-            path=["Role", "Scientific unit"],
+            path=[
+                "Role",
+                "Scientific unit"
+            ],
             values="Frequency",
             color="Frequency",
             color_continuous_scale="Turbo",
@@ -1667,10 +1678,9 @@ def main():
             role_treemap,
             use_container_width=True
         )
-
     else:
         st.caption(
-            "There are no classified expressions "
+            "There are no classified phrases "
             "to display in the treemap."
         )
 
@@ -1679,7 +1689,10 @@ def main():
     # --------------------------------------------------------
 
     st.divider()
-    st.markdown("## 🔬 Advanced visualizations")
+
+    st.markdown(
+        "## 🔬 Advanced visualizations"
+    )
 
     network_tab, heatmap_tab, sankey_tab = st.tabs([
         "🕸️ Critical network",
@@ -1688,29 +1701,33 @@ def main():
     ])
 
     with network_tab:
-        network_figure = create_critical_network(
-            analysis=analysis,
-            category_sigmas=category_sigmas,
-            top_n_phrases=35
-        )
-
-        if network_figure is not None:
-            st.plotly_chart(
-                network_figure,
-                use_container_width=True
+        try:
+            network_figure = create_critical_network(
+                analysis=analysis,
+                top_n_phrases=35
             )
 
-            st.caption(
-                "Blue nodes represent response types. Orange nodes "
-                "represent scientific units. Red nodes represent stress "
-                "factors, green nodes positive factors, and purple nodes "
-                "suggestions."
-            )
+            if network_figure is not None:
+                st.plotly_chart(
+                    network_figure,
+                    use_container_width=True
+                )
 
-        else:
-            st.info(
-                "There are not enough classified expressions "
-                "to create the network."
+                st.caption(
+                    "Blue nodes represent response types. Orange nodes "
+                    "represent scientific units. Red nodes represent stress "
+                    "factors, green nodes positive factors, and purple nodes "
+                    "suggestions."
+                )
+            else:
+                st.info(
+                    "There are not enough classified phrases "
+                    "to create the network."
+                )
+
+        except Exception as error:
+            st.error(
+                f"Could not create the network diagram: {error}"
             )
 
     with heatmap_tab:
@@ -1734,27 +1751,27 @@ def main():
         )
 
     # --------------------------------------------------------
-    # QUALITATIVE CLASSIFICATION DETAILS
+    # DETAILED CLASSIFICATION
     # --------------------------------------------------------
 
     with st.expander(
         "🔍 Detailed phrase classification"
     ):
-        tab_positive, tab_stress, tab_suggestions = st.tabs([
+        positive_tab, stress_tab, suggestions_tab = st.tabs([
             "🟢 Positive factors",
             "🔴 Stress factors",
             "🔵 Suggestions"
         ])
 
         tabs_and_roles = [
-            (tab_positive, "PF"),
-            (tab_stress, "SF"),
-            (tab_suggestions, "PR")
+            (positive_tab, "PF"),
+            (stress_tab, "SF"),
+            (suggestions_tab, "PR")
         ]
 
         for tab, role in tabs_and_roles:
             with tab:
-                frequency = Counter(
+                category_counts = Counter(
                     category
                     for _, category
                     in analysis[role]["classified"]
@@ -1769,14 +1786,19 @@ def main():
                         "Frequency": count
                     }
                     for category, count
-                    in frequency.items()
+                    in category_counts.items()
                 ])
 
-                st.dataframe(
-                    frequency_table,
-                    use_container_width=True,
-                    hide_index=True
-                )
+                if not frequency_table.empty:
+                    st.dataframe(
+                        frequency_table,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                else:
+                    st.caption(
+                        "No classified categories are available."
+                    )
 
                 st.markdown(
                     "#### Examples of classified phrases"
@@ -1789,28 +1811,3 @@ def main():
                         {
                             "Phrase": phrase,
                             "Scientific unit": CATEGORY_SHORT.get(
-                                category,
-                                category
-                            )
-                        }
-                        for phrase, category in sample
-                    ])
-
-                    st.dataframe(
-                        sample_df,
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                else:
-                    st.caption(
-                        "No classified phrases are available."
-                    )
-
-
-# ============================================================
-# 12. APPLICATION ENTRY POINT
-# ============================================================
-
-if __name__ == "__main__":
-    main()
