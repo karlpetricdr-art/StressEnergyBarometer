@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from typing import List, Literal, Optional
 
 import plotly.express as px
+import plotly.graph_objects as go
 
 from pydantic import BaseModel
 from google import genai
@@ -99,29 +100,29 @@ SHORT_TO_FULL = {v: k for k, v in CATEGORY_SHORT.items()}
 # ne dobesedni navedki.
 CATEGORY_DEFINITIONS = {
     "Attentive (physical) unit": (
-        "Fizično/senzorno okolje: hrup, osvetlitev, temperatura, zrak, "
-        "ergonomija, urejenost in estetika prostora, vonjave, barve."
+        "Physical/sensory environment: noise, lighting, temperature, air, "
+        "ergonomics, order and aesthetics of the space, odors, colors."
     ),
     "Performance unit": (
-        "Dejavniki, povezani z opravljanjem nalog: roki, obremenjenost, "
-        "administrativni postopki, dostopnost informacij, usposabljanje, "
-        "učinkovitost orodij/procesov, telesna aktivnost v vlogi razbremenitve."
+        "Factors related to performing tasks: deadlines, workload, "
+        "administrative procedures, information availability, training, "
+        "efficiency of tools/processes, physical activity when used for recovery."
     ),
     "Individual Psychological unit": (
-        "Notranja subjektivna čustvena/psihična stanja posameznika: strah, "
-        "tesnoba, samozavest, mir, občutki, osebni pomen, vrednote, "
-        "notranja sprostitev, samopodoba, duševno počutje."
+        "Internal subjective emotional/psychological states: fear, anxiety, "
+        "self-confidence, calm, feelings, personal meaning, values, "
+        "inner relaxation, self-image, psychological well-being."
     ),
     "Social unit": (
-        "Medosebni in organizacijski/statusni dejavniki: odnosi s sodelavci, "
-        "nadrejenimi, družino, prijatelji; komunikacija, konflikti, mobing, "
-        "timsko delo, organizacijska klima, hierarhija, PA TUDI status, "
-        "pravičnost, priznanje, plačilo, varnost zaposlitve in ekonomski "
-        "dejavniki (ta enota združuje 'social' in 'partial social' iz članka)."
+        "Interpersonal, organizational and status factors: relationships with colleagues, "
+        "supervisors, family and friends; communication, conflicts, bullying, "
+        "teamwork, organizational climate, hierarchy, plus status, "
+        "fairness, recognition, pay, job security and economic "
+        "factors."
     ),
     "Health biological unit": (
-        "Fizično zdravje in biološki dejavniki: bolezen, utrujenost, spanje, "
-        "higiena, prehrana, fiziološko stanje, izčrpanost."
+        "Physical health and biological factors: illness, fatigue, sleep, "
+        "hygiene, nutrition, physiological condition, exhaustion."
     ),
 }
 
@@ -263,25 +264,39 @@ def build_classification_models(allowed_short_names):
     return ClassifiedItem, RowClassification, BatchClassification
 
 
-def build_system_instruction(allowed_short_names):
+def build_system_instruction(allowed_short_names, role):
     defs_text = "\n".join(
         f"- {CATEGORY_SHORT[full]}: {CATEGORY_DEFINITIONS[full]}"
         for full in CATEGORIES_MAP.keys()
         if CATEGORY_SHORT[full] in allowed_short_names
     )
-    return f"""Si strokovnjak za klasifikacijo odgovorov v raziskavi o stresu
-javnih uslužbencev (metodologija Petrič, 2025). Za vsako vrstico besedila
-prepoznaj posamezne smiselne izraze/fraze, ki predstavljajo mnenje, stresor,
-pozitiven dejavnik ali predlog (lahko jih je več v eni vrstici, ločenih z
-vejicami, podpičji ali "in"). Vsak prepoznan izraz razvrsti v NATANKO ENO od
-naslednjih znanstvenih enot:
+    role_text = {
+        "PF": "You are classifying POSITIVE FACTORS: protective, beneficial, supportive or restorative conditions.",
+        "SF": "You are classifying STRESS FACTORS: problems, burdens, demands, threats, deficiencies, conflicts or conditions that increase stress.",
+        "PR": "You are classifying PROPOSALS: suggestions, requested changes, solutions or actions intended to improve the situation. Classify the actual target of the proposal, not generic words such as 'improve' or 'better'.",
+    }[role]
+    return f"""You are an expert in classifying survey responses about psychosocial stress in public-sector employees using the Petrič methodology (2025).
+
+CURRENT ROLE: {role}
+{role_text}
+
+For every row, identify ALL meaningful words or phrases expressing the current role. A row may contain multiple items. Each item must be assigned to EXACTLY ONE scientific unit:
 
 {defs_text}
 
-Če izraz ne sodi v nobeno od zgornjih enot ali je preveč splošen/nesmiseln,
-mu dodeli kategorijo "None". Vrni izraze v izvirnem jeziku besedila (ne
-prevajaj). Bodi izčrpen - zajemi vse smiselne izraze v vrstici, ne le
-enega."""
+Important classification rules:
+1. Classify by MEANING AND CONTEXT, not by isolated keywords.
+2. Keep meaningful multi-word expressions together when they form one concept, e.g. 'delovnem mestu'.
+3. Do not return grammatical filler or stop words such as 'več', 'the', 'and', 'to', etc.
+4. A generic word must not be classified when it has no meaningful stress-related context.
+5. Words such as 'delo'/'work' normally belong to Performance unit only when they refer to performing tasks, workload, duties or work processes.
+6. Organizational obligations, employment conditions, status, recognition, pay, job security and organizational social conditions belong to Social unit when that is the meaning in context.
+7. 'Environment' belongs to Attentive (physical) unit only when it clearly means the physical/sensory surroundings. Organizational or social environment belongs to Social unit.
+8. For proposals, classify the actual target/problem being proposed for change, not merely the improvement verb.
+9. For positive factors, classify the beneficial condition itself; do not classify a merely negated problem as positive.
+10. Return phrases in the original language; do not translate them.
+11. If an expression does not fit any active unit or is too vague, use 'None'.
+12. Be comprehensive but precise: prefer meaningful phrases over noisy single words."""
 
 
 @st.cache_resource(show_spinner=False)
@@ -289,10 +304,10 @@ def get_client(api_key):
     return genai.Client(api_key=api_key)
 
 
-def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
+def classify_batch_with_ai(client, model_name, rows, allowed_short_names, role,
                             row_class_model, batch_class_model, max_retries=3):
     """rows: list of (row_id, text). Vrne dict row_id -> [(phrase, category_full), ...]"""
-    system_instruction = build_system_instruction(allowed_short_names)
+    system_instruction = build_system_instruction(allowed_short_names, role)
     payload = "\n".join(f"[{rid}] {text}" for rid, text in rows)
 
     config = types.GenerateContentConfig(
@@ -320,7 +335,13 @@ def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
                 for item in row.get("items", []):
                     cat_short = item.get("category")
                     phrase = item.get("phrase", "").strip()
+                    phrase = re.sub(r"\s+", " ", phrase).strip(" ,.;:-")
                     if not phrase or cat_short == "None" or cat_short not in SHORT_TO_FULL:
+                        continue
+                    phrase_words = phrase.split()
+                    if len(phrase_words) == 1 and phrase.lower() in SLO_STOPWORDS:
+                        continue
+                    if len(phrase_words) > 1 and all(w.lower() in SLO_STOPWORDS for w in phrase_words):
                         continue
                     result[rid].append((phrase.lower(), SHORT_TO_FULL[cat_short]))
             return result
@@ -349,7 +370,7 @@ def run_ai_classification(client, model_name, df, col, allowed_short_names,
     batches = list(chunk_list(rows_text, batch_size))
     for b_i, batch in enumerate(batches):
         result = classify_batch_with_ai(
-            client, model_name, batch, allowed_short_names,
+            client, model_name, batch, allowed_short_names, role,
             row_class_model, batch_class_model
         )
         for rid, _ in batch:
@@ -494,21 +515,126 @@ def calculate_energy(sigma):
 
 
 # ============================================================
+# 9. ADVANCED VISUALIZATIONS
+# ============================================================
+
+def build_sankey(analysis):
+    role_labels = {"PF": "Positive factors", "SF": "Stress factors", "PR": "Proposals"}
+    counts = Counter()
+    for role, role_label in role_labels.items():
+        for _, cat in analysis[role]["classified"]:
+            counts[(role_label, CATEGORY_SHORT[cat])] += 1
+    if not counts:
+        return None
+    unit_labels = [CATEGORY_SHORT[c] for c in CATEGORIES_MAP]
+    labels = list(dict.fromkeys(list(role_labels.values()) + unit_labels))
+    idx = {x: i for i, x in enumerate(labels)}
+    sources, targets, values = [], [], []
+    for (role_label, unit), count in counts.items():
+        sources.append(idx[role_label]); targets.append(idx[unit]); values.append(count)
+    fig = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(label=labels, pad=18, thickness=20),
+        link=dict(source=sources, target=targets, value=values)
+    ))
+    fig.update_layout(title="Sankey diagram: Role → Unit", height=480,
+                      margin=dict(l=10, r=10, t=60, b=10))
+    return fig
+
+
+def build_radar(res_df):
+    if res_df.empty:
+        return None
+    theta = res_df["Enota"].tolist()
+    values = res_df["σ (°S)"].astype(float).tolist()
+    fig = go.Figure(go.Scatterpolar(
+        r=values + [values[0]],
+        theta=theta + [theta[0]],
+        fill="toself",
+        name="Stress power"
+    ))
+    fig.update_layout(
+        title="Radar profile: stress power by unit",
+        polar=dict(radialaxis=dict(visible=True, range=[0, 90])),
+        showlegend=False, height=500,
+        margin=dict(l=40, r=40, t=70, b=20)
+    )
+    return fig
+
+
+def build_cooccurrence_network(analysis):
+    # Each respondent row is treated as one observation. Units appearing
+    # anywhere across PF/SF/PR in that row form co-occurrence edges.
+    role_order = ["PF", "SF", "PR"]
+    rows = {role: analysis[role]["per_row"] for role in role_order}
+    max_len = max((len(v) for v in rows.values()), default=0)
+    edge_counts = Counter()
+    node_counts = Counter()
+
+    for i in range(max_len):
+        units = set()
+        for role in role_order:
+            if i < len(rows[role]):
+                units.update(c for c in rows[role][i] if c in CATEGORY_SHORT)
+        short_units = sorted(CATEGORY_SHORT[c] for c in units)
+        node_counts.update(short_units)
+        for a_i in range(len(short_units)):
+            for b_i in range(a_i + 1, len(short_units)):
+                edge_counts[(short_units[a_i], short_units[b_i])] += 1
+
+    if not edge_counts:
+        return None
+
+    nodes = sorted(node_counts)
+    positions = {}
+    n = len(nodes)
+    for i, node in enumerate(nodes):
+        angle = 2 * math.pi * i / max(n, 1)
+        positions[node] = (math.cos(angle), math.sin(angle))
+
+    edge_x, edge_y = [], []
+    for (a, b), weight in edge_counts.items():
+        xa, ya = positions[a]; xb, yb = positions[b]
+        edge_x += [xa, xb, None]; edge_y += [ya, yb, None]
+
+    edge_trace = go.Scatter(x=edge_x, y=edge_y, mode="lines",
+                            line=dict(width=1.5), hoverinfo="none")
+    node_trace = go.Scatter(
+        x=[positions[n][0] for n in nodes],
+        y=[positions[n][1] for n in nodes],
+        mode="markers+text",
+        text=nodes, textposition="middle center",
+        marker=dict(size=[30 + 8 * math.sqrt(node_counts[n]) for n in nodes],
+                    line=dict(width=1)),
+        customdata=[node_counts[n] for n in nodes],
+        hovertemplate="<b>%{text}</b><br>Rows containing unit: %{customdata}<extra></extra>"
+    )
+    fig = go.Figure([edge_trace, node_trace])
+    fig.update_layout(
+        title="Co-occurrence network: units appearing in the same responses",
+        showlegend=False, height=560,
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+        margin=dict(l=10, r=10, t=60, b=10), plot_bgcolor="white"
+    )
+    return fig
+
+
+# ============================================================
 # 9. GLAVNA STREAMLIT APLIKACIJA (UI)
 # ============================================================
 
 def main():
     with st.sidebar:
-        st.markdown("## ⚙️ Nastavitve")
+        st.markdown("## ⚙️ Settings")
 
-        if st.button("🔄 Ponastavi sejo", use_container_width=True):
+        if st.button("🔄 Reset session", use_container_width=True):
             reset_app()
 
         st.divider()
-        st.markdown("### 🤖 AI klasifikacija (Google)")
+        st.markdown("### 🤖 AI classification (Google)")
         classification_mode = st.radio(
-            "Način klasifikacije",
-            ["AI model (Gemini / Gemma)", "Slovar (offline, brez API klica)"]
+            "Classification mode",
+            ["AI model (Gemini / Gemma)", "Dictionary (offline, no API call)"]
         )
 
         api_key = None
@@ -517,51 +643,51 @@ def main():
 
         if classification_mode.startswith("AI"):
             api_key = st.text_input(
-                "Google AI API ključ", type="password",
+                "Google AI API key", type="password",
                 help="Brezplačen ključ dobiš na https://aistudio.google.com/apikey"
             )
             model_name = st.selectbox("Model", AVAILABLE_MODELS, index=0)
             batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
 
         st.divider()
-        st.markdown("### 🧭 Katere enote naj bodo zajete?")
+        st.markdown("### 🧭 Scientific units to include")
         included_shorts = st.multiselect(
-            "Vključene enote",
+            "Included units",
             list(CATEGORY_SHORT.values()),
             default=list(CATEGORY_SHORT.values())
         )
         active_categories = [SHORT_TO_FULL[s] for s in included_shorts] or list(CATEGORIES_MAP.keys())
 
         st.divider()
-        n_input = st.number_input("Število respondentov (N)", min_value=1, value=210)
-        is_summary = st.checkbox("Datoteka vsebuje POVZETEK", value=True)
+        n_input = st.number_input("Number of respondents (N)", min_value=1, value=210)
+        is_summary = st.checkbox("File contains a SUMMARY", value=True)
 
         st.divider()
         weighting_label = st.radio(
-            "Uteževanje znotraj enote",
-            ["Volumen (frekvenca)", "Koncentracija (ponovljivost)"]
+            "Within-unit weighting",
+            ["Volume (frequency)", "Concentration (repeatability)"]
         )
         weighting_mode = "volume" if "Volumen" in weighting_label else "concentration"
 
         st.divider()
-        chart_mode = st.radio("Prikaz porazdelitve", ["Stolpični graf", "Treemap (barvit)", "Oboje"])
+        chart_mode = st.radio("Distribution display", ["Bar chart", "Treemap (colored)", "Both"])
 
         st.divider()
-        uploaded_file = st.file_uploader("📁 Naložite podatke", type=["txt", "csv", "xlsx"])
+        uploaded_file = st.file_uploader("📁 Upload data", type=["txt", "csv", "xlsx"])
 
     st.markdown("# 📊 Petrič Stress Analysis Pro")
     st.caption("Klasifikacija z Google Gemini/Gemma modeli · 5 znanstvenih enot (Social = social + partial social)")
 
     if not uploaded_file:
-        st.info("📁 Naložite datoteko za začetek analize.", icon="ℹ️")
+        st.info("📁 Upload a file to begin the analysis.", icon="ℹ️")
         return
 
     if classification_mode.startswith("AI"):
         if not api_key:
-            st.warning("⚠️ Vnesite Google AI API ključ v stranski vrstici, da uporabite AI klasifikacijo.")
+            st.warning("⚠️ Vnesite Google AI API key v stranski vrstici, da uporabite AI klasifikacijo.")
             return
         if model_name == AVAILABLE_MODELS[0]:
-            st.warning("⚠️ Izberite model v stranski vrstici.")
+            st.warning("⚠️ Select a model in the sidebar.")
             return
 
     try:
@@ -572,16 +698,16 @@ def main():
         else:
             df = pd.read_csv(uploaded_file, engine="python", on_bad_lines="skip")
     except Exception as e:
-        st.error(f"Napaka pri branju: {e}")
+        st.error(f"File read error: {e}")
         return
 
     target_cols = df.columns.tolist()
 
     with st.sidebar:
-        st.markdown("### 🧩 Stolpci")
-        col_pf = st.selectbox("Pozitivni (PF)", target_cols, index=0)
-        col_sf = st.selectbox("Stresni (SF)", target_cols, index=min(1, len(target_cols) - 1))
-        col_pr = st.selectbox("Predlogi (PR)", target_cols, index=min(2, len(target_cols) - 1))
+        st.markdown("### 🧩 Columns")
+        col_pf = st.selectbox("Positive factors (PF)", target_cols, index=0)
+        col_sf = st.selectbox("Stress factors (SF)", target_cols, index=min(1, len(target_cols) - 1))
+        col_pr = st.selectbox("Proposals (PR)", target_cols, index=min(2, len(target_cols) - 1))
 
     # ---------------- KLASIFIKACIJA ----------------
     analysis = {}
@@ -589,12 +715,13 @@ def main():
     if classification_mode.startswith("AI"):
         client = get_client(api_key)
         for role, col, label in [
-            ("PF", col_pf, "🔵 Klasificiram pozitivne dejavnike ..."),
-            ("SF", col_sf, "🔴 Klasificiram stresne dejavnike ..."),
-            ("PR", col_pr, "🟢 Klasificiram predloge ...")
+            ("PF", col_pf, "🔵 Classifying positive factors ..."),
+            ("SF", col_sf, "🔴 Classifying stress factors ..."),
+            ("PR", col_pr, "🟢 Classifying proposals ...")
         ]:
             cls, per_row = run_ai_classification(
-                client, model_name, df, col, included_shorts, batch_size, label
+                client, model_name, df, col, included_shorts, role,
+                batch_size, label
             )
             analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
     else:
@@ -613,12 +740,12 @@ def main():
     sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
     W_EU, eta, loss = calculate_energy(sigma_total)
 
-    st.markdown("## 🎯 Skupni rezultati")
+    st.markdown("## 🎯 Overall results")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Stresna moč", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
-    m2.metric("Učinkovitost", f"{eta:.1f} %")
-    m3.metric("Izguba energije", f"{loss:.0f} Kcal")
-    m4.metric("Vzorec (N)", n_input)
+    m1.metric("Stress power", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
+    m2.metric("Efficiency", f"{eta:.1f} %")
+    m3.metric("Energy loss", f"{loss:.0f} Kcal")
+    m4.metric("Sample (N)", n_input)
     st.progress(min(sigma_total / 90.0, 1.0))
 
     # ---------------- RAZČLENITEV PO ENOTAH ----------------
@@ -637,24 +764,24 @@ def main():
         rows.append({
             "Enota": CATEGORY_SHORT[cat],
             "σ (°S)": round(data["sigma"], 2),
-            "Delež (%)": round(data["weight_share"] * 100, 1),
-            "Ocena": rate_sigma(data["sigma"])
+            "Share (%)": round(data["weight_share"] * 100, 1),
+            "Rating": rate_sigma(data["sigma"])
         })
     res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
 
-    st.markdown("### Porazdelitev po znanstvenih enotah")
+    st.markdown("### Stress power by scientific unit")
     col_left, col_right = st.columns([1, 1])
     with col_left:
         st.dataframe(res_df, use_container_width=True, hide_index=True)
 
     with col_right:
-        if chart_mode in ("Stolpični graf", "Oboje"):
+        if chart_mode in ("Bar chart", "Both"):
             st.plotly_chart(
                 px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)",
                        color_continuous_scale="Reds", height=300),
                 use_container_width=True
             )
-        if chart_mode in ("Treemap (barvit)", "Oboje"):
+        if chart_mode in ("Treemap (colored)", "Both"):
             st.plotly_chart(
                 px.treemap(
                     res_df, path=["Enota"], values="σ (°S)",
@@ -665,45 +792,64 @@ def main():
             )
 
     # ---------------- TREEMAP: PF / SF / PR SKUPAJ ----------------
-    st.markdown("### 🗺️ Treemap: vse besedne zveze po vlogi in enoti")
+    st.markdown("### 🗺️ Treemap: all classified phrases by role and unit")
     tree_rows = []
-    role_labels = {"PF": "Pozitivni", "SF": "Stresni", "PR": "Predlogi"}
+    role_labels = {"PF": "Positive", "SF": "Stress", "PR": "Proposals"}
     for role, label in role_labels.items():
         freq = Counter(c for _, c in analysis[role]["classified"])
         for cat, count in freq.items():
             tree_rows.append({
-                "Vloga": label,
+                "Role": label,
                 "Enota": CATEGORY_SHORT[cat],
-                "Frekvenca": count
+                "Frequency": count
             })
     if tree_rows:
         tree_df = pd.DataFrame(tree_rows)
         st.plotly_chart(
             px.treemap(
-                tree_df, path=["Vloga", "Enota"], values="Frekvenca",
-                color="Frekvenca", color_continuous_scale="Turbo", height=450
+                tree_df, path=["Role", "Enota"], values="Frequency",
+                color="Frequency", color_continuous_scale="Turbo", height=450
             ),
             use_container_width=True
         )
     else:
-        st.caption("Ni razvrščenih izrazov za prikaz treemap-a.")
+        st.caption("No classified expressions are available for the treemap.")
 
-    # ---------------- KVALITATIVNI PREGLED ----------------
-    with st.expander("🔍 Podrobnosti klasifikacije besed/fraz"):
-        t1, t2, t3 = st.tabs(["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"])
+    # ---------------- ADVANCED VISUALIZATIONS ----------------
+    st.divider()
+    st.markdown("## 🔬 Advanced structural visualizations")
+
+    sankey_fig = build_sankey(analysis)
+    if sankey_fig is not None:
+        st.plotly_chart(sankey_fig, use_container_width=True)
+        st.caption("Flow volume is the number of classified phrases from each role into each scientific unit.")
+
+    radar_fig = build_radar(res_df)
+    if radar_fig is not None:
+        st.plotly_chart(radar_fig, use_container_width=True)
+        st.caption("The radar profile shows the stress-power profile of the active scientific units.")
+
+    network_fig = build_cooccurrence_network(analysis)
+    if network_fig is not None:
+        st.plotly_chart(network_fig, use_container_width=True)
+        st.caption("Edges connect scientific units that occur together in the same respondent response. Thicker/stronger connections indicate more frequent co-occurrence.")
+
+    # ---------------- QUALITATIVE REVIEW ----------------
+    with st.expander("🔍 Classification details"):
+        t1, t2, t3 = st.tabs(["🟢 Positive", "🔴 Stress", "🔵 Proposals"])
         for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
             with tab:
                 freq = Counter(c for _, c in analysis[role]["classified"])
                 st.table(pd.DataFrame([
-                    {"Enota": CATEGORY_SHORT.get(k, k), "Frekvenca": v}
+                    {"Enota": CATEGORY_SHORT.get(k, k), "Frequency": v}
                     for k, v in freq.items()
                 ]))
-                st.markdown("**Primeri razvrščenih fraz:**")
+                st.markdown("****Examples of classified phrases:****")
                 sample = analysis[role]["classified"][:40]
                 if sample:
                     st.dataframe(
                         pd.DataFrame(
-                            [{"Fraza": w, "Enota": CATEGORY_SHORT[c]} for w, c in sample]
+                            [{"Phrase": w, "Enota": CATEGORY_SHORT[c]} for w, c in sample]
                         ),
                         use_container_width=True, hide_index=True
                     )
