@@ -15,7 +15,7 @@ from google.genai import types
 
 
 # ============================================================
-# 1. NASTAVITVE STRANI
+# 1. PAGE SETTINGS
 # ============================================================
 
 st.set_page_config(
@@ -56,7 +56,7 @@ h2, h3 { font-weight: 700; }
 
 
 # ============================================================
-# 3. STOPWORDS (za slovarski / offline način in čiščenje)
+# 3. STOPWORDS (for dictionary / offline mode and cleaning)
 # ============================================================
 
 SLO_STOPWORDS = {
@@ -79,11 +79,11 @@ SLO_STOPWORDS = {
 
 
 # ============================================================
-# 4. ZNANSTVENA KLASIFIKACIJA (Petrič, 2025)
+# 4. SCIENTIFIC CLASSIFICATION (Petrič, 2025)
 #
-# 5 združenih enot: partial-social + social = "Social unit"
-# (izbrana struktura, skupaj s strukturnim nagibom pri Social,
-# ker odraža sistemsko/socialno propagacijo stresorjev).
+# 5 combined units: partial-social + social = "Social unit"
+# (selected structure, together with the structural slope for Social,
+# because it reflects the systemic/social propagation of stressors).
 # ============================================================
 
 CATEGORY_SHORT = {
@@ -95,37 +95,37 @@ CATEGORY_SHORT = {
 }
 SHORT_TO_FULL = {v: k for k, v in CATEGORY_SHORT.items()}
 
-# Definicije enot za AI klasifikacijo - lastna parafraza vsebine članka,
-# ne dobesedni navedki.
+# Definitions of the units for AI classification - the author's own
+# paraphrase of the article's content, not direct quotations.
 CATEGORY_DEFINITIONS = {
     "Attentive (physical) unit": (
-        "Fizično/senzorno okolje: hrup, osvetlitev, temperatura, zrak, "
-        "ergonomija, urejenost in estetika prostora, vonjave, barve."
+        "Physical/sensory environment: noise, lighting, temperature, air, "
+        "ergonomics, orderliness and aesthetics of the space, smells, colors."
     ),
     "Performance unit": (
-        "Dejavniki, povezani z opravljanjem nalog: roki, obremenjenost, "
-        "administrativni postopki, dostopnost informacij, usposabljanje, "
-        "učinkovitost orodij/procesov, telesna aktivnost v vlogi razbremenitve."
+        "Factors related to performing tasks: deadlines, workload, "
+        "administrative procedures, information accessibility, training, "
+        "efficiency of tools/processes, physical activity as a form of relief."
     ),
     "Individual Psychological unit": (
-        "Notranja subjektivna čustvena/psihična stanja posameznika: strah, "
-        "tesnoba, samozavest, mir, občutki, osebni pomen, vrednote, "
-        "notranja sprostitev, samopodoba, duševno počutje."
+        "Inner subjective emotional/psychological states of the individual: fear, "
+        "anxiety, self-confidence, calmness, feelings, personal meaning, values, "
+        "inner relaxation, self-image, mental well-being."
     ),
     "Social unit": (
-        "Medosebni in organizacijski/statusni dejavniki: odnosi s sodelavci, "
-        "nadrejenimi, družino, prijatelji; komunikacija, konflikti, mobing, "
-        "timsko delo, organizacijska klima, hierarhija, PA TUDI status, "
-        "pravičnost, priznanje, plačilo, varnost zaposlitve in ekonomski "
-        "dejavniki (ta enota združuje 'social' in 'partial social' iz članka)."
+        "Interpersonal and organizational/status-related factors: relationships "
+        "with coworkers, superiors, family, and friends; communication, conflicts, "
+        "bullying, teamwork, organizational climate, hierarchy, AS WELL AS status, "
+        "fairness, recognition, pay, job security, and economic factors "
+        "(this unit combines 'social' and 'partial social' from the article)."
     ),
     "Health biological unit": (
-        "Fizično zdravje in biološki dejavniki: bolezen, utrujenost, spanje, "
-        "higiena, prehrana, fiziološko stanje, izčrpanost."
+        "Physical health and biological factors: illness, fatigue, sleep, "
+        "hygiene, nutrition, physiological condition, exhaustion."
     ),
 }
 
-# Star slovar za OFFLINE (fallback) način klasifikacije brez AI modela.
+# Old dictionary for OFFLINE (fallback) classification without an AI model.
 CATEGORIES_MAP = {
     "Attentive (physical) unit": [
         "hrup", "svetlob", "razsvetlj", "vroč", "mraz", "vrem",
@@ -207,12 +207,12 @@ SLOPE_WEIGHTS = {
 
 
 RATING_SCALE = [
-    (15.04, "Zelo nizka"),
-    (30.04, "Nizka"),
-    (45.04, "Srednja"),
-    (60.04, "Višja"),
-    (75.04, "Visoka"),
-    (90.01, "Zelo visoka")
+    (15.04, "Very low"),
+    (30.04, "Low"),
+    (45.04, "Medium"),
+    (60.04, "Higher"),
+    (75.04, "High"),
+    (90.01, "Very high")
 ]
 
 
@@ -220,17 +220,17 @@ def rate_sigma(sigma):
     for threshold, label in RATING_SCALE:
         if sigma <= threshold:
             return label
-    return "Zelo visoka"
+    return "Very high"
 
 
 # ============================================================
-# 5. GOOGLE MODELI (Gemini / Gemma) - na voljo za izbiro
+# 5. GOOGLE MODELS (Gemini / Gemma) - available for selection
 #
-# Uporabnik VSAKIČ izbere model sam - ni vsiljenega privzetega.
+# The user selects the model EACH TIME - no default is enforced.
 # ============================================================
 
 AVAILABLE_MODELS = [
-    "-- izberite model --",
+    "-- select a model --",
     "gemini-2.5-flash-lite",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
@@ -241,12 +241,12 @@ AVAILABLE_MODELS = [
 
 
 # ============================================================
-# 6. STRUKTURIRANI IZHOD (pydantic sheme za AI klasifikacijo)
+# 6. STRUCTURED OUTPUT (Pydantic schemas for AI classification)
 # ============================================================
 
 def build_classification_models(allowed_short_names):
-    """Dinamično zgradi pydantic sheme, ki dovolijo samo trenutno
-    vključene kratke oznake enot (+ 'None' za nerazvrščeno)."""
+    """Dynamically builds Pydantic schemas that allow only the currently
+    included short unit labels (+ 'None' for unclassified items)."""
     allowed = tuple(allowed_short_names) + ("None",)
 
     class ClassifiedItem(BaseModel):
@@ -269,19 +269,19 @@ def build_system_instruction(allowed_short_names):
         for full in CATEGORIES_MAP.keys()
         if CATEGORY_SHORT[full] in allowed_short_names
     )
-    return f"""Si strokovnjak za klasifikacijo odgovorov v raziskavi o stresu
-javnih uslužbencev (metodologija Petrič, 2025). Za vsako vrstico besedila
-prepoznaj posamezne smiselne izraze/fraze, ki predstavljajo mnenje, stresor,
-pozitiven dejavnik ali predlog (lahko jih je več v eni vrstici, ločenih z
-vejicami, podpičji ali "in"). Vsak prepoznan izraz razvrsti v NATANKO ENO od
-naslednjih znanstvenih enot:
+    return f"""You are an expert in classifying responses in a study on stress
+among public servants (Petrič methodology, 2025). For each row of text,
+identify individual meaningful expressions/phrases that represent an opinion,
+stressor, positive factor, or suggestion (there may be several in one row,
+separated by commas, semicolons, or "and"). Classify each recognized
+expression into EXACTLY ONE of the following scientific units:
 
 {defs_text}
 
-Če izraz ne sodi v nobeno od zgornjih enot ali je preveč splošen/nesmiseln,
-mu dodeli kategorijo "None". Vrni izraze v izvirnem jeziku besedila (ne
-prevajaj). Bodi izčrpen - zajemi vse smiselne izraze v vrstici, ne le
-enega."""
+If an expression does not belong to any of the units above or is too
+general/meaningless, assign it the category "None". Return the expressions in
+the original language of the text (do not translate them). Be exhaustive -
+include all meaningful expressions in the row, not just one."""
 
 
 @st.cache_resource(show_spinner=False)
@@ -291,7 +291,8 @@ def get_client(api_key):
 
 def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
                             row_class_model, batch_class_model, max_retries=3):
-    """rows: list of (row_id, text). Vrne dict row_id -> [(phrase, category_full), ...]"""
+    """rows: list of (row_id, text). Returns a dict row_id ->
+    [(phrase, category_full), ...]."""
     system_instruction = build_system_instruction(allowed_short_names)
     payload = "\n".join(f"[{rid}] {text}" for rid, text in rows)
 
@@ -327,7 +328,7 @@ def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
         except Exception as e:
             last_err = e
             time.sleep(1.5 * (attempt + 1))
-    st.warning(f"Napaka pri klicu AI modela po {max_retries} poskusih: {last_err}")
+    st.warning(f"Error when calling the AI model after {max_retries} attempts: {last_err}")
     return {}
 
 
@@ -363,7 +364,7 @@ def run_ai_classification(client, model_name, df, col, allowed_short_names,
 
 
 # ============================================================
-# 7. OFFLINE (slovarski) NAČIN - fallback brez AI
+# 7. OFFLINE (dictionary-based) MODE - fallback without AI
 # ============================================================
 
 def clean_and_tokenize(text):
@@ -404,7 +405,7 @@ def run_offline_classification(df, col, allowed_short_names):
 
 
 # ============================================================
-# 8. MATEMATIČNA LOGIKA (PETRIČEVA METODA) - nespremenjeno
+# 8. MATHEMATICAL LOGIC (PETRIČ METHOD) - unchanged
 # ============================================================
 
 def calculate_fo_real_aggregate(classified, n_override):
@@ -494,21 +495,21 @@ def calculate_energy(sigma):
 
 
 # ============================================================
-# 9. GLAVNA STREAMLIT APLIKACIJA (UI)
+# 9. MAIN STREAMLIT APPLICATION (UI)
 # ============================================================
 
 def main():
     with st.sidebar:
-        st.markdown("## ⚙️ Nastavitve")
+        st.markdown("## ⚙️ Settings")
 
-        if st.button("🔄 Ponastavi sejo", use_container_width=True):
+        if st.button("🔄 Reset session", use_container_width=True):
             reset_app()
 
         st.divider()
-        st.markdown("### 🤖 AI klasifikacija (Google)")
+        st.markdown("### 🤖 AI classification (Google)")
         classification_mode = st.radio(
-            "Način klasifikacije",
-            ["AI model (Gemini / Gemma)", "Slovar (offline, brez API klica)"]
+            "Classification mode",
+            ["AI model (Gemini / Gemma)", "Dictionary (offline, without API call)"]
         )
 
         api_key = None
@@ -517,51 +518,51 @@ def main():
 
         if classification_mode.startswith("AI"):
             api_key = st.text_input(
-                "Google AI API ključ", type="password",
-                help="Brezplačen ključ dobiš na https://aistudio.google.com/apikey"
+                "Google AI API key", type="password",
+                help="Get a free key at https://aistudio.google.com/apikey"
             )
             model_name = st.selectbox("Model", AVAILABLE_MODELS, index=0)
-            batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
+            batch_size = st.slider("Batch size (rows per call)", 5, 40, 15)
 
         st.divider()
-        st.markdown("### 🧭 Katere enote naj bodo zajete?")
+        st.markdown("### 🧭 Which units should be included?")
         included_shorts = st.multiselect(
-            "Vključene enote",
+            "Included units",
             list(CATEGORY_SHORT.values()),
             default=list(CATEGORY_SHORT.values())
         )
         active_categories = [SHORT_TO_FULL[s] for s in included_shorts] or list(CATEGORIES_MAP.keys())
 
         st.divider()
-        n_input = st.number_input("Število respondentov (N)", min_value=1, value=210)
-        is_summary = st.checkbox("Datoteka vsebuje POVZETEK", value=True)
+        n_input = st.number_input("Number of respondents (N)", min_value=1, value=210)
+        is_summary = st.checkbox("The file contains a SUMMARY", value=True)
 
         st.divider()
         weighting_label = st.radio(
-            "Uteževanje znotraj enote",
-            ["Volumen (frekvenca)", "Koncentracija (ponovljivost)"]
+            "Weighting within the unit",
+            ["Volume (frequency)", "Concentration (repeatability)"]
         )
-        weighting_mode = "volume" if "Volumen" in weighting_label else "concentration"
+        weighting_mode = "volume" if "Volume" in weighting_label else "concentration"
 
         st.divider()
-        chart_mode = st.radio("Prikaz porazdelitve", ["Stolpični graf", "Treemap (barvit)", "Oboje"])
+        chart_mode = st.radio("Distribution display", ["Bar chart", "Treemap (colorful)", "Both"])
 
         st.divider()
-        uploaded_file = st.file_uploader("📁 Naložite podatke", type=["txt", "csv", "xlsx"])
+        uploaded_file = st.file_uploader("📁 Upload data", type=["txt", "csv", "xlsx"])
 
     st.markdown("# 📊 Petrič Stress Analysis Pro")
-    st.caption("Klasifikacija z Google Gemini/Gemma modeli · 5 znanstvenih enot (Social = social + partial social)")
+    st.caption("Classification with Google Gemini/Gemma models · 5 scientific units (Social = social + partial social)")
 
     if not uploaded_file:
-        st.info("📁 Naložite datoteko za začetek analize.", icon="ℹ️")
+        st.info("📁 Upload a file to start the analysis.", icon="ℹ️")
         return
 
     if classification_mode.startswith("AI"):
         if not api_key:
-            st.warning("⚠️ Vnesite Google AI API ključ v stranski vrstici, da uporabite AI klasifikacijo.")
+            st.warning("⚠️ Enter a Google AI API key in the sidebar to use AI classification.")
             return
         if model_name == AVAILABLE_MODELS[0]:
-            st.warning("⚠️ Izberite model v stranski vrstici.")
+            st.warning("⚠️ Select a model in the sidebar.")
             return
 
     try:
@@ -572,26 +573,26 @@ def main():
         else:
             df = pd.read_csv(uploaded_file, engine="python", on_bad_lines="skip")
     except Exception as e:
-        st.error(f"Napaka pri branju: {e}")
+        st.error(f"Error reading the file: {e}")
         return
 
     target_cols = df.columns.tolist()
 
     with st.sidebar:
-        st.markdown("### 🧩 Stolpci")
-        col_pf = st.selectbox("Pozitivni (PF)", target_cols, index=0)
-        col_sf = st.selectbox("Stresni (SF)", target_cols, index=min(1, len(target_cols) - 1))
-        col_pr = st.selectbox("Predlogi (PR)", target_cols, index=min(2, len(target_cols) - 1))
+        st.markdown("### 🧩 Columns")
+        col_pf = st.selectbox("Positive (PF)", target_cols, index=0)
+        col_sf = st.selectbox("Stress-related (SF)", target_cols, index=min(1, len(target_cols) - 1))
+        col_pr = st.selectbox("Suggestions (PR)", target_cols, index=min(2, len(target_cols) - 1))
 
-    # ---------------- KLASIFIKACIJA ----------------
+    # ---------------- CLASSIFICATION ----------------
     analysis = {}
 
     if classification_mode.startswith("AI"):
         client = get_client(api_key)
         for role, col, label in [
-            ("PF", col_pf, "🔵 Klasificiram pozitivne dejavnike ..."),
-            ("SF", col_sf, "🔴 Klasificiram stresne dejavnike ..."),
-            ("PR", col_pr, "🟢 Klasificiram predloge ...")
+            ("PF", col_pf, "🔵 Classifying positive factors ..."),
+            ("SF", col_sf, "🔴 Classifying stress-related factors ..."),
+            ("PR", col_pr, "🟢 Classifying suggestions ...")
         ]:
             cls, per_row = run_ai_classification(
                 client, model_name, df, col, included_shorts, batch_size, label
@@ -602,7 +603,7 @@ def main():
             cls, per_row = run_offline_classification(df, col, included_shorts)
             analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
 
-    # ---------------- GLOBALNI IZRAČUN ----------------
+    # ---------------- GLOBAL CALCULATION ----------------
     f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
     f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"]["classified"], n_input)
     f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"]["classified"], n_input)
@@ -613,15 +614,15 @@ def main():
     sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
     W_EU, eta, loss = calculate_energy(sigma_total)
 
-    st.markdown("## 🎯 Skupni rezultati")
+    st.markdown("## 🎯 Overall results")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Stresna moč", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
-    m2.metric("Učinkovitost", f"{eta:.1f} %")
-    m3.metric("Izguba energije", f"{loss:.0f} Kcal")
-    m4.metric("Vzorec (N)", n_input)
+    m1.metric("Stress intensity", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
+    m2.metric("Efficiency", f"{eta:.1f} %")
+    m3.metric("Energy loss", f"{loss:.0f} Kcal")
+    m4.metric("Sample (N)", n_input)
     st.progress(min(sigma_total / 90.0, 1.0))
 
-    # ---------------- RAZČLENITEV PO ENOTAH ----------------
+    # ---------------- BREAKDOWN BY UNIT ----------------
     st.divider()
     f_pf_cat = compute_category_factors(analysis["PF"]["classified"], n_input, active_categories, weighting_mode)
     f_sf_cat = compute_category_factors(analysis["SF"]["classified"], n_input, active_categories, weighting_mode)
@@ -635,79 +636,72 @@ def main():
     rows = []
     for cat, data in cat_sigmas.items():
         rows.append({
-            "Enota": CATEGORY_SHORT[cat],
+            "Unit": CATEGORY_SHORT[cat],
             "σ (°S)": round(data["sigma"], 2),
-            "Delež (%)": round(data["weight_share"] * 100, 1),
-            "Ocena": rate_sigma(data["sigma"])
+            "Share (%)": round(data["weight_share"] * 100, 1),
+            "Rating": rate_sigma(data["sigma"])
         })
     res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
 
-    st.markdown("### Porazdelitev po znanstvenih enotah")
+    st.markdown("### Distribution by scientific unit")
     col_left, col_right = st.columns([1, 1])
     with col_left:
         st.dataframe(res_df, use_container_width=True, hide_index=True)
 
     with col_right:
-        if chart_mode in ("Stolpični graf", "Oboje"):
+        if chart_mode in ("Bar chart", "Both"):
             st.plotly_chart(
-                px.bar(res_df, x="Enota", y="σ (°S)", color="σ (°S)",
+                px.bar(res_df, x="Unit", y="σ (°S)", color="σ (°S)",
                        color_continuous_scale="Reds", height=300),
                 use_container_width=True
             )
-        if chart_mode in ("Treemap (barvit)", "Oboje"):
+        if chart_mode in ("Treemap (colorful)", "Both"):
             st.plotly_chart(
                 px.treemap(
-                    res_df, path=["Enota"], values="σ (°S)",
+                    res_df, path=["Unit"], values="σ (°S)",
                     color="σ (°S)", color_continuous_scale="RdYlGn_r",
                     height=350
                 ),
                 use_container_width=True
             )
 
-    # ---------------- TREEMAP: PF / SF / PR SKUPAJ ----------------
-    st.markdown("### 🗺️ Treemap: vse besedne zveze po vlogi in enoti")
+    # ---------------- TREEMAP: PF / SF / PR TOGETHER ----------------
+    st.markdown("### 🗺️ Treemap: all phrases by role and unit")
     tree_rows = []
-    role_labels = {"PF": "Pozitivni", "SF": "Stresni", "PR": "Predlogi"}
+    role_labels = {"PF": "Positive", "SF": "Stress-related", "PR": "Suggestions"}
     for role, label in role_labels.items():
         freq = Counter(c for _, c in analysis[role]["classified"])
         for cat, count in freq.items():
             tree_rows.append({
-                "Vloga": label,
-                "Enota": CATEGORY_SHORT[cat],
-                "Frekvenca": count
+                "Role": label,
+                "Unit": CATEGORY_SHORT[cat],
+                "Frequency": count
             })
     if tree_rows:
         tree_df = pd.DataFrame(tree_rows)
         st.plotly_chart(
             px.treemap(
-                tree_df, path=["Vloga", "Enota"], values="Frekvenca",
-                color="Frekvenca", color_continuous_scale="Turbo", height=450
+                tree_df, path=["Role", "Unit"], values="Frequency",
+                color="Frequency", color_continuous_scale="Turbo", height=450
             ),
             use_container_width=True
         )
     else:
-        st.caption("Ni razvrščenih izrazov za prikaz treemap-a.")
+        st.caption("There are no classified expressions to display in the treemap.")
 
-    # ---------------- KVALITATIVNI PREGLED ----------------
-    with st.expander("🔍 Podrobnosti klasifikacije besed/fraz"):
-        t1, t2, t3 = st.tabs(["🟢 Pozitivni", "🔴 Stresni", "🔵 Predlogi"])
+    # ---------------- QUALITATIVE REVIEW ----------------
+    with st.expander("🔍 Classification details for words/phrases"):
+        t1, t2, t3 = st.tabs(["🟢 Positive", "🔴 Stress-related", "🔵 Suggestions"])
         for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
             with tab:
                 freq = Counter(c for _, c in analysis[role]["classified"])
                 st.table(pd.DataFrame([
-                    {"Enota": CATEGORY_SHORT.get(k, k), "Frekvenca": v}
+                    {"Unit": CATEGORY_SHORT.get(k, k), "Frequency": v}
                     for k, v in freq.items()
                 ]))
-                st.markdown("**Primeri razvrščenih fraz:**")
+                st.markdown("**Examples of classified phrases:**")
                 sample = analysis[role]["classified"][:40]
                 if sample:
                     st.dataframe(
                         pd.DataFrame(
-                            [{"Fraza": w, "Enota": CATEGORY_SHORT[c]} for w, c in sample]
-                        ),
-                        use_container_width=True, hide_index=True
-                    )
-
-
-if __name__ == "__main__":
-    main()
+                            [{"Phrase": w, "Unit": CATEGORY_SHORT[c]}
