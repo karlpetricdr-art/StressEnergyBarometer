@@ -1,6 +1,7 @@
 streamlit
 pandas
-plotly
 openpyxl
-google-genai
+plotly
+networkx
 pydantic
+google-genai
