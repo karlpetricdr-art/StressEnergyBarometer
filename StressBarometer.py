@@ -263,12 +263,20 @@ def build_classification_models(allowed_short_names):
     return ClassifiedItem, RowClassification, BatchClassification
 
 
-def build_system_instruction(allowed_short_names):
+def build_system_instruction(allowed_short_names, whole_set_mode=False):
     defs_text = "\n".join(
         f"- {CATEGORY_SHORT[full]}: {CATEGORY_DEFINITIONS[full]}"
         for full in CATEGORIES_MAP.keys()
         if CATEGORY_SHORT[full] in allowed_short_names
     )
+    cohort_note = ""
+    if whole_set_mode:
+        cohort_note = """
+Vsi vhodni podatki skupaj predstavljajo EN sam vzorec/kohorto (npr. javni
+uslužbenci ali drug del družbe) - obravnavaj jih kot eno homogeno množico
+mnenj, ne kot ločene posamezne primere. Kljub temu moraš vsako vrstico
+obdelati posamično in ohraniti njeno oznako vloge (PF/SF/PR) in row_id, da
+je mogoče rezultate nazaj združiti."""
     return f"""Si strokovnjak za klasifikacijo odgovorov v raziskavi o stresu
 javnih uslužbencev (metodologija Petrič, 2025). Za vsako vrstico besedila
 prepoznaj posamezne smiselne izraze/fraze, ki predstavljajo mnenje, stresor,
@@ -281,7 +289,8 @@ naslednjih znanstvenih enot:
 Če izraz ne sodi v nobeno od zgornjih enot ali je preveč splošen/nesmiseln,
 mu dodeli kategorijo "None". Vrni izraze v izvirnem jeziku besedila (ne
 prevajaj). Bodi izčrpen - zajemi vse smiselne izraze v vrstici, ne le
-enega."""
+enega. Obdelaj VSE vrstice, ki so ti podane - nobene ne izpusti.
+{cohort_note}"""
 
 
 @st.cache_resource(show_spinner=False)
@@ -334,6 +343,101 @@ def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
 def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
+
+
+def build_full_classification_model(allowed_short_names):
+    """Shema za en sam klic, ki obdela PF+SF+PR skupaj (cel nabor kot ena množica)."""
+    allowed = tuple(allowed_short_names) + ("None",)
+
+    class ClassifiedItem(BaseModel):
+        phrase: str
+        category: Literal[allowed]
+
+    class RowClassification(BaseModel):
+        role: Literal["PF", "SF", "PR"]
+        row_id: int
+        items: List[ClassifiedItem]
+
+    class FullClassification(BaseModel):
+        rows: List[RowClassification]
+
+    return FullClassification
+
+
+def classify_everything_single_call(client, model_name, df, col_pf, col_sf, col_pr,
+                                      allowed_short_names, max_output_tokens=65536,
+                                      max_retries=2):
+    """Obdela CELOTEN nabor podatkov (vse vrstice PF+SF+PR, npr. 200 respondentov)
+    v ENEM API klicu, kot eno homogeno množico. Hitreje kot paketno procesiranje,
+    a lahko odpove pri zelo velikih naborih (limit izhodnih tokenov)."""
+    full_model = build_full_classification_model(allowed_short_names)
+    system_instruction = build_system_instruction(allowed_short_names, whole_set_mode=True)
+
+    lines = []
+    for idx, v in df[col_pf].dropna().items():
+        lines.append(f"[PF-{idx}] {v}")
+    for idx, v in df[col_sf].dropna().items():
+        lines.append(f"[SF-{idx}] {v}")
+    for idx, v in df[col_pr].dropna().items():
+        lines.append(f"[PR-{idx}] {v}")
+    payload = "\n".join(lines)
+
+    config = types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        response_mime_type="application/json",
+        response_schema=full_model,
+        temperature=0.1,
+        max_output_tokens=max_output_tokens,
+    )
+    if model_name.startswith("gemini"):
+        try:
+            config.thinking_config = types.ThinkingConfig(thinking_budget=0)
+        except Exception:
+            pass
+
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model=model_name, contents=payload, config=config
+            )
+            raw = response.text
+            raw = re.sub(r"^```json|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+            data = json.loads(raw)
+
+            buckets = {
+                "PF": {"classified": [], "per_row": defaultdict(list), "col_name": col_pf},
+                "SF": {"classified": [], "per_row": defaultdict(list), "col_name": col_sf},
+                "PR": {"classified": [], "per_row": defaultdict(list), "col_name": col_pr},
+            }
+            for row in data.get("rows", []):
+                role = row.get("role")
+                rid = row.get("row_id")
+                if role not in buckets:
+                    continue
+                items = []
+                for item in row.get("items", []):
+                    cat_short = item.get("category")
+                    phrase = item.get("phrase", "").strip()
+                    if not phrase or cat_short == "None" or cat_short not in SHORT_TO_FULL:
+                        continue
+                    items.append((phrase.lower(), SHORT_TO_FULL[cat_short]))
+                buckets[role]["classified"].extend(items)
+                buckets[role]["per_row"][rid] = [c for _, c in items]
+
+            for role in buckets:
+                buckets[role]["per_row"] = list(buckets[role]["per_row"].values())
+            return buckets
+        except Exception as e:
+            last_err = e
+            time.sleep(2.0 * (attempt + 1))
+
+    st.error(
+        f"En-klicna obdelava celotnega nabora ni uspela ({last_err}). "
+        "Preklopi na 'Paketno procesiranje' v stranski vrstici za bolj zanesljivo "
+        "(a počasnejšo) obdelavo, ali zmanjšaj število vrstic."
+    )
+    return None
 
 
 def run_ai_classification(client, model_name, df, col, allowed_short_names,
@@ -514,6 +618,7 @@ def main():
         api_key = None
         model_name = None
         batch_size = 15
+        processing_mode = "single_call"
 
         if classification_mode.startswith("AI"):
             api_key = st.text_input(
@@ -521,7 +626,25 @@ def main():
                 help="Brezplačen ključ dobiš na https://aistudio.google.com/apikey"
             )
             model_name = st.selectbox("Model", AVAILABLE_MODELS, index=0)
-            batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
+
+            processing_label = st.radio(
+                "Način obdelave",
+                [
+                    "En sam klic (najhitreje - cel nabor kot ena množica)",
+                    "Paketno procesiranje (bolj zanesljivo pri zelo velikih naborih)"
+                ],
+                help=(
+                    "'En sam klic' pošlje vse vrstice PF+SF+PR (npr. vseh 200 "
+                    "respondentov) v enem API klicu - model jih obravnava kot eno "
+                    "homogeno množico (npr. javna uprava). Bistveno hitreje, a pri "
+                    "zelo velikih datotekah lahko naleti na omejitev izhodnih "
+                    "tokenov - v tem primeru preklopi na paketno obdelavo."
+                )
+            )
+            processing_mode = "single_call" if processing_label.startswith("En sam") else "batched"
+
+            if processing_mode == "batched":
+                batch_size = st.slider("Velikost paketa (vrstic na klic)", 5, 40, 15)
 
         st.divider()
         st.markdown("### 🧭 Katere enote naj bodo zajete?")
@@ -588,15 +711,33 @@ def main():
 
     if classification_mode.startswith("AI"):
         client = get_client(api_key)
-        for role, col, label in [
-            ("PF", col_pf, "🔵 Klasificiram pozitivne dejavnike ..."),
-            ("SF", col_sf, "🔴 Klasificiram stresne dejavnike ..."),
-            ("PR", col_pr, "🟢 Klasificiram predloge ...")
-        ]:
-            cls, per_row = run_ai_classification(
-                client, model_name, df, col, included_shorts, batch_size, label
+
+        if processing_mode == "single_call":
+            n_rows_total = (
+                df[col_pf].dropna().shape[0]
+                + df[col_sf].dropna().shape[0]
+                + df[col_pr].dropna().shape[0]
             )
-            analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
+            with st.spinner(
+                f"🤖 Model obdeluje vseh {n_rows_total} vrstic (PF+SF+PR) "
+                "v enem klicu, kot eno množico ..."
+            ):
+                buckets = classify_everything_single_call(
+                    client, model_name, df, col_pf, col_sf, col_pr, included_shorts
+                )
+            if buckets is None:
+                return
+            analysis = buckets
+        else:
+            for role, col, label in [
+                ("PF", col_pf, "🔵 Klasificiram pozitivne dejavnike ..."),
+                ("SF", col_sf, "🔴 Klasificiram stresne dejavnike ..."),
+                ("PR", col_pr, "🟢 Klasificiram predloge ...")
+            ]:
+                cls, per_row = run_ai_classification(
+                    client, model_name, df, col, included_shorts, batch_size, label
+                )
+                analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
     else:
         for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
             cls, per_row = run_offline_classification(df, col, included_shorts)
