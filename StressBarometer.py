@@ -11,6 +11,9 @@ from typing import List, Literal
 import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
+import streamlit.components.v1 as components
+
+from pyvis.network import Network
 
 from pydantic import BaseModel
 from google import genai
@@ -42,6 +45,7 @@ def reset_app():
 st.markdown(
     """
     <style>
+
     .main {
         background-color: #f7f9fc;
     }
@@ -88,6 +92,17 @@ st.markdown(
         color: #16a34a;
         font-weight: 700;
     }
+
+    .network-help {
+        background: #f8fafc;
+        border: 1px solid #dbe3ec;
+        border-radius: 10px;
+        padding: 12px 15px;
+        margin: 10px 0 15px 0;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -112,6 +127,7 @@ SLO_STOPWORDS = {
     "med", "nad", "pred", "brez", "ob", "po", "skozi", "čez",
     "proti", "kljub", "zaradi", "namesto", "razen", "okoli", "okrog",
     "tem",
+
     "the", "and", "to", "of", "a", "is", "it", "with", "some",
     "more", "being", "able", "use", "make", "nice", "your", "this",
     "that", "from", "for", "are", "was", "were"
@@ -130,12 +146,14 @@ CATEGORY_SHORT = {
     "Health biological unit": "Health"
 }
 
+
 SHORT_TO_FULL = {
     v: k for k, v in CATEGORY_SHORT.items()
 }
 
 
 CATEGORY_DEFINITIONS = {
+
     "Attentive (physical) unit": (
         "Physical/sensory environment: noise, lighting, temperature, air, "
         "ergonomics, orderliness and aesthetics of the space, smells, colors."
@@ -169,7 +187,7 @@ CATEGORY_DEFINITIONS = {
 
 
 # ============================================================
-# OFFLINE CLASSIFICATION DICTIONARY
+# 5. OFFLINE CLASSIFICATION DICTIONARY
 # ============================================================
 
 CATEGORIES_MAP = {
@@ -252,6 +270,10 @@ CATEGORIES_MAP = {
 }
 
 
+# ============================================================
+# 6. SCIENTIFIC SLOPE WEIGHTS
+# ============================================================
+
 SLOPE_WEIGHTS = {
     "Attentive (physical) unit": 0.85,
     "Performance unit": 1.05,
@@ -272,14 +294,17 @@ RATING_SCALE = [
 
 
 def rate_sigma(sigma):
+
     for threshold, label in RATING_SCALE:
+
         if sigma <= threshold:
             return label
+
     return "Very high"
 
 
 # ============================================================
-# 5. GOOGLE MODELS
+# 7. GOOGLE MODELS
 # ============================================================
 
 AVAILABLE_MODELS = [
@@ -295,6 +320,7 @@ AVAILABLE_MODELS = [
 
 
 MODEL_NOTES = {
+
     "gemini-3.5-flash-lite":
         "Fast Flash-Lite model for high-throughput classification.",
 
@@ -319,14 +345,10 @@ MODEL_NOTES = {
 
 
 # ============================================================
-# 6. STRUCTURED OUTPUT
+# 8. STRUCTURED OUTPUT
 # ============================================================
 
 def build_classification_models(allowed_short_names):
-    """
-    Dynamically builds Pydantic schemas that allow only the currently
-    included short unit labels plus 'None'.
-    """
 
     allowed = tuple(allowed_short_names) + ("None",)
 
@@ -387,6 +409,7 @@ Preserve Slovenian characters such as č, š and ž exactly as they occur.
 
 @st.cache_resource(show_spinner=False)
 def get_client(api_key):
+
     return genai.Client(api_key=api_key)
 
 
@@ -399,13 +422,6 @@ def classify_batch_with_ai(
     batch_class_model,
     max_retries=3
 ):
-    """
-    rows:
-        list of (row_id, text)
-
-    Returns:
-        dict row_id -> [(phrase, category_full), ...]
-    """
 
     system_instruction = build_system_instruction(
         allowed_short_names
@@ -455,6 +471,7 @@ def classify_batch_with_ai(
                 for item in row.get("items", []):
 
                     cat_short = item.get("category")
+
                     phrase = item.get(
                         "phrase",
                         ""
@@ -512,6 +529,7 @@ def run_ai_classification(
 ):
 
     if col not in df.columns:
+
         raise ValueError(
             f"Selected column '{col}' does not exist in the dataset."
         )
@@ -572,7 +590,9 @@ def run_ai_classification(
                 [c for _, c in items]
             )
 
-            per_row_items.append(items)
+            per_row_items.append(
+                items
+            )
 
         progress.progress(
             (b_i + 1) / max(len(batches), 1),
@@ -589,7 +609,7 @@ def run_ai_classification(
 
 
 # ============================================================
-# 7. OFFLINE CLASSIFICATION
+# 9. OFFLINE CLASSIFICATION
 # ============================================================
 
 def clean_and_tokenize(text):
@@ -657,6 +677,7 @@ def run_offline_classification(
 ):
 
     if col not in df.columns:
+
         raise ValueError(
             f"Selected column '{col}' does not exist in the dataset."
         )
@@ -705,7 +726,7 @@ def run_offline_classification(
 
 
 # ============================================================
-# 8. MATHEMATICAL LOGIC
+# 10. MATHEMATICAL LOGIC
 # ============================================================
 
 def calculate_fo_real_aggregate(
@@ -724,6 +745,7 @@ def calculate_fo_real_aggregate(
     )
 
     if fr == 0 or n_override == 0:
+
         return (
             0.0001,
             fo,
@@ -755,7 +777,10 @@ def compute_category_factors(
     words_by_cat = defaultdict(list)
 
     for word, category in classified:
-        words_by_cat[category].append(word)
+
+        words_by_cat[category].append(
+            word
+        )
 
     result = {}
 
@@ -977,7 +1002,7 @@ def calculate_energy(sigma):
 
 
 # ============================================================
-# 9. FACTOR / OPINION NETWORK
+# 11. FACTOR / OPINION NETWORK
 # ============================================================
 
 ROLE_LABELS = {
@@ -994,6 +1019,22 @@ ROLE_CRITICALITY = {
 }
 
 
+NETWORK_CATEGORY_COLORS = {
+    "Attentive (physical) unit": "#3b82f6",
+    "Performance unit": "#8b5cf6",
+    "Individual Psychological unit": "#f59e0b",
+    "Social unit": "#ef4444",
+    "Health biological unit": "#10b981"
+}
+
+
+NETWORK_ROLE_COLORS = {
+    "PF": "#2563eb",
+    "SF": "#dc2626",
+    "PR": "#16a34a"
+}
+
+
 def normalize_network_phrase(phrase):
 
     return re.sub(
@@ -1003,26 +1044,20 @@ def normalize_network_phrase(phrase):
     )
 
 
-def build_factor_network(
+def build_network_data(
     analysis,
     max_nodes=25
 ):
 
     """
-    Co-occurrence network of classified factors/opinions.
+    Builds the common graph data used by both:
 
-    Node size is based on criticality:
-      SF = 3.0
-      PR = 1.5
-      PF = 0.5
+    1. Plotly report network.
+    2. PyVis interactive network.
 
-    Criticality is additionally multiplied by the scientific
-    slope weight of the corresponding unit.
-
-    Edge strength:
-      3+ co-occurrences = strong solid
-      2 co-occurrences = moderate solid
-      1 co-occurrence = weak dashed
+    The important difference is that the application network is
+    rendered with PyVis, which allows the user to drag nodes
+    directly with the mouse.
     """
 
     node_data = defaultdict(
@@ -1034,36 +1069,26 @@ def build_factor_network(
         }
     )
 
-    max_rows = max(
-        (
-            len(
-                analysis[r].get(
-                    "per_row_items",
-                    []
-                )
-            )
-            for r in ROLE_LABELS
-        ),
-        default=0
-    )
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # Use the original row positions where possible.
+    # This prevents PF/SF/PR answers from being incorrectly
+    # merged when columns contain different numbers of
+    # non-empty cells.
+    # --------------------------------------------------------
 
-    row_documents = []
+    row_documents = defaultdict(set)
 
-    for i in range(max_rows):
+    for role in ROLE_LABELS:
 
-        row_nodes = set()
+        items_by_row = analysis[role].get(
+            "items_by_original_row",
+            {}
+        )
 
-        for role in ROLE_LABELS:
+        for original_row, items in items_by_row.items():
 
-            items = analysis[role].get(
-                "per_row_items",
-                []
-            )
-
-            if i >= len(items):
-                continue
-
-            for phrase, category in items[i]:
+            for phrase, category in items:
 
                 key = normalize_network_phrase(
                     phrase
@@ -1086,15 +1111,12 @@ def build_factor_network(
                     )
                 )
 
-                row_nodes.add(key)
-
-        if row_nodes:
-            row_documents.append(
-                row_nodes
-            )
+                row_documents[original_row].add(
+                    key
+                )
 
     if not node_data:
-        return None, None
+        return None
 
     max_nodes = max(
         5,
@@ -1141,7 +1163,7 @@ def build_factor_network(
 
     edge_counts = Counter()
 
-    for row_nodes in row_documents:
+    for row_nodes in row_documents.values():
 
         nodes = sorted(
             row_nodes.intersection(
@@ -1157,10 +1179,7 @@ def build_factor_network(
                     (nodes[i], nodes[j])
                 ] += 1
 
-    for (
-        a,
-        b
-    ), strength in edge_counts.items():
+    for (a, b), strength in edge_counts.items():
 
         graph.add_edge(
             a,
@@ -1168,13 +1187,26 @@ def build_factor_network(
             strength=strength
         )
 
+    return graph
+
+
+# ============================================================
+# 12. PLOTLY NETWORK FOR REPORT
+# ============================================================
+
+def build_plotly_network(graph):
+
+    if graph is None or len(graph.nodes) == 0:
+        return None
+
     if len(graph) == 1:
 
+        only_node = next(
+            iter(graph.nodes)
+        )
+
         pos = {
-            next(iter(graph.nodes)): (
-                0,
-                0
-            )
+            only_node: (0, 0)
         }
 
     else:
@@ -1188,7 +1220,7 @@ def build_factor_network(
                     1
                 )
             ),
-            iterations=120,
+            iterations=150,
             weight="strength"
         )
 
@@ -1373,37 +1405,277 @@ def build_factor_network(
         scaleratio=1
     )
 
-    net_df = pd.DataFrame([
-        {
-            "Node": n,
-            "Unit": CATEGORY_SHORT[
-                graph.nodes[n]["category"]
-            ],
-            "Role": ROLE_LABELS[
-                graph.nodes[n]["role"]
-            ],
-            "Occurrences": graph.nodes[n]["count"],
-            "Criticality": round(
-                graph.nodes[n]["criticality"],
-                2
-            )
-        }
-        for n in sorted(
-            graph.nodes,
-            key=lambda x:
-                graph.nodes[x]["criticality"],
-            reverse=True
-        )
-    ])
-
-    return (
-        fig,
-        net_df
-    )
+    return fig
 
 
 # ============================================================
-# 10. HTML REPORT EXPORT
+# 13. PYVIS INTERACTIVE NETWORK
+# ============================================================
+
+def build_pyvis_network(graph):
+
+    if graph is None or len(graph.nodes) == 0:
+
+        return None
+
+    net = Network(
+        height="720px",
+        width="100%",
+        bgcolor="#ffffff",
+        font_color="#1f2937",
+        directed=False,
+        notebook=False,
+        cdn_resources="in_line"
+    )
+
+    # --------------------------------------------------------
+    # PHYSICS
+    # --------------------------------------------------------
+
+    net.set_options(
+        """
+        {
+          "interaction": {
+            "dragNodes": true,
+            "dragView": true,
+            "zoomView": true,
+            "hover": true,
+            "navigationButtons": true,
+            "keyboard": true
+          },
+
+          "physics": {
+            "enabled": true,
+            "solver": "forceAtlas2Based",
+
+            "forceAtlas2Based": {
+              "gravitationalConstant": -70,
+              "centralGravity": 0.008,
+              "springLength": 160,
+              "springConstant": 0.045,
+              "damping": 0.82,
+              "avoidOverlap": 1.0
+            },
+
+            "minVelocity": 0.75,
+            "stabilization": {
+              "enabled": true,
+              "iterations": 250,
+              "updateInterval": 25,
+              "fit": true
+            }
+          },
+
+          "nodes": {
+            "shape": "dot",
+            "font": {
+              "size": 15,
+              "face": "Arial",
+              "strokeWidth": 3,
+              "strokeColor": "#ffffff"
+            },
+            "borderWidth": 1.5
+          },
+
+          "edges": {
+            "smooth": {
+              "enabled": true,
+              "type": "dynamic"
+            },
+            "color": {
+              "inherit": false,
+              "color": "#94a3b8",
+              "highlight": "#334155"
+            },
+            "selectionWidth": 2,
+            "hoverWidth": 2
+          }
+        }
+        """
+    )
+
+    # --------------------------------------------------------
+    # NODES
+    # --------------------------------------------------------
+
+    for node in graph.nodes:
+
+        data = graph.nodes[node]
+
+        category = data["category"]
+
+        role = data["role"]
+
+        criticality = float(
+            data["criticality"]
+        )
+
+        size = (
+            18
+            + 10
+            * math.sqrt(
+                max(
+                    criticality,
+                    0.1
+                )
+            )
+        )
+
+        color = NETWORK_CATEGORY_COLORS.get(
+            category,
+            "#64748b"
+        )
+
+        role_label = ROLE_LABELS.get(
+            role,
+            role
+        )
+
+        tooltip = (
+            f"<b>{html.escape(node)}</b><br>"
+            f"Unit: "
+            f"{html.escape(CATEGORY_SHORT.get(category, category))}<br>"
+            f"Role: "
+            f"{html.escape(role_label)}<br>"
+            f"Occurrences: "
+            f"{data['count']}<br>"
+            f"Criticality: "
+            f"{criticality:.2f}<br>"
+            f"Slope weight: "
+            f"{SLOPE_WEIGHTS.get(category, 1.0):.2f}"
+        )
+
+        net.add_node(
+            node,
+            label=node,
+            title=tooltip,
+            size=size,
+            color={
+                "background": color,
+                "border": "#334155",
+                "highlight": {
+                    "background": color,
+                    "border": "#111827"
+                },
+                "hover": {
+                    "background": color,
+                    "border": "#111827"
+                }
+            },
+            borderWidth=2,
+            font={
+                "size": 15,
+                "face": "Arial",
+                "strokeWidth": 3,
+                "strokeColor": "#ffffff"
+            }
+        )
+
+    # --------------------------------------------------------
+    # EDGES
+    # --------------------------------------------------------
+
+    for a, b, data in graph.edges(
+        data=True
+    ):
+
+        strength = int(
+            data.get(
+                "strength",
+                1
+            )
+        )
+
+        if strength >= 3:
+
+            width = 5
+
+            color = {
+                "color": "#64748b",
+                "highlight": "#1e293b",
+                "hover": "#1e293b"
+            }
+
+        elif strength == 2:
+
+            width = 3
+
+            color = {
+                "color": "#94a3b8",
+                "highlight": "#475569",
+                "hover": "#475569"
+            }
+
+        else:
+
+            width = 1.5
+
+            color = {
+                "color": "#cbd5e1",
+                "highlight": "#64748b",
+                "hover": "#64748b"
+            }
+
+        net.add_edge(
+            a,
+            b,
+            value=strength,
+            width=width,
+            dashes=(strength == 1),
+            title=(
+                f"Co-occurrence: {strength}"
+            ),
+            color=color
+        )
+
+    # --------------------------------------------------------
+    # GENERATE HTML
+    # --------------------------------------------------------
+
+    return net.generate_html()
+
+
+# ============================================================
+# 14. NETWORK TABLE
+# ============================================================
+
+def build_network_table(graph):
+
+    if graph is None:
+
+        return None
+
+    rows = []
+
+    for node in sorted(
+        graph.nodes,
+        key=lambda x:
+            graph.nodes[x]["criticality"],
+        reverse=True
+    ):
+
+        rows.append(
+            {
+                "Node": node,
+                "Unit": CATEGORY_SHORT[
+                    graph.nodes[node]["category"]
+                ],
+                "Role": ROLE_LABELS[
+                    graph.nodes[node]["role"]
+                ],
+                "Occurrences": graph.nodes[node]["count"],
+                "Criticality": round(
+                    graph.nodes[node]["criticality"],
+                    2
+                )
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# 15. HTML REPORT EXPORT
 # ============================================================
 
 def build_report_html(
@@ -1509,7 +1781,7 @@ def build_report_html(
             )
 
     # --------------------------------------------------------
-    # INTERACTIVE PLOTLY VISUALIZATIONS
+    # PLOTLY VISUALIZATIONS
     # --------------------------------------------------------
 
     plotly_added = False
@@ -1601,14 +1873,16 @@ def build_report_html(
         )
 
     # --------------------------------------------------------
-    # COMPLETE HTML DOCUMENT
+    # COMPLETE HTML
     # --------------------------------------------------------
 
     return f"""<!doctype html>
 <html lang="en">
+
 <head>
 
 <meta charset="UTF-8">
+
 <meta http-equiv="Content-Type"
       content="text/html; charset=UTF-8">
 
@@ -1743,6 +2017,7 @@ p {{
 }}
 
 </style>
+
 </head>
 
 <body>
@@ -1755,11 +2030,12 @@ p {{
 </div>
 
 </body>
+
 </html>"""
 
 
 # ============================================================
-# 11. MAIN STREAMLIT APPLICATION
+# 16. MAIN STREAMLIT APPLICATION
 # ============================================================
 
 def main():
@@ -1778,9 +2054,14 @@ def main():
             "🔄 Reset session",
             use_container_width=True
         ):
+
             reset_app()
 
         st.divider()
+
+        # ----------------------------------------------------
+        # AI
+        # ----------------------------------------------------
 
         st.markdown(
             "### 🤖 AI Classification (Google)"
@@ -1845,6 +2126,10 @@ def main():
 
         st.divider()
 
+        # ----------------------------------------------------
+        # SCIENTIFIC UNITS
+        # ----------------------------------------------------
+
         st.markdown(
             "### 🧭 Scientific units"
         )
@@ -1863,11 +2148,16 @@ def main():
         ]
 
         if not active_categories:
+
             active_categories = list(
                 CATEGORIES_MAP.keys()
             )
 
         st.divider()
+
+        # ----------------------------------------------------
+        # SAMPLE
+        # ----------------------------------------------------
 
         n_input = st.number_input(
             "Number of respondents (N)",
@@ -1881,6 +2171,10 @@ def main():
         )
 
         st.divider()
+
+        # ----------------------------------------------------
+        # WEIGHTING
+        # ----------------------------------------------------
 
         weighting_label = st.radio(
             "Weighting within the unit",
@@ -1898,6 +2192,10 @@ def main():
 
         st.divider()
 
+        # ----------------------------------------------------
+        # CHART MODE
+        # ----------------------------------------------------
+
         chart_mode = st.radio(
             "Distribution display",
             [
@@ -1908,6 +2206,10 @@ def main():
         )
 
         st.divider()
+
+        # ----------------------------------------------------
+        # NETWORK
+        # ----------------------------------------------------
 
         st.markdown(
             "### 🕸️ Factor / Opinion Network"
@@ -1926,6 +2228,10 @@ def main():
         )
 
         st.divider()
+
+        # ----------------------------------------------------
+        # UPLOAD
+        # ----------------------------------------------------
 
         uploaded_file = st.file_uploader(
             "📁 Upload data",
@@ -1992,7 +2298,7 @@ def main():
 
     try:
 
-        if uploaded_file.name.endswith(
+        if uploaded_file.name.lower().endswith(
             ".xlsx"
         ):
 
@@ -2000,7 +2306,7 @@ def main():
                 uploaded_file
             )
 
-        elif uploaded_file.name.endswith(
+        elif uploaded_file.name.lower().endswith(
             ".txt"
         ):
 
@@ -2028,7 +2334,7 @@ def main():
         return
 
     # --------------------------------------------------------
-    # EMPTY / INVALID DATASET CHECK
+    # DATASET VALIDATION
     # --------------------------------------------------------
 
     if df.empty:
@@ -2058,6 +2364,9 @@ def main():
         st.markdown(
             "### 🧩 Columns"
         )
+
+        # IMPORTANT:
+        # All three labels are now fully English.
 
         col_pf = st.selectbox(
             "Positive factors (PF)",
@@ -2153,10 +2462,32 @@ def main():
                 per_row = []
                 per_row_items = []
 
+            # ------------------------------------------------
+            # Preserve original dataframe row IDs for network
+            # ------------------------------------------------
+
+            items_by_original_row = {}
+
+            non_empty_rows = [
+                (i, str(v))
+                for i, v in df[col].dropna().items()
+            ]
+
+            for index, items in zip(
+                [i for i, _ in non_empty_rows],
+                per_row_items
+            ):
+
+                items_by_original_row[
+                    index
+                ] = items
+
             analysis[role] = {
                 "classified": cls,
                 "per_row": per_row,
                 "per_row_items": per_row_items,
+                "items_by_original_row":
+                    items_by_original_row,
                 "col_name": col
             }
 
@@ -2191,10 +2522,32 @@ def main():
                 per_row = []
                 per_row_items = []
 
+            # ------------------------------------------------
+            # Preserve original dataframe row IDs for network
+            # ------------------------------------------------
+
+            items_by_original_row = {}
+
+            non_empty_rows = [
+                (i, v)
+                for i, v in df[col].dropna().items()
+            ]
+
+            for index, items in zip(
+                [i for i, _ in non_empty_rows],
+                per_row_items
+            ):
+
+                items_by_original_row[
+                    index
+                ] = items
+
             analysis[role] = {
                 "classified": cls,
                 "per_row": per_row,
                 "per_row_items": per_row_items,
+                "items_by_original_row":
+                    items_by_original_row,
                 "col_name": col
             }
 
@@ -2413,7 +2766,7 @@ def main():
             )
 
     # ========================================================
-    # TREEMAP: PF / SF / PR
+    # TREEMAP PF / SF / PR
     # ========================================================
 
     st.markdown(
@@ -2491,34 +2844,70 @@ def main():
         "## 🕸️ Factor and Opinion Network"
     )
 
-    network_fig, net_df = build_factor_network(
+    st.markdown(
+        """
+        <div class="network-help">
+        <b>Interactive network:</b>
+        drag individual nodes with the mouse to reposition them.
+        Use the mouse wheel to zoom, drag the background to move the
+        entire network, and use the navigation controls for additional
+        positioning. Larger nodes represent higher criticality.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    graph = build_network_data(
         analysis,
         network_nodes
     )
 
-    if network_fig is not None:
+    network_fig = build_plotly_network(
+        graph
+    )
 
-        st.plotly_chart(
-            network_fig,
-            use_container_width=True
+    interactive_network_html = build_pyvis_network(
+        graph
+    )
+
+    net_df = build_network_table(
+        graph
+    )
+
+    if interactive_network_html is not None:
+
+        # ----------------------------------------------------
+        # IMPORTANT:
+        # PyVis provides real mouse-dragging of nodes.
+        # ----------------------------------------------------
+
+        components.html(
+            interactive_network_html,
+            height=750,
+            scrolling=False
         )
 
         st.caption(
-            "Node size = criticality. Strong links are thick "
-            "solid lines, moderate links are thinner solid "
-            "lines, and weak links are dashed. Links represent "
-            "co-occurrence in the same respondent answer."
+            "Node size = criticality. "
+            "Strong links are thick solid lines, "
+            "moderate links are thinner solid lines, "
+            "and weak links are dashed. "
+            "Links represent co-occurrence in the same "
+            "respondent answer. "
+            "Nodes can be freely moved with the mouse."
         )
 
         with st.expander(
             "Critical Nodes / Opinions"
         ):
 
-            st.dataframe(
-                net_df,
-                use_container_width=True,
-                hide_index=True
-            )
+            if net_df is not None:
+
+                st.dataframe(
+                    net_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
     else:
 
@@ -2672,14 +3061,16 @@ def main():
                     "Stress-related expressions receive "
                     "the highest role weight, followed by "
                     "suggestions/opinions and positive factors. "
-                    "Scientific unit slope weights are also applied."
+                    "Scientific unit slope weights are also applied. "
+                    "The interactive application network allows "
+                    "nodes to be freely repositioned with the mouse."
                 )
             )
         ]
     )
 
     # --------------------------------------------------------
-    # HTML DOWNLOAD ONLY
+    # HTML DOWNLOAD
     # --------------------------------------------------------
 
     st.download_button(
@@ -2696,7 +3087,7 @@ def main():
 
 
 # ============================================================
-# 12. APPLICATION ENTRY POINT
+# 17. APPLICATION ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
