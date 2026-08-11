@@ -37,7 +37,7 @@ except Exception:
 # ============================================================
 
 st.set_page_config(
-    page_title="Petrič Stress Analysis Pro",
+    page_title="Stress degree and kcal analysis PRO",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -1021,10 +1021,10 @@ def main():
             reset_app()
 
         st.divider()
-        st.markdown("### 🤖 AI classification (Google)")
+        st.markdown("### 🤖 AI Classification (Google)")
         classification_mode = st.radio(
             "Classification mode",
-            ["AI model (Gemini / Gemma)", "Dictionary (offline, without API call)"]
+            ["AI model (Gemini / Gemma)", "Dictionary (offline, no API call)"]
         )
 
         api_key = None
@@ -1045,9 +1045,9 @@ def main():
                 batch_size = 1
 
         st.divider()
-        st.markdown("### 🧭 Which units should be included?")
+        st.markdown("### 🧭 Scientific units")
         included_shorts = st.multiselect(
-            "Included units",
+            "Included scientific units",
             list(CATEGORY_SHORT.values()),
             default=list(CATEGORY_SHORT.values())
         )
@@ -1068,9 +1068,9 @@ def main():
         chart_mode = st.radio("Distribution display", ["Bar chart", "Treemap (colorful)", "Both"])
 
         st.divider()
-        st.markdown("### 🕸️ Factor / opinion network")
+        st.markdown("### 🕸️ Factor / Opinion Network")
         network_nodes = st.slider(
-            "Number of nodes",
+            "Number of network nodes",
             min_value=5,
             max_value=50,
             value=25,
@@ -1081,7 +1081,7 @@ def main():
         st.divider()
         uploaded_file = st.file_uploader("📁 Upload data", type=["txt", "csv", "xlsx"])
 
-    st.markdown("# 📊 Petrič Stress Analysis Pro")
+    st.markdown("# 📊 Stress degree and kcal analysis PRO")
     st.caption("Classification with Google Gemini/Gemma models · 5 scientific units (Social = social + partial social)")
 
     if not uploaded_file:
@@ -1111,8 +1111,8 @@ def main():
 
     with st.sidebar:
         st.markdown("### 🧩 Columns")
-        col_pf = st.selectbox("Positive (PF)", target_cols, index=0)
-        col_sf = st.selectbox("Stress-related (SF)", target_cols, index=min(1, len(target_cols) - 1))
+        col_pf = st.selectbox("Positive factors (PF)", target_cols, index=0)
+        col_sf = st.selectbox("Stress-related factors (SF)", target_cols, index=min(1, len(target_cols) - 1))
         col_pr = st.selectbox("Suggestions (PR)", target_cols, index=min(2, len(target_cols) - 1))
 
     # ---------------- CLASSIFICATION ----------------
@@ -1157,7 +1157,7 @@ def main():
     sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
     W_EU, eta, loss = calculate_energy(sigma_total)
 
-    st.markdown("## 🎯 Overall results")
+    st.markdown("## 🎯 Overall Results")
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Stress intensity", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
     m2.metric("Efficiency", f"{eta:.1f} %")
@@ -1186,7 +1186,7 @@ def main():
         })
     res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
 
-    st.markdown("### Distribution by scientific unit")
+    st.markdown("### Distribution by Scientific Unit")
     col_left, col_right = st.columns([1, 1])
 
     unit_fig = px.bar(
@@ -1225,7 +1225,7 @@ def main():
             )
 
     # ---------------- TREEMAP: PF / SF / PR TOGETHER ----------------
-    st.markdown("### 🗺️ Treemap: all phrases by role and unit")
+    st.markdown("### 🗺️ Treemap: All Phrases by Role and Unit")
     tree_rows = []
     role_labels = {"PF": "Positive", "SF": "Stress-related", "PR": "Suggestions"}
     for role, label in role_labels.items():
@@ -1259,7 +1259,7 @@ def main():
 
     # ---------------- FACTOR / OPINION NETWORK ----------------
     st.divider()
-    st.markdown("## 🕸️ Factor and opinion network")
+    st.markdown("## 🕸️ Factor and Opinion Network")
 
     network_fig, net_df = build_factor_network(
         analysis,
@@ -1278,7 +1278,7 @@ def main():
             "Links represent co-occurrence in the same respondent answer."
         )
 
-        with st.expander("Critical nodes / opinions"):
+        with st.expander("Critical Nodes / Opinions"):
             st.dataframe(
                 net_df,
                 use_container_width=True,
@@ -1290,7 +1290,7 @@ def main():
         )
 
     # ---------------- QUALITATIVE REVIEW ----------------
-    with st.expander("🔍 Classification details for words/phrases"):
+    with st.expander("🔍 Classification Details for Words/Phrases"):
         t1, t2, t3 = st.tabs(
             ["🟢 Positive", "🔴 Stress-related", "🔵 Suggestions"]
         )
@@ -1343,7 +1343,7 @@ def main():
         "visualizations. PDF contains the calculations, tables and rendered images."
     )
 
-    report_title = "Petrič Stress Analysis Pro — Report"
+    report_title = "Stress degree and kcal analysis PRO — Report"
 
     html_report = build_report_html(
         report_title,
@@ -1413,7 +1413,7 @@ def main():
 
     with c1:
         st.download_button(
-            "⬇️ Save complete report as HTML",
+            "⬇️ Save Complete Report as HTML",
             data=html_report.encode("utf-8"),
             file_name="petric_stress_analysis_report.html",
             mime="text/html",
@@ -1423,7 +1423,7 @@ def main():
     with c2:
         if pdf_report:
             st.download_button(
-                "⬇️ Save complete report as PDF",
+                "⬇️ Save Complete Report as PDF",
                 data=pdf_report,
                 file_name="petric_stress_analysis_report.pdf",
                 mime="application/pdf",
@@ -1431,7 +1431,7 @@ def main():
             )
         else:
             st.button(
-                "⬇️ Save complete report as PDF",
+                "⬇️ Save Complete Report as PDF",
                 disabled=True,
                 use_container_width=True
             )
