@@ -5,31 +5,16 @@ import math
 import json
 import time
 import html
-from io import BytesIO
 from collections import Counter, defaultdict
-from typing import List, Literal, Optional
+from typing import List, Literal
 
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.io as pio
 import networkx as nx
 
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
-
-try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-        Image as RLImage, PageBreak
-    )
-    REPORTLAB_AVAILABLE = True
-except Exception:
-    REPORTLAB_AVAILABLE = False
 
 
 # ============================================================
@@ -54,27 +39,63 @@ def reset_app():
 # 2. CSS
 # ============================================================
 
-st.markdown("""
-<style>
-.main { background-color: #f7f9fc; }
-.block-container { padding-top: 1.5rem; padding-bottom: 3rem; }
-h1 { font-weight: 800; letter-spacing: -0.5px; }
-h2, h3 { font-weight: 700; }
-.metric-card {
-    background: white; border-radius: 16px; padding: 20px;
-    border: 1px solid #e5e9f0; box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-    min-height: 145px;
-}
-.small-muted { color: #64748b; font-size: 0.82rem; }
-.stress-high { color: #dc2626; font-weight: 800; }
-.stress-medium { color: #ea580c; font-weight: 700; }
-.stress-low { color: #16a34a; font-weight: 700; }
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #f7f9fc;
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+    }
+
+    h1 {
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+
+    h2, h3 {
+        font-weight: 700;
+    }
+
+    .metric-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid #e5e9f0;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+        min-height: 145px;
+    }
+
+    .small-muted {
+        color: #64748b;
+        font-size: 0.82rem;
+    }
+
+    .stress-high {
+        color: #dc2626;
+        font-weight: 800;
+    }
+
+    .stress-medium {
+        color: #ea580c;
+        font-weight: 700;
+    }
+
+    .stress-low {
+        color: #16a34a;
+        font-weight: 700;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # ============================================================
-# 3. STOPWORDS (for dictionary / offline mode and cleaning)
+# 3. STOPWORDS
 # ============================================================
 
 SLO_STOPWORDS = {
@@ -89,7 +110,8 @@ SLO_STOPWORDS = {
     "predvsem", "sploh", "šele", "kar", "naj", "gre", "marsikaj",
     "marsikdo", "nekdo", "nekateri", "nekatera", "nekatero", "pod",
     "med", "nad", "pred", "brez", "ob", "po", "skozi", "čez",
-    "proti", "kljub", "zaradi", "namesto", "razen", "okoli", "okrog", "tem",
+    "proti", "kljub", "zaradi", "namesto", "razen", "okoli", "okrog",
+    "tem",
     "the", "and", "to", "of", "a", "is", "it", "with", "some",
     "more", "being", "able", "use", "make", "nice", "your", "this",
     "that", "from", "for", "are", "was", "were"
@@ -97,11 +119,7 @@ SLO_STOPWORDS = {
 
 
 # ============================================================
-# 4. SCIENTIFIC CLASSIFICATION (Petrič, 2025)
-#
-# 5 combined units: partial-social + social = "Social unit"
-# (selected structure, together with the structural slope for Social,
-# because it reflects the systemic/social propagation of stressors).
+# 4. SCIENTIFIC CLASSIFICATION
 # ============================================================
 
 CATEGORY_SHORT = {
@@ -111,25 +129,30 @@ CATEGORY_SHORT = {
     "Social unit": "Social",
     "Health biological unit": "Health"
 }
-SHORT_TO_FULL = {v: k for k, v in CATEGORY_SHORT.items()}
 
-# Definitions of the units for AI classification - the author's own
-# paraphrase of the article's content, not direct quotations.
+SHORT_TO_FULL = {
+    v: k for k, v in CATEGORY_SHORT.items()
+}
+
+
 CATEGORY_DEFINITIONS = {
     "Attentive (physical) unit": (
         "Physical/sensory environment: noise, lighting, temperature, air, "
         "ergonomics, orderliness and aesthetics of the space, smells, colors."
     ),
+
     "Performance unit": (
         "Factors related to performing tasks: deadlines, workload, "
         "administrative procedures, information accessibility, training, "
         "efficiency of tools/processes, physical activity as a form of relief."
     ),
+
     "Individual Psychological unit": (
         "Inner subjective emotional/psychological states of the individual: fear, "
         "anxiety, self-confidence, calmness, feelings, personal meaning, values, "
         "inner relaxation, self-image, mental well-being."
     ),
+
     "Social unit": (
         "Interpersonal and organizational/status-related factors: relationships "
         "with coworkers, superiors, family, and friends; communication, conflicts, "
@@ -137,14 +160,20 @@ CATEGORY_DEFINITIONS = {
         "fairness, recognition, pay, job security, and economic factors "
         "(this unit combines 'social' and 'partial social' from the article)."
     ),
+
     "Health biological unit": (
         "Physical health and biological factors: illness, fatigue, sleep, "
         "hygiene, nutrition, physiological condition, exhaustion."
     ),
 }
 
-# Old dictionary for OFFLINE (fallback) classification without an AI model.
+
+# ============================================================
+# OFFLINE CLASSIFICATION DICTIONARY
+# ============================================================
+
 CATEGORIES_MAP = {
+
     "Attentive (physical) unit": [
         "hrup", "svetlob", "razsvetlj", "vroč", "mraz", "vrem",
         "prostor", "pisarn", "ergonom", "oprem", "tišin", "zrak",
@@ -156,6 +185,7 @@ CATEGORIES_MAP = {
         "hrupn", "svetloba", "tišina", "classical", "music",
         "flower", "klasič", "glasb", "rož", "cvet", "flowers"
     ],
+
     "Performance unit": [
         "rok", "deadline", "obremen", "nalog", "oprav", "čas",
         "administra", "birokra", "obrazc", "poročil",
@@ -171,6 +201,7 @@ CATEGORIES_MAP = {
         "training", "exercise", "activities", "šport", "rekreac",
         "tek", "joga", "plavanj", "kolo"
     ],
+
     "Individual Psychological unit": [
         "strah", "tesnob", "samozav", "čustv", "stres",
         "frustr", "mir", "negotov", "nervoz", "panik", "nemoč",
@@ -184,28 +215,33 @@ CATEGORIES_MAP = {
         "sprošč", "relax", "medit", "dihan", "narav", "spomini",
         "praznina", "osebnost", "samokontrol", "vera", "mirnost"
     ],
+
     "Social unit": [
-        "odnos", "odnosih", "odnosov", "sodelav", "sodelovanje", "sodelov",
-        "šef", "vodstv", "nadrejen", "vodja", "direktor", "družin",
-        "family", "prijatel", "friends", "friend", "komunik", "pogovor",
-        "talk", "prepir", "konflikt", "conflict", "mobing", "mobbing",
-        "šikan", "harass", "harassment", "bully", "bullying", "zahrbt",
-        "vzvišen", "nesram", "aroganc", "egoiz", "neiskren", "rival",
-        "rivalstvo", "polit", "hierarh", "timsko", "team", "teamwork",
-        "druženj", "uporabnik", "osebj", "človek", "zaupan", "trust",
-        "support", "podpor", "klima", "vzdušje", "pripadnost", "ignor",
-        "nerazum", "posluš", "organizac", "organizaciji", "organizacijo",
-        "sestank", "meeting", "meetings", "management", "leader",
-        "leadership", "manager", "plač", "dohod", "denar", "finanč",
-        "nagrad", "status", "priznan", "revšč", "standar", "nepravič",
-        "nestimul", "krivic", "dostojen", "zaposlit", "služb", "karier",
-        "napredov", "varnost", "staž", "benefic", "ekonom", "proračun",
-        "pokojnin", "sredstv", "zamudn", "opomin", "kazn", "plačev",
-        "plačilo", "money", "salary", "financial", "budget", "stability",
-        "znesek", "družb", "law", "zakon", "orož", "weapon", "alcohol",
-        "economic", "level", "standard", "overcrowding", "crowding",
-        "injustice", "punishment", "reward", "recognition"
+        "odnos", "odnosih", "odnosov", "sodelav", "sodelovanje",
+        "sodelov", "šef", "vodstv", "nadrejen", "vodja", "direktor",
+        "družin", "family", "prijatel", "friends", "friend",
+        "komunik", "pogovor", "talk", "prepir", "konflikt",
+        "conflict", "mobing", "mobbing", "šikan", "harass",
+        "harassment", "bully", "bullying", "zahrbt", "vzvišen",
+        "nesram", "aroganc", "egoiz", "neiskren", "rival",
+        "rivalstvo", "polit", "hierarh", "timsko", "team",
+        "teamwork", "druženj", "uporabnik", "osebj", "človek",
+        "zaupan", "trust", "support", "podpor", "klima", "vzdušje",
+        "pripadnost", "ignor", "nerazum", "posluš", "organizac",
+        "organizaciji", "organizacijo", "sestank", "meeting",
+        "meetings", "management", "leader", "leadership", "manager",
+        "plač", "dohod", "denar", "finanč", "nagrad", "status",
+        "priznan", "revšč", "standar", "nepravič", "nestimul",
+        "krivic", "dostojen", "zaposlit", "služb", "karier",
+        "napredov", "varnost", "staž", "benefic", "ekonom",
+        "proračun", "pokojnin", "sredstv", "zamudn", "opomin",
+        "kazn", "plačev", "plačilo", "money", "salary", "financial",
+        "budget", "stability", "znesek", "družb", "law", "zakon",
+        "orož", "weapon", "alcohol", "economic", "level", "standard",
+        "overcrowding", "crowding", "injustice", "punishment",
+        "reward", "recognition"
     ],
+
     "Health biological unit": [
         "zdrav", "bolniš", "bolezen", "spanj", "utrujen", "izčrpan",
         "higien", "čistoč", "sleep", "rest", "dihanje", "izčrpanost",
@@ -214,6 +250,7 @@ CATEGORIES_MAP = {
         "utrujena", "spanja", "telesno", "exhaustion"
     ]
 }
+
 
 SLOPE_WEIGHTS = {
     "Attentive (physical) unit": 0.85,
@@ -242,9 +279,7 @@ def rate_sigma(sigma):
 
 
 # ============================================================
-# 5. GOOGLE MODELS (Gemini / Gemma) - available for selection
-#
-# The user selects the model EACH TIME - no default is enforced.
+# 5. GOOGLE MODELS
 # ============================================================
 
 AVAILABLE_MODELS = [
@@ -258,24 +293,41 @@ AVAILABLE_MODELS = [
     "gemma-4-31b-it",
 ]
 
+
 MODEL_NOTES = {
-    "gemini-3.5-flash-lite": "Fast Flash-Lite model for high-throughput classification.",
-    "gemini-3.1-flash-lite": "Fast and efficient Flash-Lite model for classification.",
-    "gemini-2.5-flash-lite": "Lightweight Flash-Lite model suitable for fast classification.",
-    "gemini-3.5-flash": "More capable general Flash model.",
-    "gemini-3.6-flash": "Higher-capability Flash model when available to the API key.",
-    "gemma-4-26b-a4b-it": "Gemma model for classification.",
-    "gemma-4-31b-it": "Gemma model for classification.",
+    "gemini-3.5-flash-lite":
+        "Fast Flash-Lite model for high-throughput classification.",
+
+    "gemini-3.1-flash-lite":
+        "Fast and efficient Flash-Lite model for classification.",
+
+    "gemini-2.5-flash-lite":
+        "Lightweight Flash-Lite model suitable for fast classification.",
+
+    "gemini-3.5-flash":
+        "More capable general Flash model.",
+
+    "gemini-3.6-flash":
+        "Higher-capability Flash model when available to the API key.",
+
+    "gemma-4-26b-a4b-it":
+        "Gemma model for classification.",
+
+    "gemma-4-31b-it":
+        "Gemma model for classification.",
 }
 
 
 # ============================================================
-# 6. STRUCTURED OUTPUT (Pydantic schemas for AI classification)
+# 6. STRUCTURED OUTPUT
 # ============================================================
 
 def build_classification_models(allowed_short_names):
-    """Dynamically builds Pydantic schemas that allow only the currently
-    included short unit labels (+ 'None' for unclassified items)."""
+    """
+    Dynamically builds Pydantic schemas that allow only the currently
+    included short unit labels plus 'None'.
+    """
+
     allowed = tuple(allowed_short_names) + ("None",)
 
     class ClassifiedItem(BaseModel):
@@ -289,28 +341,48 @@ def build_classification_models(allowed_short_names):
     class BatchClassification(BaseModel):
         rows: List[RowClassification]
 
-    return ClassifiedItem, RowClassification, BatchClassification
+    return (
+        ClassifiedItem,
+        RowClassification,
+        BatchClassification
+    )
 
 
 def build_system_instruction(allowed_short_names):
+
     defs_text = "\n".join(
         f"- {CATEGORY_SHORT[full]}: {CATEGORY_DEFINITIONS[full]}"
         for full in CATEGORIES_MAP.keys()
         if CATEGORY_SHORT[full] in allowed_short_names
     )
-    return f"""You are an expert in classifying responses in a study on stress
-among public servants (Petrič methodology, 2025). For each row of text,
-identify individual meaningful expressions/phrases that represent an opinion,
-stressor, positive factor, or suggestion (there may be several in one row,
-separated by commas, semicolons, or "and"). Classify each recognized
-expression into EXACTLY ONE of the following scientific units:
+
+    return f"""
+You are an expert in classifying responses in a study on stress
+among public servants (Petrič methodology, 2025).
+
+For each row of text, identify individual meaningful
+expressions/phrases that represent an opinion, stressor, positive
+factor, or suggestion.
+
+There may be several expressions in one row, separated by commas,
+semicolons, conjunctions, or other natural language structures.
+
+Classify each recognized expression into EXACTLY ONE of the following
+scientific units:
 
 {defs_text}
 
 If an expression does not belong to any of the units above or is too
-general/meaningless, assign it the category "None". Return the expressions in
-the original language of the text (do not translate them). Be exhaustive -
-include all meaningful expressions in the row, not just one."""
+general/meaningless, assign the category "None".
+
+Return the expressions in the original language of the text.
+Do not translate them.
+
+Be exhaustive and include all meaningful expressions in the row,
+not just one.
+
+Preserve Slovenian characters such as č, š and ž exactly as they occur.
+"""
 
 
 @st.cache_resource(show_spinner=False)
@@ -318,12 +390,31 @@ def get_client(api_key):
     return genai.Client(api_key=api_key)
 
 
-def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
-                            row_class_model, batch_class_model, max_retries=3):
-    """rows: list of (row_id, text). Returns a dict row_id ->
-    [(phrase, category_full), ...]."""
-    system_instruction = build_system_instruction(allowed_short_names)
-    payload = "\n".join(f"[{rid}] {text}" for rid, text in rows)
+def classify_batch_with_ai(
+    client,
+    model_name,
+    rows,
+    allowed_short_names,
+    row_class_model,
+    batch_class_model,
+    max_retries=3
+):
+    """
+    rows:
+        list of (row_id, text)
+
+    Returns:
+        dict row_id -> [(phrase, category_full), ...]
+    """
+
+    system_instruction = build_system_instruction(
+        allowed_short_names
+    )
+
+    payload = "\n".join(
+        f"[{rid}] {text}"
+        for rid, text in rows
+    )
 
     config = types.GenerateContentConfig(
         system_instruction=system_instruction,
@@ -333,201 +424,556 @@ def classify_batch_with_ai(client, model_name, rows, allowed_short_names,
     )
 
     last_err = None
+
     for attempt in range(max_retries):
+
         try:
+
             response = client.models.generate_content(
                 model=model_name,
                 contents=payload,
                 config=config,
             )
+
             raw = response.text
-            raw = re.sub(r"^```json|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+
+            raw = re.sub(
+                r"^```json|```$",
+                "",
+                raw.strip(),
+                flags=re.MULTILINE
+            ).strip()
+
             data = json.loads(raw)
 
             result = defaultdict(list)
+
             for row in data.get("rows", []):
+
                 rid = row["row_id"]
+
                 for item in row.get("items", []):
+
                     cat_short = item.get("category")
-                    phrase = item.get("phrase", "").strip()
-                    if not phrase or cat_short == "None" or cat_short not in SHORT_TO_FULL:
+                    phrase = item.get(
+                        "phrase",
+                        ""
+                    ).strip()
+
+                    if (
+                        not phrase
+                        or cat_short == "None"
+                        or cat_short not in SHORT_TO_FULL
+                    ):
                         continue
-                    result[rid].append((phrase.lower(), SHORT_TO_FULL[cat_short]))
+
+                    result[rid].append(
+                        (
+                            phrase.lower(),
+                            SHORT_TO_FULL[cat_short]
+                        )
+                    )
+
             return result
+
         except Exception as e:
+
             last_err = e
-            time.sleep(1.5 * (attempt + 1))
-    st.warning(f"Error when calling the AI model after {max_retries} attempts: {last_err}")
+
+            time.sleep(
+                1.5 * (attempt + 1)
+            )
+
+    st.warning(
+        f"Error when calling the AI model after "
+        f"{max_retries} attempts: {last_err}"
+    )
+
     return {}
 
 
 def chunk_list(lst, size):
+
+    if size <= 0:
+        size = 1
+
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
 
-def run_ai_classification(client, model_name, df, col, allowed_short_names,
-                           batch_size, progress_label):
-    row_class_model, _, batch_class_model = build_classification_models(allowed_short_names)
+def run_ai_classification(
+    client,
+    model_name,
+    df,
+    col,
+    allowed_short_names,
+    batch_size,
+    progress_label
+):
 
-    rows_text = [(i, str(v)) for i, v in df[col].dropna().items()]
+    if col not in df.columns:
+        raise ValueError(
+            f"Selected column '{col}' does not exist in the dataset."
+        )
+
+    if batch_size <= 0:
+        batch_size = 1
+
+    (
+        row_class_model,
+        _,
+        batch_class_model
+    ) = build_classification_models(
+        allowed_short_names
+    )
+
+    rows_text = [
+        (i, str(v))
+        for i, v in df[col].dropna().items()
+    ]
+
     classified = []
     per_row_categories = []
     per_row_items = []
-    row_id_to_idx = {}
 
-    progress = st.progress(0.0, text=progress_label)
-    batches = list(chunk_list(rows_text, batch_size))
-    for b_i, batch in enumerate(batches):
-        result = classify_batch_with_ai(
-            client, model_name, batch, allowed_short_names,
-            row_class_model, batch_class_model
+    progress = st.progress(
+        0.0,
+        text=progress_label
+    )
+
+    batches = list(
+        chunk_list(
+            rows_text,
+            batch_size
         )
+    )
+
+    for b_i, batch in enumerate(batches):
+
+        result = classify_batch_with_ai(
+            client,
+            model_name,
+            batch,
+            allowed_short_names,
+            row_class_model,
+            batch_class_model
+        )
+
         for rid, _ in batch:
-            items = result.get(rid, [])
+
+            items = result.get(
+                rid,
+                []
+            )
+
             classified.extend(items)
-            per_row_categories.append([c for _, c in items])
+
+            per_row_categories.append(
+                [c for _, c in items]
+            )
+
             per_row_items.append(items)
-        progress.progress((b_i + 1) / max(len(batches), 1), text=progress_label)
+
+        progress.progress(
+            (b_i + 1) / max(len(batches), 1),
+            text=progress_label
+        )
+
     progress.empty()
 
-    return classified, per_row_categories, per_row_items
+    return (
+        classified,
+        per_row_categories,
+        per_row_items
+    )
 
 
 # ============================================================
-# 7. OFFLINE (dictionary-based) MODE - fallback without AI
+# 7. OFFLINE CLASSIFICATION
 # ============================================================
 
 def clean_and_tokenize(text):
+
     if not isinstance(text, str):
         return []
+
     text = text.lower()
-    text = re.sub(r"[^\w\s]", " ", text)
+
+    text = re.sub(
+        r"[^\w\s]",
+        " ",
+        text,
+        flags=re.UNICODE
+    )
+
     words = text.split()
-    return [w for w in words if w not in SLO_STOPWORDS and len(w) > 2]
 
-
-def classify_word_single(word, allowed_short_names):
-    priority_order = [
-        "Social unit", "Performance unit", "Individual Psychological unit",
-        "Health biological unit", "Attentive (physical) unit"
+    return [
+        w
+        for w in words
+        if w not in SLO_STOPWORDS
+        and len(w) > 2
     ]
+
+
+def classify_word_single(
+    word,
+    allowed_short_names
+):
+
+    priority_order = [
+        "Social unit",
+        "Performance unit",
+        "Individual Psychological unit",
+        "Health biological unit",
+        "Attentive (physical) unit"
+    ]
+
     for cat in priority_order:
+
         if CATEGORY_SHORT[cat] not in allowed_short_names:
             continue
+
         for koren in CATEGORIES_MAP[cat]:
-            if re.search(rf"\b{re.escape(koren)}\w*\b", word):
+
+            pattern = (
+                rf"\b{re.escape(koren)}\w*\b"
+            )
+
+            if re.search(
+                pattern,
+                word,
+                flags=re.IGNORECASE
+            ):
                 return cat
+
     return None
 
 
-def run_offline_classification(df, col, allowed_short_names):
+def run_offline_classification(
+    df,
+    col,
+    allowed_short_names
+):
+
+    if col not in df.columns:
+        raise ValueError(
+            f"Selected column '{col}' does not exist in the dataset."
+        )
+
     classified = []
     per_row_categories = []
     per_row_items = []
+
     for row in df[col].dropna():
+
         row_cats = []
         row_items = []
+
         for kw in clean_and_tokenize(row):
-            cat = classify_word_single(kw, allowed_short_names)
+
+            cat = classify_word_single(
+                kw,
+                allowed_short_names
+            )
+
             if cat:
-                classified.append((kw, cat))
+
+                classified.append(
+                    (kw, cat)
+                )
+
                 row_cats.append(cat)
-                row_items.append((kw, cat))
-        per_row_categories.append(row_cats)
-        per_row_items.append(row_items)
-    return classified, per_row_categories, per_row_items
+
+                row_items.append(
+                    (kw, cat)
+                )
+
+        per_row_categories.append(
+            row_cats
+        )
+
+        per_row_items.append(
+            row_items
+        )
+
+    return (
+        classified,
+        per_row_categories,
+        per_row_items
+    )
 
 
 # ============================================================
-# 8. MATHEMATICAL LOGIC (PETRIČ METHOD) - unchanged
+# 8. MATHEMATICAL LOGIC
 # ============================================================
 
-def calculate_fo_real_aggregate(classified, n_override):
-    all_words = [w for w, _ in classified]
+def calculate_fo_real_aggregate(
+    classified,
+    n_override
+):
+
+    all_words = [
+        w for w, _ in classified
+    ]
+
     fo = len(all_words)
-    fr = len(set(all_words))
+
+    fr = len(
+        set(all_words)
+    )
+
     if fr == 0 or n_override == 0:
-        return 0.0001, fo, fr
+        return (
+            0.0001,
+            fo,
+            fr
+        )
+
     rho_o = fo / n_override
+
     c_o = fo / fr
-    fo_real = (c_o * rho_o) / 10.0
-    return fo_real, fo, fr
+
+    fo_real = (
+        c_o * rho_o
+    ) / 10.0
+
+    return (
+        fo_real,
+        fo,
+        fr
+    )
 
 
-def compute_category_factors(classified, n_override, active_categories, weighting_mode="volume"):
+def compute_category_factors(
+    classified,
+    n_override,
+    active_categories,
+    weighting_mode="volume"
+):
+
     words_by_cat = defaultdict(list)
+
     for word, category in classified:
         words_by_cat[category].append(word)
 
     result = {}
+
     for category in active_categories:
-        words = words_by_cat.get(category, [])
+
+        words = words_by_cat.get(
+            category,
+            []
+        )
+
         fE = len(words)
-        frE = len(set(words))
+
+        frE = len(
+            set(words)
+        )
+
         if weighting_mode == "concentration":
-            CE = fE / frE if frE > 0 else 0.0001
+
+            CE = (
+                fE / frE
+                if frE > 0
+                else 0.0001
+            )
+
         else:
+
             CE = 1.0
-        rho = fE / n_override if n_override else 0.0
-        F = (CE * rho) / 10.0
-        result[category] = {"fE": fE, "frE": frE, "CE": CE, "rho": rho, "F": F}
+
+        rho = (
+            fE / n_override
+            if n_override
+            else 0.0
+        )
+
+        F = (
+            CE * rho
+        ) / 10.0
+
+        result[category] = {
+            "fE": fE,
+            "frE": frE,
+            "CE": CE,
+            "rho": rho,
+            "F": F
+        }
+
     return result
 
 
-def sigma_argument(f_sf, f_pr, f_pf):
+def sigma_argument(
+    f_sf,
+    f_pr,
+    f_pf
+):
+
     if f_pf <= 0:
         f_pf = 0.0001
-    argument = (f_sf * f_pr) / f_pf
-    return max(argument, 0.0)
+
+    argument = (
+        f_sf * f_pr
+    ) / f_pf
+
+    return max(
+        argument,
+        0.0
+    )
 
 
-def sigma_deg(f_sf, f_pr, f_pf):
-    arg = sigma_argument(f_sf, f_pr, f_pf)
-    sigma_rad = math.asin(math.sqrt(min(arg, 1.0)))
-    return math.degrees(sigma_rad)
+def sigma_deg(
+    f_sf,
+    f_pr,
+    f_pf
+):
+
+    arg = sigma_argument(
+        f_sf,
+        f_pr,
+        f_pf
+    )
+
+    sigma_rad = math.asin(
+        math.sqrt(
+            min(arg, 1.0)
+        )
+    )
+
+    return math.degrees(
+        sigma_rad
+    )
 
 
-def compute_category_sigmas(factors_sf, factors_pf, factors_pr,
-                             sigma_total_argument, is_summary, active_categories):
+def compute_category_sigmas(
+    factors_sf,
+    factors_pf,
+    factors_pr,
+    sigma_total_argument,
+    is_summary,
+    active_categories
+):
+
     raw_scores = {}
+
     for category in active_categories:
-        f_pf = factors_pf[category]["F"]
-        f_sf = factors_sf[category]["F"]
-        f_pr = factors_pr[category]["F"]
+
+        f_pf = factors_pf[
+            category
+        ]["F"]
+
+        f_sf = factors_sf[
+            category
+        ]["F"]
+
+        f_pr = factors_pr[
+            category
+        ]["F"]
 
         if is_summary and f_sf > 0:
-            f_pr = min(f_pr, f_sf * 1.5)
 
-        argument = sigma_argument(f_sf, f_pr, f_pf)
-        bonus = 1.15 if category == "Social unit" else 1.0
-        weighted_score = argument * SLOPE_WEIGHTS[category] * bonus
-        raw_scores[category] = weighted_score
+            f_pr = min(
+                f_pr,
+                f_sf * 1.5
+            )
 
-    total_score = sum(raw_scores.values())
+        argument = sigma_argument(
+            f_sf,
+            f_pr,
+            f_pf
+        )
+
+        bonus = (
+            1.15
+            if category == "Social unit"
+            else 1.0
+        )
+
+        weighted_score = (
+            argument
+            * SLOPE_WEIGHTS[category]
+            * bonus
+        )
+
+        raw_scores[category] = (
+            weighted_score
+        )
+
+    total_score = sum(
+        raw_scores.values()
+    )
+
     results = {}
 
     if total_score <= 0:
+
         for category in active_categories:
-            results[category] = {"sigma": 0.0, "weight_share": 0.0}
-        return results, 0.0
+
+            results[category] = {
+                "sigma": 0.0,
+                "weight_share": 0.0
+            }
+
+        return (
+            results,
+            0.0
+        )
 
     for category in active_categories:
-        share = raw_scores[category] / total_score
-        scaled_argument = min(sigma_total_argument * share, 1.0)
-        sigma = math.degrees(math.asin(math.sqrt(scaled_argument)))
-        results[category] = {"sigma": sigma, "weight_share": share}
 
-    return results, total_score
+        share = (
+            raw_scores[category]
+            / total_score
+        )
+
+        scaled_argument = min(
+            sigma_total_argument * share,
+            1.0
+        )
+
+        sigma = math.degrees(
+            math.asin(
+                math.sqrt(
+                    scaled_argument
+                )
+            )
+        )
+
+        results[category] = {
+            "sigma": sigma,
+            "weight_share": share
+        }
+
+    return (
+        results,
+        total_score
+    )
 
 
 def calculate_energy(sigma):
-    W_I = 2500.0
-    W_EU = W_I - (W_I * sigma / 90.0)
-    eta = (W_EU / W_I) * 100.0
-    loss = W_I - W_EU
-    return W_EU, eta, loss
 
+    W_I = 2500.0
+
+    W_EU = (
+        W_I
+        - (W_I * sigma / 90.0)
+    )
+
+    eta = (
+        W_EU / W_I
+    ) * 100.0
+
+    loss = (
+        W_I - W_EU
+    )
+
+    return (
+        W_EU,
+        eta,
+        loss
+    )
 
 
 # ============================================================
@@ -540,6 +986,7 @@ ROLE_LABELS = {
     "PR": "Opinion / suggestion"
 }
 
+
 ROLE_CRITICALITY = {
     "PF": 0.5,
     "SF": 3.0,
@@ -548,10 +995,19 @@ ROLE_CRITICALITY = {
 
 
 def normalize_network_phrase(phrase):
-    return re.sub(r"\s+", " ", str(phrase).strip().lower())
+
+    return re.sub(
+        r"\s+",
+        " ",
+        str(phrase).strip().lower()
+    )
 
 
-def build_factor_network(analysis, max_nodes=25):
+def build_factor_network(
+    analysis,
+    max_nodes=25
+):
+
     """
     Co-occurrence network of classified factors/opinions.
 
@@ -569,49 +1025,84 @@ def build_factor_network(analysis, max_nodes=25):
       1 co-occurrence = weak dashed
     """
 
-    node_data = defaultdict(lambda: {
-        "count": 0,
-        "roles": Counter(),
-        "categories": Counter(),
-        "criticality": 0.0
-    })
+    node_data = defaultdict(
+        lambda: {
+            "count": 0,
+            "roles": Counter(),
+            "categories": Counter(),
+            "criticality": 0.0
+        }
+    )
 
     max_rows = max(
-        (len(analysis[r].get("per_row_items", [])) for r in ROLE_LABELS),
+        (
+            len(
+                analysis[r].get(
+                    "per_row_items",
+                    []
+                )
+            )
+            for r in ROLE_LABELS
+        ),
         default=0
     )
 
     row_documents = []
 
     for i in range(max_rows):
+
         row_nodes = set()
 
         for role in ROLE_LABELS:
-            items = analysis[role].get("per_row_items", [])
+
+            items = analysis[role].get(
+                "per_row_items",
+                []
+            )
+
             if i >= len(items):
                 continue
 
             for phrase, category in items[i]:
-                key = normalize_network_phrase(phrase)
+
+                key = normalize_network_phrase(
+                    phrase
+                )
+
                 if not key or len(key) < 2:
                     continue
 
                 node_data[key]["count"] += 1
+
                 node_data[key]["roles"][role] += 1
+
                 node_data[key]["categories"][category] += 1
+
                 node_data[key]["criticality"] += (
                     ROLE_CRITICALITY[role]
-                    * SLOPE_WEIGHTS.get(category, 1.0)
+                    * SLOPE_WEIGHTS.get(
+                        category,
+                        1.0
+                    )
                 )
+
                 row_nodes.add(key)
 
         if row_nodes:
-            row_documents.append(row_nodes)
+            row_documents.append(
+                row_nodes
+            )
 
     if not node_data:
         return None, None
 
-    max_nodes = max(5, min(50, int(max_nodes)))
+    max_nodes = max(
+        5,
+        min(
+            50,
+            int(max_nodes)
+        )
+    )
 
     selected = sorted(
         node_data,
@@ -623,12 +1114,22 @@ def build_factor_network(analysis, max_nodes=25):
     )[:max_nodes]
 
     selected_set = set(selected)
+
     graph = nx.Graph()
 
     for node in selected:
+
         d = node_data[node]
-        category = d["categories"].most_common(1)[0][0]
-        role = d["roles"].most_common(1)[0][0]
+
+        category = (
+            d["categories"]
+            .most_common(1)[0][0]
+        )
+
+        role = (
+            d["roles"]
+            .most_common(1)[0][0]
+        )
 
         graph.add_node(
             node,
@@ -641,21 +1142,52 @@ def build_factor_network(analysis, max_nodes=25):
     edge_counts = Counter()
 
     for row_nodes in row_documents:
-        nodes = sorted(row_nodes.intersection(selected_set))
-        for i in range(len(nodes)):
-            for j in range(i + 1, len(nodes)):
-                edge_counts[(nodes[i], nodes[j])] += 1
 
-    for (a, b), strength in edge_counts.items():
-        graph.add_edge(a, b, strength=strength)
+        nodes = sorted(
+            row_nodes.intersection(
+                selected_set
+            )
+        )
+
+        for i in range(len(nodes)):
+
+            for j in range(i + 1, len(nodes)):
+
+                edge_counts[
+                    (nodes[i], nodes[j])
+                ] += 1
+
+    for (
+        a,
+        b
+    ), strength in edge_counts.items():
+
+        graph.add_edge(
+            a,
+            b,
+            strength=strength
+        )
 
     if len(graph) == 1:
-        pos = {next(iter(graph.nodes)): (0, 0)}
+
+        pos = {
+            next(iter(graph.nodes)): (
+                0,
+                0
+            )
+        }
+
     else:
+
         pos = nx.spring_layout(
             graph,
             seed=42,
-            k=1.7 / math.sqrt(max(len(graph.nodes), 1)),
+            k=1.7 / math.sqrt(
+                max(
+                    len(graph.nodes),
+                    1
+                )
+            ),
             iterations=120,
             weight="strength"
         )
@@ -663,16 +1195,46 @@ def build_factor_network(analysis, max_nodes=25):
     fig = go.Figure()
 
     edge_styles = [
-        ("strong", 3, 4.5, "solid", "Strong connection"),
-        ("medium", 2, 2.5, "solid", "Moderate connection"),
-        ("weak", 1, 1.2, "dash", "Weak / dashed connection"),
+        (
+            "strong",
+            3,
+            4.5,
+            "solid",
+            "Strong connection"
+        ),
+        (
+            "medium",
+            2,
+            2.5,
+            "solid",
+            "Moderate connection"
+        ),
+        (
+            "weak",
+            1,
+            1.2,
+            "dash",
+            "Weak / dashed connection"
+        )
     ]
 
-    for style_name, min_strength, width, dash, legend_name in edge_styles:
-        x, y = [], []
+    for (
+        style_name,
+        min_strength,
+        width,
+        dash,
+        legend_name
+    ) in edge_styles:
 
-        for a, b, data in graph.edges(data=True):
+        x = []
+        y = []
+
+        for a, b, data in graph.edges(
+            data=True
+        ):
+
             strength = data["strength"]
+
             qualifies = (
                 strength >= min_strength
                 if style_name != "weak"
@@ -682,66 +1244,127 @@ def build_factor_network(analysis, max_nodes=25):
             if not qualifies:
                 continue
 
-            x.extend([pos[a][0], pos[b][0], None])
-            y.extend([pos[a][1], pos[b][1], None])
+            x.extend([
+                pos[a][0],
+                pos[b][0],
+                None
+            ])
+
+            y.extend([
+                pos[a][1],
+                pos[b][1],
+                None
+            ])
 
         if x:
-            fig.add_trace(go.Scatter(
-                x=x,
-                y=y,
-                mode="lines",
-                line=dict(width=width, dash=dash),
-                hoverinfo="skip",
-                name=legend_name
-            ))
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=y,
+                    mode="lines",
+                    line=dict(
+                        width=width,
+                        dash=dash
+                    ),
+                    hoverinfo="skip",
+                    name=legend_name
+                )
+            )
 
     for category in CATEGORY_SHORT:
+
         nodes = [
-            n for n in graph.nodes
-            if graph.nodes[n]["category"] == category
+            n
+            for n in graph.nodes
+            if graph.nodes[n]["category"]
+            == category
         ]
+
         if not nodes:
             continue
 
-        xs = [pos[n][0] for n in nodes]
-        ys = [pos[n][1] for n in nodes]
+        xs = [
+            pos[n][0]
+            for n in nodes
+        ]
+
+        ys = [
+            pos[n][1]
+            for n in nodes
+        ]
+
         sizes = [
-            16 + 9 * math.sqrt(max(graph.nodes[n]["criticality"], 0.1))
+            16
+            + 9
+            * math.sqrt(
+                max(
+                    graph.nodes[n]["criticality"],
+                    0.1
+                )
+            )
             for n in nodes
         ]
 
         hover = [
             (
                 f"<b>{html.escape(n)}</b><br>"
-                f"Unit: {CATEGORY_SHORT[graph.nodes[n]['category']]}<br>"
-                f"Role: {ROLE_LABELS[graph.nodes[n]['role']]}<br>"
-                f"Occurrences: {graph.nodes[n]['count']}<br>"
-                f"Criticality: {graph.nodes[n]['criticality']:.2f}"
+                f"Unit: "
+                f"{CATEGORY_SHORT[graph.nodes[n]['category']]}<br>"
+                f"Role: "
+                f"{ROLE_LABELS[graph.nodes[n]['role']]}<br>"
+                f"Occurrences: "
+                f"{graph.nodes[n]['count']}<br>"
+                f"Criticality: "
+                f"{graph.nodes[n]['criticality']:.2f}"
             )
             for n in nodes
         ]
 
-        fig.add_trace(go.Scatter(
-            x=xs,
-            y=ys,
-            mode="markers+text",
-            text=nodes,
-            textposition="top center",
-            marker=dict(size=sizes, line=dict(width=1)),
-            hovertext=hover,
-            hoverinfo="text",
-            name=CATEGORY_SHORT[category]
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=xs,
+                y=ys,
+                mode="markers+text",
+                text=nodes,
+                textposition="top center",
+                marker=dict(
+                    size=sizes,
+                    line=dict(width=1)
+                ),
+                hovertext=hover,
+                hoverinfo="text",
+                name=CATEGORY_SHORT[category]
+            )
+        )
 
     fig.update_layout(
-        title="Factor & opinion network — node size = criticality",
+        title=(
+            "Factor & opinion network — "
+            "node size = criticality"
+        ),
         height=720,
         template="plotly_white",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-        margin=dict(l=20, r=20, t=80, b=20)
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            x=0
+        ),
+        margin=dict(
+            l=20,
+            r=20,
+            t=80,
+            b=20
+        )
     )
 
-    fig.update_xaxes(showgrid=False, zeroline=False, visible=False)
+    fig.update_xaxes(
+        showgrid=False,
+        zeroline=False,
+        visible=False
+    )
+
     fig.update_yaxes(
         showgrid=False,
         zeroline=False,
@@ -753,40 +1376,35 @@ def build_factor_network(analysis, max_nodes=25):
     net_df = pd.DataFrame([
         {
             "Node": n,
-            "Unit": CATEGORY_SHORT[graph.nodes[n]["category"]],
-            "Role": ROLE_LABELS[graph.nodes[n]["role"]],
+            "Unit": CATEGORY_SHORT[
+                graph.nodes[n]["category"]
+            ],
+            "Role": ROLE_LABELS[
+                graph.nodes[n]["role"]
+            ],
             "Occurrences": graph.nodes[n]["count"],
-            "Criticality": round(graph.nodes[n]["criticality"], 2)
+            "Criticality": round(
+                graph.nodes[n]["criticality"],
+                2
+            )
         }
         for n in sorted(
             graph.nodes,
-            key=lambda x: graph.nodes[x]["criticality"],
+            key=lambda x:
+                graph.nodes[x]["criticality"],
             reverse=True
         )
     ])
 
-    return fig, net_df
+    return (
+        fig,
+        net_df
+    )
 
 
 # ============================================================
-# 10. REPORT EXPORT
+# 10. HTML REPORT EXPORT
 # ============================================================
-
-def fig_to_png_bytes(fig, width=1400, height=800):
-    if fig is None:
-        return None
-
-    try:
-        return pio.to_image(
-            fig,
-            format="png",
-            width=width,
-            height=height,
-            scale=1
-        )
-    except Exception:
-        return None
-
 
 def build_report_html(
     title,
@@ -804,227 +1422,376 @@ def build_report_html(
     net_df,
     text_sections=None
 ):
-    generated = time.strftime("%Y-%m-%d %H:%M")
+
+    generated = time.strftime(
+        "%Y-%m-%d %H:%M"
+    )
 
     parts = [
+
         f"<h1>{html.escape(title)}</h1>",
+
         (
-            f"<p><b>Generated:</b> {generated}<br>"
-            f"<b>Mode:</b> {html.escape(classification_mode)}<br>"
-            f"<b>Model:</b> {html.escape(model_name or 'Offline dictionary')}<br>"
-            f"<b>N:</b> {n_input}</p>"
+            f"<p>"
+            f"<b>Generated / Ustvarjeno:</b> "
+            f"{generated}<br>"
+            f"<b>Mode / Način:</b> "
+            f"{html.escape(classification_mode)}<br>"
+            f"<b>Model:</b> "
+            f"{html.escape(model_name or 'Offline dictionary')}<br>"
+            f"<b>N:</b> {n_input}"
+            f"</p>"
         ),
-        "<h2>Overall results</h2>",
+
         (
-            f"<p><b>Stress intensity:</b> {sigma_total:.2f} °S<br>"
-            f"<b>Rating:</b> {html.escape(rate_sigma(sigma_total))}<br>"
-            f"<b>Efficiency:</b> {eta:.1f}%<br>"
-            f"<b>Energy loss:</b> {loss:.0f} Kcal<br>"
-            f"<b>Useful energy:</b> {W_EU:.0f} Kcal</p>"
+            "<h2>"
+            "Overall results / Skupni rezultati"
+            "</h2>"
         ),
-        "<h2>Distribution by scientific unit</h2>",
+
+        (
+            "<div class='result-box'>"
+            "<p>"
+            "<b>Stress intensity / Stresna intenzivnost:</b> "
+            f"{sigma_total:.2f} °S<br>"
+            "<b>Rating / Ocena:</b> "
+            f"{html.escape(rate_sigma(sigma_total))}<br>"
+            "<b>Efficiency / Učinkovitost:</b> "
+            f"{eta:.1f}%<br>"
+            "<b>Energy loss / Izguba energije:</b> "
+            f"{loss:.0f} Kcal<br>"
+            "<b>Useful energy / Koristna energija:</b> "
+            f"{W_EU:.0f} Kcal"
+            "</p>"
+            "</div>"
+        ),
+
+        (
+            "<h2>"
+            "Distribution by scientific unit / "
+            "Porazdelitev po znanstvenih enotah"
+            "</h2>"
+        ),
+
         res_df.to_html(
             index=False,
             border=0,
-            classes="report-table"
+            classes="report-table",
+            justify="left"
         )
     ]
 
-    if text_sections:
-        for heading, body in text_sections:
-            parts.append(f"<h2>{html.escape(heading)}</h2>")
-            parts.append(f"<p>{html.escape(body).replace(chr(10), '<br>')}</p>")
+    # --------------------------------------------------------
+    # TEXT SECTIONS
+    # --------------------------------------------------------
 
-    for heading, fig in [
-        ("Stress intensity by scientific unit", unit_fig),
-        ("All classified phrases by role and unit", role_tree_fig),
-        ("Factor and opinion network", network_fig)
-    ]:
-        if fig is not None:
-            parts.append(f"<h2>{html.escape(heading)}</h2>")
-            parts.append(
-                fig.to_html(
-                    full_html=False,
-                    include_plotlyjs="cdn" if not any(
-                        "plotly" in p for p in parts
-                    ) else False,
-                    config={"responsive": True}
+    if text_sections:
+
+        for heading, body in text_sections:
+
+            safe_body = (
+                html.escape(
+                    str(body)
+                ).replace(
+                    "\n",
+                    "<br>"
                 )
             )
 
-    if net_df is not None and not net_df.empty:
-        parts.append("<h2>Critical network nodes</h2>")
+            parts.append(
+                f"<h2>{html.escape(str(heading))}</h2>"
+            )
+
+            parts.append(
+                f"<div class='text-section'>"
+                f"{safe_body}"
+                f"</div>"
+            )
+
+    # --------------------------------------------------------
+    # INTERACTIVE PLOTLY VISUALIZATIONS
+    # --------------------------------------------------------
+
+    plotly_added = False
+
+    visualizations = [
+
+        (
+            "Stress intensity by scientific unit / "
+            "Stresna intenzivnost po znanstvenih enotah",
+            unit_fig
+        ),
+
+        (
+            "All classified phrases by role and unit / "
+            "Vsi klasificirani izrazi po vlogi in enoti",
+            role_tree_fig
+        ),
+
+        (
+            "Factor and opinion network / "
+            "Omrežje dejavnikov in mnenj",
+            network_fig
+        )
+    ]
+
+    for heading, fig in visualizations:
+
+        if fig is None:
+            continue
+
+        parts.append(
+            f"<h2>{html.escape(heading)}</h2>"
+        )
+
+        try:
+
+            plot_html = fig.to_html(
+                full_html=False,
+                include_plotlyjs=(
+                    "cdn"
+                    if not plotly_added
+                    else False
+                ),
+                config={
+                    "responsive": True,
+                    "displaylogo": False
+                }
+            )
+
+            parts.append(
+                plot_html
+            )
+
+            plotly_added = True
+
+        except Exception as e:
+
+            parts.append(
+                "<p><i>"
+                "Visualization could not be embedded "
+                "in the HTML report: "
+                f"{html.escape(str(e))}"
+                "</i></p>"
+            )
+
+    # --------------------------------------------------------
+    # NETWORK TABLE
+    # --------------------------------------------------------
+
+    if (
+        net_df is not None
+        and not net_df.empty
+    ):
+
+        parts.append(
+            "<h2>"
+            "Critical network nodes / "
+            "Kritična vozlišča omrežja"
+            "</h2>"
+        )
+
         parts.append(
             net_df.to_html(
                 index=False,
                 border=0,
-                classes="report-table"
+                classes="report-table",
+                justify="left"
             )
         )
+
+    # --------------------------------------------------------
+    # COMPLETE HTML DOCUMENT
+    # --------------------------------------------------------
 
     return f"""<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type"
+      content="text/html; charset=UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
+
 <title>{html.escape(title)}</title>
+
 <style>
-body {{
-    font-family: Arial, sans-serif;
-    margin: 32px;
-    color: #1f2937;
-    line-height: 1.45;
+
+* {{
+    box-sizing: border-box;
 }}
-h1 {{ color: #111827; }}
-h2 {{ margin-top: 35px; }}
+
+body {{
+    font-family:
+        "Segoe UI",
+        "Noto Sans",
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    margin: 0;
+    padding: 35px;
+
+    color: #1f2937;
+    background: #ffffff;
+
+    line-height: 1.55;
+
+    font-size: 15px;
+}}
+
+h1 {{
+    color: #111827;
+    font-size: 30px;
+    margin-bottom: 8px;
+}}
+
+h2 {{
+    color: #1f2937;
+    font-size: 21px;
+    margin-top: 42px;
+    margin-bottom: 15px;
+
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 7px;
+}}
+
+p {{
+    margin: 8px 0 14px;
+}}
+
+.result-box {{
+    background: #f8fafc;
+    border: 1px solid #dbe3ec;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 15px 0 25px;
+}}
+
+.text-section {{
+    white-space: normal;
+    background: #f8fafc;
+    border-left: 4px solid #94a3b8;
+    padding: 12px 16px;
+    margin: 10px 0 20px;
+}}
+
 .report-table {{
     border-collapse: collapse;
     width: 100%;
-    margin: 12px 0 24px;
+    margin: 15px 0 30px;
+    font-size: 14px;
 }}
+
 .report-table th,
 .report-table td {{
     border: 1px solid #d1d5db;
-    padding: 7px;
+    padding: 8px 10px;
     text-align: left;
+    vertical-align: top;
 }}
-.report-table th {{ background: #f3f4f6; }}
+
+.report-table th {{
+    background: #f1f5f9;
+    font-weight: 700;
+}}
+
+.report-table tr:nth-child(even) {{
+    background: #f8fafc;
+}}
+
+.js-plotly-plot {{
+    width: 100% !important;
+    margin: 10px 0 35px 0;
+}}
+
+.footer {{
+    margin-top: 50px;
+    padding-top: 15px;
+    border-top: 1px solid #e5e7eb;
+    color: #64748b;
+    font-size: 12px;
+}}
+
+@media print {{
+
+    body {{
+        padding: 15px;
+        font-size: 12px;
+    }}
+
+    h1 {{
+        font-size: 24px;
+    }}
+
+    h2 {{
+        font-size: 17px;
+        page-break-after: avoid;
+    }}
+
+    .js-plotly-plot {{
+        page-break-inside: avoid;
+    }}
+
+    .report-table {{
+        page-break-inside: avoid;
+    }}
+}}
+
 </style>
 </head>
+
 <body>
+
 {''.join(parts)}
+
+<div class="footer">
+    Petrič Stress Analysis Pro<br>
+    Stress degree and kcal analysis
+</div>
+
 </body>
 </html>"""
 
 
-def build_report_pdf(
-    title,
-    model_name,
-    classification_mode,
-    sigma_total,
-    W_EU,
-    eta,
-    loss,
-    n_input,
-    res_df,
-    figures,
-    net_df
-):
-    if not REPORTLAB_AVAILABLE:
-        return None
-
-    buffer = BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=landscape(A4),
-        rightMargin=28,
-        leftMargin=28,
-        topMargin=28,
-        bottomMargin=28
-    )
-
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        "ReportTitle",
-        parent=styles["Title"],
-        alignment=TA_CENTER,
-        fontSize=20
-    )
-
-    story = [
-        Paragraph(html.escape(title), title_style),
-        Spacer(1, 10),
-        Paragraph(
-            (
-                f"Generated: {time.strftime('%Y-%m-%d %H:%M')} · "
-                f"Mode: {html.escape(classification_mode)} · "
-                f"Model: {html.escape(model_name or 'Offline dictionary')} · "
-                f"N={n_input}"
-            ),
-            styles["Normal"]
-        ),
-        Spacer(1, 12),
-        Paragraph("Overall results", styles["Heading2"]),
-        Paragraph(
-            (
-                f"Stress intensity: <b>{sigma_total:.2f} °S</b> · "
-                f"Rating: <b>{html.escape(rate_sigma(sigma_total))}</b> · "
-                f"Efficiency: <b>{eta:.1f}%</b> · "
-                f"Energy loss: <b>{loss:.0f} Kcal</b> · "
-                f"Useful energy: <b>{W_EU:.0f} Kcal</b>"
-            ),
-            styles["Normal"]
-        ),
-        Spacer(1, 12),
-        Paragraph("Distribution by scientific unit", styles["Heading2"])
-    ]
-
-    table_data = (
-        [list(res_df.columns)]
-        + res_df.astype(str).values.tolist()
-    )
-
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
-    story.append(table)
-
-    for caption, fig in figures:
-        img_bytes = fig_to_png_bytes(fig)
-        if img_bytes:
-            story.extend([
-                PageBreak(),
-                Paragraph(caption, styles["Heading2"]),
-                RLImage(BytesIO(img_bytes), width=720, height=390)
-            ])
-
-    if net_df is not None and not net_df.empty:
-        story.extend([
-            PageBreak(),
-            Paragraph("Critical network nodes", styles["Heading2"])
-        ])
-
-        nd = (
-            [list(net_df.columns)]
-            + net_df.astype(str).values.tolist()
-        )
-        nt = Table(nd, repeatRows=1)
-        nt.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        story.append(nt)
-
-    doc.build(story)
-    return buffer.getvalue()
-
-
 # ============================================================
-# 11. MAIN STREAMLIT APPLICATION (UI)
+# 11. MAIN STREAMLIT APPLICATION
 # ============================================================
 
 def main():
-    with st.sidebar:
-        st.markdown("## ⚙️ Settings")
 
-        if st.button("🔄 Reset session", use_container_width=True):
+    # --------------------------------------------------------
+    # SIDEBAR
+    # --------------------------------------------------------
+
+    with st.sidebar:
+
+        st.markdown(
+            "## ⚙️ Settings"
+        )
+
+        if st.button(
+            "🔄 Reset session",
+            use_container_width=True
+        ):
             reset_app()
 
         st.divider()
-        st.markdown("### 🤖 AI Classification (Google)")
+
+        st.markdown(
+            "### 🤖 AI Classification (Google)"
+        )
+
         classification_mode = st.radio(
             "Classification mode",
-            ["AI model (Gemini / Gemma)", "Dictionary (offline, no API call)"]
+            [
+                "AI model (Gemini / Gemma)",
+                "Dictionary (offline, no API call)"
+            ]
         )
 
         api_key = None
@@ -1032,113 +1799,360 @@ def main():
         batch_size = 15
 
         if classification_mode.startswith("AI"):
+
             api_key = st.text_input(
-                "Google AI API key", type="password",
-                help="Get a free key at https://aistudio.google.com/apikey"
+                "Google AI API key",
+                type="password",
+                help=(
+                    "Get a free key at "
+                    "https://aistudio.google.com/apikey"
+                )
             )
-            model_name = st.selectbox("Model", AVAILABLE_MODELS, index=0)
-            if model_name != AVAILABLE_MODELS[0]:
-                st.caption(MODEL_NOTES.get(model_name, ""))
-            batch_size = st.slider("Batch size (rows per call)", 0, 50, 15)
+
+            model_name = st.selectbox(
+                "Model",
+                AVAILABLE_MODELS,
+                index=0
+            )
+
+            if (
+                model_name
+                != AVAILABLE_MODELS[0]
+            ):
+
+                st.caption(
+                    MODEL_NOTES.get(
+                        model_name,
+                        ""
+                    )
+                )
+
+            batch_size = st.slider(
+                "Batch size (rows per call)",
+                0,
+                50,
+                15
+            )
+
             if batch_size == 0:
-                st.warning("Batch size 0 is not valid for an API call; it will be treated as 1.")
+
+                st.warning(
+                    "Batch size 0 is not valid for "
+                    "an API call; it will be treated as 1."
+                )
+
                 batch_size = 1
 
         st.divider()
-        st.markdown("### 🧭 Scientific units")
+
+        st.markdown(
+            "### 🧭 Scientific units"
+        )
+
         included_shorts = st.multiselect(
             "Included scientific units",
             list(CATEGORY_SHORT.values()),
-            default=list(CATEGORY_SHORT.values())
+            default=list(
+                CATEGORY_SHORT.values()
+            )
         )
-        active_categories = [SHORT_TO_FULL[s] for s in included_shorts] or list(CATEGORIES_MAP.keys())
+
+        active_categories = [
+            SHORT_TO_FULL[s]
+            for s in included_shorts
+        ]
+
+        if not active_categories:
+            active_categories = list(
+                CATEGORIES_MAP.keys()
+            )
 
         st.divider()
-        n_input = st.number_input("Number of respondents (N)", min_value=1, value=210)
-        is_summary = st.checkbox("The file contains a SUMMARY", value=True)
+
+        n_input = st.number_input(
+            "Number of respondents (N)",
+            min_value=1,
+            value=210
+        )
+
+        is_summary = st.checkbox(
+            "The file contains a SUMMARY",
+            value=True
+        )
 
         st.divider()
+
         weighting_label = st.radio(
             "Weighting within the unit",
-            ["Volume (frequency)", "Concentration (repeatability)"]
+            [
+                "Volume (frequency)",
+                "Concentration (repeatability)"
+            ]
         )
-        weighting_mode = "volume" if "Volume" in weighting_label else "concentration"
+
+        weighting_mode = (
+            "volume"
+            if "Volume" in weighting_label
+            else "concentration"
+        )
 
         st.divider()
-        chart_mode = st.radio("Distribution display", ["Bar chart", "Treemap (colorful)", "Both"])
+
+        chart_mode = st.radio(
+            "Distribution display",
+            [
+                "Bar chart",
+                "Treemap (colorful)",
+                "Both"
+            ]
+        )
 
         st.divider()
-        st.markdown("### 🕸️ Factor / Opinion Network")
+
+        st.markdown(
+            "### 🕸️ Factor / Opinion Network"
+        )
+
         network_nodes = st.slider(
             "Number of network nodes",
             min_value=5,
             max_value=50,
             value=25,
             step=1,
-            help="The most critical factors/opinions become the largest nodes."
+            help=(
+                "The most critical factors/opinions "
+                "become the largest nodes."
+            )
         )
 
         st.divider()
-        uploaded_file = st.file_uploader("📁 Upload data", type=["txt", "csv", "xlsx"])
 
-    st.markdown("# 📊 Stress degree and kcal analysis PRO")
-    st.caption("Classification with Google Gemini/Gemma models · 5 scientific units (Social = social + partial social)")
+        uploaded_file = st.file_uploader(
+            "📁 Upload data",
+            type=[
+                "txt",
+                "csv",
+                "xlsx"
+            ]
+        )
+
+    # --------------------------------------------------------
+    # HEADER
+    # --------------------------------------------------------
+
+    st.markdown(
+        "# 📊 Stress degree and kcal analysis PRO"
+    )
+
+    st.caption(
+        "Classification with Google Gemini/Gemma models · "
+        "5 scientific units "
+        "(Social = social + partial social)"
+    )
+
+    # --------------------------------------------------------
+    # FILE CHECK
+    # --------------------------------------------------------
 
     if not uploaded_file:
-        st.info("📁 Upload a file to start the analysis.", icon="ℹ️")
+
+        st.info(
+            "📁 Upload a file to start the analysis.",
+            icon="ℹ️"
+        )
+
         return
 
+    # --------------------------------------------------------
+    # AI SETTINGS CHECK
+    # --------------------------------------------------------
+
     if classification_mode.startswith("AI"):
+
         if not api_key:
-            st.warning("⚠️ Enter a Google AI API key in the sidebar to use AI classification.")
-            return
-        if model_name == AVAILABLE_MODELS[0]:
-            st.warning("⚠️ Select a model in the sidebar.")
+
+            st.warning(
+                "⚠️ Enter a Google AI API key in the sidebar "
+                "to use AI classification."
+            )
+
             return
 
+        if model_name == AVAILABLE_MODELS[0]:
+
+            st.warning(
+                "⚠️ Select a model in the sidebar."
+            )
+
+            return
+
+    # --------------------------------------------------------
+    # READ DATA
+    # --------------------------------------------------------
+
     try:
-        if uploaded_file.name.endswith(".xlsx"):
-            df = pd.read_excel(uploaded_file)
-        elif uploaded_file.name.endswith(".txt"):
-            df = pd.read_csv(uploaded_file, sep="\t", engine="python", on_bad_lines="skip")
+
+        if uploaded_file.name.endswith(
+            ".xlsx"
+        ):
+
+            df = pd.read_excel(
+                uploaded_file
+            )
+
+        elif uploaded_file.name.endswith(
+            ".txt"
+        ):
+
+            df = pd.read_csv(
+                uploaded_file,
+                sep="\t",
+                engine="python",
+                on_bad_lines="skip"
+            )
+
         else:
-            df = pd.read_csv(uploaded_file, engine="python", on_bad_lines="skip")
+
+            df = pd.read_csv(
+                uploaded_file,
+                engine="python",
+                on_bad_lines="skip"
+            )
+
     except Exception as e:
-        st.error(f"Error reading the file: {e}")
+
+        st.error(
+            f"Error reading the file: {e}"
+        )
+
+        return
+
+    # --------------------------------------------------------
+    # EMPTY / INVALID DATASET CHECK
+    # --------------------------------------------------------
+
+    if df.empty:
+
+        st.error(
+            "The uploaded dataset is empty."
+        )
+
+        return
+
+    if len(df.columns) == 0:
+
+        st.error(
+            "The uploaded dataset contains no columns."
+        )
+
         return
 
     target_cols = df.columns.tolist()
 
-    with st.sidebar:
-        st.markdown("### 🧩 Columns")
-        col_pf = st.selectbox("Positive factors (PF)", target_cols, index=0)
-        col_sf = st.selectbox("Stress-related factors (SF)", target_cols, index=min(1, len(target_cols) - 1))
-        col_pr = st.selectbox("Suggestions (PR)", target_cols, index=min(2, len(target_cols) - 1))
+    # --------------------------------------------------------
+    # COLUMN SELECTION
+    # --------------------------------------------------------
 
-    # ---------------- CLASSIFICATION ----------------
+    with st.sidebar:
+
+        st.markdown(
+            "### 🧩 Columns"
+        )
+
+        col_pf = st.selectbox(
+            "Positive factors (PF)",
+            target_cols,
+            index=0
+        )
+
+        col_sf = st.selectbox(
+            "Stress-related factors (SF)",
+            target_cols,
+            index=min(
+                1,
+                len(target_cols) - 1
+            )
+        )
+
+        col_pr = st.selectbox(
+            "Suggestions (PR)",
+            target_cols,
+            index=min(
+                2,
+                len(target_cols) - 1
+            )
+        )
+
+    # ========================================================
+    # CLASSIFICATION
+    # ========================================================
+
     analysis = {}
 
     if classification_mode.startswith("AI"):
-        client = get_client(api_key)
+
+        try:
+
+            client = get_client(
+                api_key
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"Could not initialize Google AI client: {e}"
+            )
+
+            return
+
         for role, col, label in [
-            ("PF", col_pf, "🔵 Classifying positive factors ..."),
-            ("SF", col_sf, "🔴 Classifying stress-related factors ..."),
-            ("PR", col_pr, "🟢 Classifying suggestions ...")
+
+            (
+                "PF",
+                col_pf,
+                "🔵 Classifying positive factors ..."
+            ),
+
+            (
+                "SF",
+                col_sf,
+                "🔴 Classifying stress-related factors ..."
+            ),
+
+            (
+                "PR",
+                col_pr,
+                "🟢 Classifying suggestions ..."
+            )
+
         ]:
-            cls, per_row, per_row_items = run_ai_classification(
-                client, model_name, df, col, included_shorts, batch_size, label
-            )
-            analysis[role] = {
-                "classified": cls,
-                "per_row": per_row,
-                "per_row_items": per_row_items,
-                "col_name": col
-            }
-    else:
-        for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
-            cls, per_row, per_row_items = run_offline_classification(
-                df, col, included_shorts
-            )
+
+            try:
+
+                (
+                    cls,
+                    per_row,
+                    per_row_items
+                ) = run_ai_classification(
+                    client,
+                    model_name,
+                    df,
+                    col,
+                    included_shorts,
+                    batch_size,
+                    label
+                )
+
+            except Exception as e:
+
+                st.error(
+                    f"Classification error for {role}: {e}"
+                )
+
+                cls = []
+                per_row = []
+                per_row_items = []
+
             analysis[role] = {
                 "classified": cls,
                 "per_row": per_row,
@@ -1146,48 +2160,203 @@ def main():
                 "col_name": col
             }
 
-    # ---------------- GLOBAL CALCULATION ----------------
-    f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
-    f_sf_agg, _, _ = calculate_fo_real_aggregate(analysis["SF"]["classified"], n_input)
-    f_pr_agg, _, _ = calculate_fo_real_aggregate(analysis["PR"]["classified"], n_input)
+    else:
+
+        for role, col in [
+            ("PF", col_pf),
+            ("SF", col_sf),
+            ("PR", col_pr)
+        ]:
+
+            try:
+
+                (
+                    cls,
+                    per_row,
+                    per_row_items
+                ) = run_offline_classification(
+                    df,
+                    col,
+                    included_shorts
+                )
+
+            except Exception as e:
+
+                st.error(
+                    f"Offline classification error "
+                    f"for {role}: {e}"
+                )
+
+                cls = []
+                per_row = []
+                per_row_items = []
+
+            analysis[role] = {
+                "classified": cls,
+                "per_row": per_row,
+                "per_row_items": per_row_items,
+                "col_name": col
+            }
+
+    # ========================================================
+    # GLOBAL CALCULATION
+    # ========================================================
+
+    f_pf_agg, _, _ = calculate_fo_real_aggregate(
+        analysis["PF"]["classified"],
+        n_input
+    )
+
+    f_sf_agg, _, _ = calculate_fo_real_aggregate(
+        analysis["SF"]["classified"],
+        n_input
+    )
+
+    f_pr_agg, _, _ = calculate_fo_real_aggregate(
+        analysis["PR"]["classified"],
+        n_input
+    )
 
     if is_summary:
-        f_pr_agg = min(f_pr_agg, f_sf_agg * 1.5)
 
-    sigma_total = sigma_deg(f_sf_agg, f_pr_agg, f_pf_agg)
-    W_EU, eta, loss = calculate_energy(sigma_total)
+        f_pr_agg = min(
+            f_pr_agg,
+            f_sf_agg * 1.5
+        )
 
-    st.markdown("## 🎯 Overall Results")
+    sigma_total = sigma_deg(
+        f_sf_agg,
+        f_pr_agg,
+        f_pf_agg
+    )
+
+    W_EU, eta, loss = calculate_energy(
+        sigma_total
+    )
+
+    # ========================================================
+    # OVERALL RESULTS
+    # ========================================================
+
+    st.markdown(
+        "## 🎯 Overall Results"
+    )
+
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Stress intensity", f"{sigma_total:.2f} °S", rate_sigma(sigma_total))
-    m2.metric("Efficiency", f"{eta:.1f} %")
-    m3.metric("Energy loss", f"{loss:.0f} Kcal")
-    m4.metric("Sample (N)", n_input)
-    st.progress(min(sigma_total / 90.0, 1.0))
 
-    # ---------------- BREAKDOWN BY UNIT ----------------
+    m1.metric(
+        "Stress intensity",
+        f"{sigma_total:.2f} °S",
+        rate_sigma(sigma_total)
+    )
+
+    m2.metric(
+        "Efficiency",
+        f"{eta:.1f} %"
+    )
+
+    m3.metric(
+        "Energy loss",
+        f"{loss:.0f} Kcal"
+    )
+
+    m4.metric(
+        "Sample (N)",
+        n_input
+    )
+
+    st.progress(
+        min(
+            sigma_total / 90.0,
+            1.0
+        )
+    )
+
+    # ========================================================
+    # BREAKDOWN BY UNIT
+    # ========================================================
+
     st.divider()
-    f_pf_cat = compute_category_factors(analysis["PF"]["classified"], n_input, active_categories, weighting_mode)
-    f_sf_cat = compute_category_factors(analysis["SF"]["classified"], n_input, active_categories, weighting_mode)
-    f_pr_cat = compute_category_factors(analysis["PR"]["classified"], n_input, active_categories, weighting_mode)
 
-    sig_total_arg = min(sigma_argument(f_sf_agg, f_pr_agg, f_pf_agg), 1.0)
+    f_pf_cat = compute_category_factors(
+        analysis["PF"]["classified"],
+        n_input,
+        active_categories,
+        weighting_mode
+    )
+
+    f_sf_cat = compute_category_factors(
+        analysis["SF"]["classified"],
+        n_input,
+        active_categories,
+        weighting_mode
+    )
+
+    f_pr_cat = compute_category_factors(
+        analysis["PR"]["classified"],
+        n_input,
+        active_categories,
+        weighting_mode
+    )
+
+    sig_total_arg = min(
+        sigma_argument(
+            f_sf_agg,
+            f_pr_agg,
+            f_pf_agg
+        ),
+        1.0
+    )
+
     cat_sigmas, _ = compute_category_sigmas(
-        f_sf_cat, f_pf_cat, f_pr_cat, sig_total_arg, is_summary, active_categories
+        f_sf_cat,
+        f_pf_cat,
+        f_pr_cat,
+        sig_total_arg,
+        is_summary,
+        active_categories
     )
 
     rows = []
-    for cat, data in cat_sigmas.items():
-        rows.append({
-            "Unit": CATEGORY_SHORT[cat],
-            "σ (°S)": round(data["sigma"], 2),
-            "Share (%)": round(data["weight_share"] * 100, 1),
-            "Rating": rate_sigma(data["sigma"])
-        })
-    res_df = pd.DataFrame(rows).sort_values(by="σ (°S)", ascending=False)
 
-    st.markdown("### Distribution by Scientific Unit")
-    col_left, col_right = st.columns([1, 1])
+    for cat, data in cat_sigmas.items():
+
+        rows.append(
+            {
+                "Unit": CATEGORY_SHORT[cat],
+                "σ (°S)": round(
+                    data["sigma"],
+                    2
+                ),
+                "Share (%)": round(
+                    data["weight_share"] * 100,
+                    1
+                ),
+                "Rating": rate_sigma(
+                    data["sigma"]
+                )
+            }
+        )
+
+    res_df = (
+        pd.DataFrame(rows)
+        .sort_values(
+            by="σ (°S)",
+            ascending=False
+        )
+    )
+
+    # ========================================================
+    # DISTRIBUTION BY SCIENTIFIC UNIT
+    # ========================================================
+
+    st.markdown(
+        "### Distribution by Scientific Unit"
+    )
+
+    col_left, col_right = st.columns(
+        [1, 1]
+    )
 
     unit_fig = px.bar(
         res_df,
@@ -1196,20 +2365,36 @@ def main():
         color="σ (°S)",
         color_continuous_scale="Reds",
         height=300,
-        title="Stress intensity by scientific unit"
+        title=(
+            "Stress intensity by scientific unit"
+        )
     )
 
     with col_left:
-        st.dataframe(res_df, use_container_width=True, hide_index=True)
+
+        st.dataframe(
+            res_df,
+            use_container_width=True,
+            hide_index=True
+        )
 
     with col_right:
-        if chart_mode in ("Bar chart", "Both"):
+
+        if chart_mode in (
+            "Bar chart",
+            "Both"
+        ):
+
             st.plotly_chart(
                 unit_fig,
                 use_container_width=True
             )
 
-        if chart_mode in ("Treemap (colorful)", "Both"):
+        if chart_mode in (
+            "Treemap (colorful)",
+            "Both"
+        ):
+
             unit_treemap_fig = px.treemap(
                 res_df,
                 path=["Unit"],
@@ -1217,49 +2402,94 @@ def main():
                 color="σ (°S)",
                 color_continuous_scale="RdYlGn_r",
                 height=350,
-                title="Stress profile by scientific unit"
+                title=(
+                    "Stress profile by scientific unit"
+                )
             )
+
             st.plotly_chart(
                 unit_treemap_fig,
                 use_container_width=True
             )
 
-    # ---------------- TREEMAP: PF / SF / PR TOGETHER ----------------
-    st.markdown("### 🗺️ Treemap: All Phrases by Role and Unit")
+    # ========================================================
+    # TREEMAP: PF / SF / PR
+    # ========================================================
+
+    st.markdown(
+        "### 🗺️ Treemap: All Phrases by Role and Unit"
+    )
+
     tree_rows = []
-    role_labels = {"PF": "Positive", "SF": "Stress-related", "PR": "Suggestions"}
+
+    role_labels = {
+        "PF": "Positive",
+        "SF": "Stress-related",
+        "PR": "Suggestions"
+    }
+
     for role, label in role_labels.items():
-        freq = Counter(c for _, c in analysis[role]["classified"])
+
+        freq = Counter(
+            c
+            for _, c
+            in analysis[role]["classified"]
+        )
+
         for cat, count in freq.items():
-            tree_rows.append({
-                "Role": label,
-                "Unit": CATEGORY_SHORT[cat],
-                "Frequency": count
-            })
+
+            tree_rows.append(
+                {
+                    "Role": label,
+                    "Unit": CATEGORY_SHORT[cat],
+                    "Frequency": count
+                }
+            )
 
     role_tree_fig = None
 
     if tree_rows:
-        tree_df = pd.DataFrame(tree_rows)
+
+        tree_df = pd.DataFrame(
+            tree_rows
+        )
+
         role_tree_fig = px.treemap(
             tree_df,
-            path=["Role", "Unit"],
+            path=[
+                "Role",
+                "Unit"
+            ],
             values="Frequency",
             color="Frequency",
             color_continuous_scale="Turbo",
             height=450,
-            title="All classified phrases by role and unit"
+            title=(
+                "All classified phrases by role and unit"
+            )
         )
+
         st.plotly_chart(
             role_tree_fig,
             use_container_width=True
         )
-    else:
-        st.caption("There are no classified expressions to display in the treemap.")
 
-    # ---------------- FACTOR / OPINION NETWORK ----------------
+    else:
+
+        st.caption(
+            "There are no classified expressions "
+            "to display in the treemap."
+        )
+
+    # ========================================================
+    # FACTOR / OPINION NETWORK
+    # ========================================================
+
     st.divider()
-    st.markdown("## 🕸️ Factor and Opinion Network")
+
+    st.markdown(
+        "## 🕸️ Factor and Opinion Network"
+    )
 
     network_fig, net_df = build_factor_network(
         analysis,
@@ -1267,62 +2497,114 @@ def main():
     )
 
     if network_fig is not None:
+
         st.plotly_chart(
             network_fig,
             use_container_width=True
         )
 
         st.caption(
-            "Node size = criticality. Strong links are thick solid lines, "
-            "moderate links are thinner solid lines, and weak links are dashed. "
-            "Links represent co-occurrence in the same respondent answer."
+            "Node size = criticality. Strong links are thick "
+            "solid lines, moderate links are thinner solid "
+            "lines, and weak links are dashed. Links represent "
+            "co-occurrence in the same respondent answer."
         )
 
-        with st.expander("Critical Nodes / Opinions"):
+        with st.expander(
+            "Critical Nodes / Opinions"
+        ):
+
             st.dataframe(
                 net_df,
                 use_container_width=True,
                 hide_index=True
             )
+
     else:
+
         st.info(
-            "No classified factors/opinions are available for the network."
+            "No classified factors/opinions are available "
+            "for the network."
         )
 
-    # ---------------- QUALITATIVE REVIEW ----------------
-    with st.expander("🔍 Classification Details for Words/Phrases"):
+    # ========================================================
+    # QUALITATIVE REVIEW
+    # ========================================================
+
+    with st.expander(
+        "🔍 Classification Details for Words/Phrases"
+    ):
+
         t1, t2, t3 = st.tabs(
-            ["🟢 Positive", "🔴 Stress-related", "🔵 Suggestions"]
+            [
+                "🟢 Positive",
+                "🔴 Stress-related",
+                "🔵 Suggestions"
+            ]
         )
 
-        for tab, role in zip([t1, t2, t3], ["PF", "SF", "PR"]):
+        for tab, role in zip(
+            [t1, t2, t3],
+            ["PF", "SF", "PR"]
+        ):
+
             with tab:
+
                 freq = Counter(
                     category
-                    for _, category in analysis[role]["classified"]
+                    for _, category
+                    in analysis[role]["classified"]
                 )
 
-                st.table(
-                    pd.DataFrame([
-                        {
-                            "Unit": CATEGORY_SHORT.get(category, category),
-                            "Frequency": count
-                        }
-                        for category, count in freq.items()
-                    ])
+                if freq:
+
+                    st.table(
+                        pd.DataFrame(
+                            [
+                                {
+                                    "Unit":
+                                        CATEGORY_SHORT.get(
+                                            category,
+                                            category
+                                        ),
+                                    "Frequency":
+                                        count
+                                }
+                                for category, count
+                                in freq.items()
+                            ]
+                        )
+                    )
+
+                else:
+
+                    st.caption(
+                        "No classified expressions."
+                    )
+
+                st.markdown(
+                    "**Examples of classified phrases:**"
                 )
 
-                st.markdown("**Examples of classified phrases:**")
-                sample = analysis[role]["classified"][:40]
+                sample = (
+                    analysis[role]["classified"][:40]
+                )
 
                 if sample:
-                    sample_df = pd.DataFrame([
-                        {
-                            "Phrase": phrase,
-                            "Unit": CATEGORY_SHORT[category]
-                        }
-                        for phrase, category in sample
-                    ])
+
+                    sample_df = pd.DataFrame(
+                        [
+                            {
+                                "Phrase": phrase,
+                                "Unit":
+                                    CATEGORY_SHORT[
+                                        category
+                                    ]
+                            }
+                            for phrase, category
+                            in sample
+                        ]
+                    )
 
                     st.dataframe(
                         sample_df,
@@ -1330,20 +2612,32 @@ def main():
                         hide_index=True
                     )
 
+                else:
+
+                    st.caption(
+                        "No examples available."
+                    )
 
     # ========================================================
-    # REPORT EXPORT
+    # HTML REPORT EXPORT
     # ========================================================
 
     st.divider()
-    st.markdown("## 💾 Save report")
 
-    st.caption(
-        "HTML contains the calculations, tables, text and interactive Plotly "
-        "visualizations. PDF contains the calculations, tables and rendered images."
+    st.markdown(
+        "## 💾 Save report"
     )
 
-    report_title = "Stress degree and kcal analysis PRO — Report"
+    st.caption(
+        "The HTML report contains all calculations, tables, "
+        "text and interactive Plotly visualizations. "
+        "Slovenian and English characters "
+        "(č, š, ž, Č, Š, Ž) are fully supported."
+    )
+
+    report_title = (
+        "Stress degree and kcal analysis PRO — Report"
+    )
 
     html_report = build_report_html(
         report_title,
@@ -1355,87 +2649,55 @@ def main():
         loss,
         n_input,
         res_df,
-        unit_fig if 'unit_fig' in locals() else None,
-        role_tree_fig if 'role_tree_fig' in locals() else None,
+        unit_fig,
+        role_tree_fig,
         network_fig,
         net_df,
         text_sections=[
             (
                 "Method",
-                "PF = positive factors; SF = stress-related factors; "
-                "PR = suggestions/opinions. The network is based on co-occurrence "
-                "of classified expressions within the same respondent answer."
+                (
+                    "PF = positive factors; "
+                    "SF = stress-related factors; "
+                    "PR = suggestions/opinions. "
+                    "The network is based on co-occurrence "
+                    "of classified expressions within the "
+                    "same respondent answer."
+                )
             ),
             (
                 "Network interpretation",
-                "Node size represents criticality. Stress-related expressions "
-                "receive the highest role weight, followed by suggestions/opinions "
-                "and positive factors. Scientific unit slope weights are also applied."
+                (
+                    "Node size represents criticality. "
+                    "Stress-related expressions receive "
+                    "the highest role weight, followed by "
+                    "suggestions/opinions and positive factors. "
+                    "Scientific unit slope weights are also applied."
+                )
             )
         ]
     )
 
-    pdf_report = None
+    # --------------------------------------------------------
+    # HTML DOWNLOAD ONLY
+    # --------------------------------------------------------
 
-    try:
-        pdf_report = build_report_pdf(
-            report_title,
-            model_name,
-            classification_mode,
-            sigma_total,
-            W_EU,
-            eta,
-            loss,
-            n_input,
-            res_df,
-            [
-                (
-                    "Stress intensity by scientific unit",
-                    unit_fig if 'unit_fig' in locals() else None
-                ),
-                (
-                    "All classified phrases by role and unit",
-                    role_tree_fig if 'role_tree_fig' in locals() else None
-                ),
-                (
-                    "Factor and opinion network",
-                    network_fig
-                )
-            ],
-            net_df
-        )
-    except Exception as e:
-        st.warning(
-            f"PDF generation failed: {e}"
-        )
+    st.download_button(
+        "⬇️ Save Complete Report as HTML",
+        data=html_report.encode(
+            "utf-8"
+        ),
+        file_name=(
+            "petric_stress_analysis_report.html"
+        ),
+        mime="text/html; charset=utf-8",
+        use_container_width=True
+    )
 
-    c1, c2 = st.columns(2)
 
-    with c1:
-        st.download_button(
-            "⬇️ Save Complete Report as HTML",
-            data=html_report.encode("utf-8"),
-            file_name="petric_stress_analysis_report.html",
-            mime="text/html",
-            use_container_width=True
-        )
-
-    with c2:
-        if pdf_report:
-            st.download_button(
-                "⬇️ Save Complete Report as PDF",
-                data=pdf_report,
-                file_name="petric_stress_analysis_report.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-        else:
-            st.button(
-                "⬇️ Save Complete Report as PDF",
-                disabled=True,
-                use_container_width=True
-            )
-
+# ============================================================
+# 12. APPLICATION ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
     main()
