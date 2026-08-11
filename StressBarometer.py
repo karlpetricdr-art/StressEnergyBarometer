@@ -4,14 +4,32 @@ import re
 import math
 import json
 import time
+import html
+from io import BytesIO
 from collections import Counter, defaultdict
 from typing import List, Literal, Optional
 
 import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+import networkx as nx
 
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
+
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        Image as RLImage, PageBreak
+    )
+    REPORTLAB_AVAILABLE = True
+except Exception:
+    REPORTLAB_AVAILABLE = False
 
 
 # ============================================================
@@ -231,13 +249,24 @@ def rate_sigma(sigma):
 
 AVAILABLE_MODELS = [
     "-- select a model --",
-    "gemini-2.5-flash-lite",
     "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.6-flash",
     "gemma-4-26b-a4b-it",
     "gemma-4-31b-it",
 ]
+
+MODEL_NOTES = {
+    "gemini-3.5-flash-lite": "Fast Flash-Lite model for high-throughput classification.",
+    "gemini-3.1-flash-lite": "Fast and efficient Flash-Lite model for classification.",
+    "gemini-2.5-flash-lite": "Lightweight Flash-Lite model suitable for fast classification.",
+    "gemini-3.5-flash": "More capable general Flash model.",
+    "gemini-3.6-flash": "Higher-capability Flash model when available to the API key.",
+    "gemma-4-26b-a4b-it": "Gemma model for classification.",
+    "gemma-4-31b-it": "Gemma model for classification.",
+}
 
 
 # ============================================================
@@ -344,6 +373,7 @@ def run_ai_classification(client, model_name, df, col, allowed_short_names,
     rows_text = [(i, str(v)) for i, v in df[col].dropna().items()]
     classified = []
     per_row_categories = []
+    per_row_items = []
     row_id_to_idx = {}
 
     progress = st.progress(0.0, text=progress_label)
@@ -357,10 +387,11 @@ def run_ai_classification(client, model_name, df, col, allowed_short_names,
             items = result.get(rid, [])
             classified.extend(items)
             per_row_categories.append([c for _, c in items])
+            per_row_items.append(items)
         progress.progress((b_i + 1) / max(len(batches), 1), text=progress_label)
     progress.empty()
 
-    return classified, per_row_categories
+    return classified, per_row_categories, per_row_items
 
 
 # ============================================================
@@ -393,15 +424,19 @@ def classify_word_single(word, allowed_short_names):
 def run_offline_classification(df, col, allowed_short_names):
     classified = []
     per_row_categories = []
+    per_row_items = []
     for row in df[col].dropna():
         row_cats = []
+        row_items = []
         for kw in clean_and_tokenize(row):
             cat = classify_word_single(kw, allowed_short_names)
             if cat:
                 classified.append((kw, cat))
                 row_cats.append(cat)
+                row_items.append((kw, cat))
         per_row_categories.append(row_cats)
-    return classified, per_row_categories
+        per_row_items.append(row_items)
+    return classified, per_row_categories, per_row_items
 
 
 # ============================================================
@@ -494,8 +529,488 @@ def calculate_energy(sigma):
     return W_EU, eta, loss
 
 
+
 # ============================================================
-# 9. MAIN STREAMLIT APPLICATION (UI)
+# 9. FACTOR / OPINION NETWORK
+# ============================================================
+
+ROLE_LABELS = {
+    "PF": "Positive",
+    "SF": "Stress-related",
+    "PR": "Opinion / suggestion"
+}
+
+ROLE_CRITICALITY = {
+    "PF": 0.5,
+    "SF": 3.0,
+    "PR": 1.5
+}
+
+
+def normalize_network_phrase(phrase):
+    return re.sub(r"\s+", " ", str(phrase).strip().lower())
+
+
+def build_factor_network(analysis, max_nodes=25):
+    """
+    Co-occurrence network of classified factors/opinions.
+
+    Node size is based on criticality:
+      SF = 3.0
+      PR = 1.5
+      PF = 0.5
+
+    Criticality is additionally multiplied by the scientific
+    slope weight of the corresponding unit.
+
+    Edge strength:
+      3+ co-occurrences = strong solid
+      2 co-occurrences = moderate solid
+      1 co-occurrence = weak dashed
+    """
+
+    node_data = defaultdict(lambda: {
+        "count": 0,
+        "roles": Counter(),
+        "categories": Counter(),
+        "criticality": 0.0
+    })
+
+    max_rows = max(
+        (len(analysis[r].get("per_row_items", [])) for r in ROLE_LABELS),
+        default=0
+    )
+
+    row_documents = []
+
+    for i in range(max_rows):
+        row_nodes = set()
+
+        for role in ROLE_LABELS:
+            items = analysis[role].get("per_row_items", [])
+            if i >= len(items):
+                continue
+
+            for phrase, category in items[i]:
+                key = normalize_network_phrase(phrase)
+                if not key or len(key) < 2:
+                    continue
+
+                node_data[key]["count"] += 1
+                node_data[key]["roles"][role] += 1
+                node_data[key]["categories"][category] += 1
+                node_data[key]["criticality"] += (
+                    ROLE_CRITICALITY[role]
+                    * SLOPE_WEIGHTS.get(category, 1.0)
+                )
+                row_nodes.add(key)
+
+        if row_nodes:
+            row_documents.append(row_nodes)
+
+    if not node_data:
+        return None, None
+
+    max_nodes = max(5, min(50, int(max_nodes)))
+
+    selected = sorted(
+        node_data,
+        key=lambda x: (
+            node_data[x]["criticality"],
+            node_data[x]["count"]
+        ),
+        reverse=True
+    )[:max_nodes]
+
+    selected_set = set(selected)
+    graph = nx.Graph()
+
+    for node in selected:
+        d = node_data[node]
+        category = d["categories"].most_common(1)[0][0]
+        role = d["roles"].most_common(1)[0][0]
+
+        graph.add_node(
+            node,
+            criticality=d["criticality"],
+            count=d["count"],
+            category=category,
+            role=role
+        )
+
+    edge_counts = Counter()
+
+    for row_nodes in row_documents:
+        nodes = sorted(row_nodes.intersection(selected_set))
+        for i in range(len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                edge_counts[(nodes[i], nodes[j])] += 1
+
+    for (a, b), strength in edge_counts.items():
+        graph.add_edge(a, b, strength=strength)
+
+    if len(graph) == 1:
+        pos = {next(iter(graph.nodes)): (0, 0)}
+    else:
+        pos = nx.spring_layout(
+            graph,
+            seed=42,
+            k=1.7 / math.sqrt(max(len(graph.nodes), 1)),
+            iterations=120,
+            weight="strength"
+        )
+
+    fig = go.Figure()
+
+    edge_styles = [
+        ("strong", 3, 4.5, "solid", "Strong connection"),
+        ("medium", 2, 2.5, "solid", "Moderate connection"),
+        ("weak", 1, 1.2, "dash", "Weak / dashed connection"),
+    ]
+
+    for style_name, min_strength, width, dash, legend_name in edge_styles:
+        x, y = [], []
+
+        for a, b, data in graph.edges(data=True):
+            strength = data["strength"]
+            qualifies = (
+                strength >= min_strength
+                if style_name != "weak"
+                else strength == 1
+            )
+
+            if not qualifies:
+                continue
+
+            x.extend([pos[a][0], pos[b][0], None])
+            y.extend([pos[a][1], pos[b][1], None])
+
+        if x:
+            fig.add_trace(go.Scatter(
+                x=x,
+                y=y,
+                mode="lines",
+                line=dict(width=width, dash=dash),
+                hoverinfo="skip",
+                name=legend_name
+            ))
+
+    for category in CATEGORY_SHORT:
+        nodes = [
+            n for n in graph.nodes
+            if graph.nodes[n]["category"] == category
+        ]
+        if not nodes:
+            continue
+
+        xs = [pos[n][0] for n in nodes]
+        ys = [pos[n][1] for n in nodes]
+        sizes = [
+            16 + 9 * math.sqrt(max(graph.nodes[n]["criticality"], 0.1))
+            for n in nodes
+        ]
+
+        hover = [
+            (
+                f"<b>{html.escape(n)}</b><br>"
+                f"Unit: {CATEGORY_SHORT[graph.nodes[n]['category']]}<br>"
+                f"Role: {ROLE_LABELS[graph.nodes[n]['role']]}<br>"
+                f"Occurrences: {graph.nodes[n]['count']}<br>"
+                f"Criticality: {graph.nodes[n]['criticality']:.2f}"
+            )
+            for n in nodes
+        ]
+
+        fig.add_trace(go.Scatter(
+            x=xs,
+            y=ys,
+            mode="markers+text",
+            text=nodes,
+            textposition="top center",
+            marker=dict(size=sizes, line=dict(width=1)),
+            hovertext=hover,
+            hoverinfo="text",
+            name=CATEGORY_SHORT[category]
+        ))
+
+    fig.update_layout(
+        title="Factor & opinion network — node size = criticality",
+        height=720,
+        template="plotly_white",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        margin=dict(l=20, r=20, t=80, b=20)
+    )
+
+    fig.update_xaxes(showgrid=False, zeroline=False, visible=False)
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+        visible=False,
+        scaleanchor="x",
+        scaleratio=1
+    )
+
+    net_df = pd.DataFrame([
+        {
+            "Node": n,
+            "Unit": CATEGORY_SHORT[graph.nodes[n]["category"]],
+            "Role": ROLE_LABELS[graph.nodes[n]["role"]],
+            "Occurrences": graph.nodes[n]["count"],
+            "Criticality": round(graph.nodes[n]["criticality"], 2)
+        }
+        for n in sorted(
+            graph.nodes,
+            key=lambda x: graph.nodes[x]["criticality"],
+            reverse=True
+        )
+    ])
+
+    return fig, net_df
+
+
+# ============================================================
+# 10. REPORT EXPORT
+# ============================================================
+
+def fig_to_png_bytes(fig, width=1400, height=800):
+    if fig is None:
+        return None
+
+    try:
+        return pio.to_image(
+            fig,
+            format="png",
+            width=width,
+            height=height,
+            scale=1
+        )
+    except Exception:
+        return None
+
+
+def build_report_html(
+    title,
+    model_name,
+    classification_mode,
+    sigma_total,
+    W_EU,
+    eta,
+    loss,
+    n_input,
+    res_df,
+    unit_fig,
+    role_tree_fig,
+    network_fig,
+    net_df,
+    text_sections=None
+):
+    generated = time.strftime("%Y-%m-%d %H:%M")
+
+    parts = [
+        f"<h1>{html.escape(title)}</h1>",
+        (
+            f"<p><b>Generated:</b> {generated}<br>"
+            f"<b>Mode:</b> {html.escape(classification_mode)}<br>"
+            f"<b>Model:</b> {html.escape(model_name or 'Offline dictionary')}<br>"
+            f"<b>N:</b> {n_input}</p>"
+        ),
+        "<h2>Overall results</h2>",
+        (
+            f"<p><b>Stress intensity:</b> {sigma_total:.2f} °S<br>"
+            f"<b>Rating:</b> {html.escape(rate_sigma(sigma_total))}<br>"
+            f"<b>Efficiency:</b> {eta:.1f}%<br>"
+            f"<b>Energy loss:</b> {loss:.0f} Kcal<br>"
+            f"<b>Useful energy:</b> {W_EU:.0f} Kcal</p>"
+        ),
+        "<h2>Distribution by scientific unit</h2>",
+        res_df.to_html(
+            index=False,
+            border=0,
+            classes="report-table"
+        )
+    ]
+
+    if text_sections:
+        for heading, body in text_sections:
+            parts.append(f"<h2>{html.escape(heading)}</h2>")
+            parts.append(f"<p>{html.escape(body).replace(chr(10), '<br>')}</p>")
+
+    for heading, fig in [
+        ("Stress intensity by scientific unit", unit_fig),
+        ("All classified phrases by role and unit", role_tree_fig),
+        ("Factor and opinion network", network_fig)
+    ]:
+        if fig is not None:
+            parts.append(f"<h2>{html.escape(heading)}</h2>")
+            parts.append(
+                fig.to_html(
+                    full_html=False,
+                    include_plotlyjs="cdn" if not any(
+                        "plotly" in p for p in parts
+                    ) else False,
+                    config={"responsive": True}
+                )
+            )
+
+    if net_df is not None and not net_df.empty:
+        parts.append("<h2>Critical network nodes</h2>")
+        parts.append(
+            net_df.to_html(
+                index=False,
+                border=0,
+                classes="report-table"
+            )
+        )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(title)}</title>
+<style>
+body {{
+    font-family: Arial, sans-serif;
+    margin: 32px;
+    color: #1f2937;
+    line-height: 1.45;
+}}
+h1 {{ color: #111827; }}
+h2 {{ margin-top: 35px; }}
+.report-table {{
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0 24px;
+}}
+.report-table th,
+.report-table td {{
+    border: 1px solid #d1d5db;
+    padding: 7px;
+    text-align: left;
+}}
+.report-table th {{ background: #f3f4f6; }}
+</style>
+</head>
+<body>
+{''.join(parts)}
+</body>
+</html>"""
+
+
+def build_report_pdf(
+    title,
+    model_name,
+    classification_mode,
+    sigma_total,
+    W_EU,
+    eta,
+    loss,
+    n_input,
+    res_df,
+    figures,
+    net_df
+):
+    if not REPORTLAB_AVAILABLE:
+        return None
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=28,
+        leftMargin=28,
+        topMargin=28,
+        bottomMargin=28
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "ReportTitle",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
+        fontSize=20
+    )
+
+    story = [
+        Paragraph(html.escape(title), title_style),
+        Spacer(1, 10),
+        Paragraph(
+            (
+                f"Generated: {time.strftime('%Y-%m-%d %H:%M')} · "
+                f"Mode: {html.escape(classification_mode)} · "
+                f"Model: {html.escape(model_name or 'Offline dictionary')} · "
+                f"N={n_input}"
+            ),
+            styles["Normal"]
+        ),
+        Spacer(1, 12),
+        Paragraph("Overall results", styles["Heading2"]),
+        Paragraph(
+            (
+                f"Stress intensity: <b>{sigma_total:.2f} °S</b> · "
+                f"Rating: <b>{html.escape(rate_sigma(sigma_total))}</b> · "
+                f"Efficiency: <b>{eta:.1f}%</b> · "
+                f"Energy loss: <b>{loss:.0f} Kcal</b> · "
+                f"Useful energy: <b>{W_EU:.0f} Kcal</b>"
+            ),
+            styles["Normal"]
+        ),
+        Spacer(1, 12),
+        Paragraph("Distribution by scientific unit", styles["Heading2"])
+    ]
+
+    table_data = (
+        [list(res_df.columns)]
+        + res_df.astype(str).values.tolist()
+    )
+
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(table)
+
+    for caption, fig in figures:
+        img_bytes = fig_to_png_bytes(fig)
+        if img_bytes:
+            story.extend([
+                PageBreak(),
+                Paragraph(caption, styles["Heading2"]),
+                RLImage(BytesIO(img_bytes), width=720, height=390)
+            ])
+
+    if net_df is not None and not net_df.empty:
+        story.extend([
+            PageBreak(),
+            Paragraph("Critical network nodes", styles["Heading2"])
+        ])
+
+        nd = (
+            [list(net_df.columns)]
+            + net_df.astype(str).values.tolist()
+        )
+        nt = Table(nd, repeatRows=1)
+        nt.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.append(nt)
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
+# ============================================================
+# 11. MAIN STREAMLIT APPLICATION (UI)
 # ============================================================
 
 def main():
@@ -522,7 +1037,12 @@ def main():
                 help="Get a free key at https://aistudio.google.com/apikey"
             )
             model_name = st.selectbox("Model", AVAILABLE_MODELS, index=0)
-            batch_size = st.slider("Batch size (rows per call)", 5, 40, 15)
+            if model_name != AVAILABLE_MODELS[0]:
+                st.caption(MODEL_NOTES.get(model_name, ""))
+            batch_size = st.slider("Batch size (rows per call)", 0, 50, 15)
+            if batch_size == 0:
+                st.warning("Batch size 0 is not valid for an API call; it will be treated as 1.")
+                batch_size = 1
 
         st.divider()
         st.markdown("### 🧭 Which units should be included?")
@@ -546,6 +1066,17 @@ def main():
 
         st.divider()
         chart_mode = st.radio("Distribution display", ["Bar chart", "Treemap (colorful)", "Both"])
+
+        st.divider()
+        st.markdown("### 🕸️ Factor / opinion network")
+        network_nodes = st.slider(
+            "Number of nodes",
+            min_value=5,
+            max_value=50,
+            value=25,
+            step=1,
+            help="The most critical factors/opinions become the largest nodes."
+        )
 
         st.divider()
         uploaded_file = st.file_uploader("📁 Upload data", type=["txt", "csv", "xlsx"])
@@ -594,14 +1125,26 @@ def main():
             ("SF", col_sf, "🔴 Classifying stress-related factors ..."),
             ("PR", col_pr, "🟢 Classifying suggestions ...")
         ]:
-            cls, per_row = run_ai_classification(
+            cls, per_row, per_row_items = run_ai_classification(
                 client, model_name, df, col, included_shorts, batch_size, label
             )
-            analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
+            analysis[role] = {
+                "classified": cls,
+                "per_row": per_row,
+                "per_row_items": per_row_items,
+                "col_name": col
+            }
     else:
         for role, col in [("PF", col_pf), ("SF", col_sf), ("PR", col_pr)]:
-            cls, per_row = run_offline_classification(df, col, included_shorts)
-            analysis[role] = {"classified": cls, "per_row": per_row, "col_name": col}
+            cls, per_row, per_row_items = run_offline_classification(
+                df, col, included_shorts
+            )
+            analysis[role] = {
+                "classified": cls,
+                "per_row": per_row,
+                "per_row_items": per_row_items,
+                "col_name": col
+            }
 
     # ---------------- GLOBAL CALCULATION ----------------
     f_pf_agg, _, _ = calculate_fo_real_aggregate(analysis["PF"]["classified"], n_input)
@@ -645,23 +1188,39 @@ def main():
 
     st.markdown("### Distribution by scientific unit")
     col_left, col_right = st.columns([1, 1])
+
+    unit_fig = px.bar(
+        res_df,
+        x="Unit",
+        y="σ (°S)",
+        color="σ (°S)",
+        color_continuous_scale="Reds",
+        height=300,
+        title="Stress intensity by scientific unit"
+    )
+
     with col_left:
         st.dataframe(res_df, use_container_width=True, hide_index=True)
 
     with col_right:
         if chart_mode in ("Bar chart", "Both"):
             st.plotly_chart(
-                px.bar(res_df, x="Unit", y="σ (°S)", color="σ (°S)",
-                       color_continuous_scale="Reds", height=300),
+                unit_fig,
                 use_container_width=True
             )
+
         if chart_mode in ("Treemap (colorful)", "Both"):
+            unit_treemap_fig = px.treemap(
+                res_df,
+                path=["Unit"],
+                values="σ (°S)",
+                color="σ (°S)",
+                color_continuous_scale="RdYlGn_r",
+                height=350,
+                title="Stress profile by scientific unit"
+            )
             st.plotly_chart(
-                px.treemap(
-                    res_df, path=["Unit"], values="σ (°S)",
-                    color="σ (°S)", color_continuous_scale="RdYlGn_r",
-                    height=350
-                ),
+                unit_treemap_fig,
                 use_container_width=True
             )
 
@@ -677,19 +1236,60 @@ def main():
                 "Unit": CATEGORY_SHORT[cat],
                 "Frequency": count
             })
+
+    role_tree_fig = None
+
     if tree_rows:
         tree_df = pd.DataFrame(tree_rows)
+        role_tree_fig = px.treemap(
+            tree_df,
+            path=["Role", "Unit"],
+            values="Frequency",
+            color="Frequency",
+            color_continuous_scale="Turbo",
+            height=450,
+            title="All classified phrases by role and unit"
+        )
         st.plotly_chart(
-            px.treemap(
-                tree_df, path=["Role", "Unit"], values="Frequency",
-                color="Frequency", color_continuous_scale="Turbo", height=450
-            ),
+            role_tree_fig,
             use_container_width=True
         )
     else:
         st.caption("There are no classified expressions to display in the treemap.")
 
-        # ---------------- QUALITATIVE REVIEW ----------------
+    # ---------------- FACTOR / OPINION NETWORK ----------------
+    st.divider()
+    st.markdown("## 🕸️ Factor and opinion network")
+
+    network_fig, net_df = build_factor_network(
+        analysis,
+        network_nodes
+    )
+
+    if network_fig is not None:
+        st.plotly_chart(
+            network_fig,
+            use_container_width=True
+        )
+
+        st.caption(
+            "Node size = criticality. Strong links are thick solid lines, "
+            "moderate links are thinner solid lines, and weak links are dashed. "
+            "Links represent co-occurrence in the same respondent answer."
+        )
+
+        with st.expander("Critical nodes / opinions"):
+            st.dataframe(
+                net_df,
+                use_container_width=True,
+                hide_index=True
+            )
+    else:
+        st.info(
+            "No classified factors/opinions are available for the network."
+        )
+
+    # ---------------- QUALITATIVE REVIEW ----------------
     with st.expander("🔍 Classification details for words/phrases"):
         t1, t2, t3 = st.tabs(
             ["🟢 Positive", "🔴 Stress-related", "🔵 Suggestions"]
@@ -729,6 +1329,112 @@ def main():
                         use_container_width=True,
                         hide_index=True
                     )
+
+
+    # ========================================================
+    # REPORT EXPORT
+    # ========================================================
+
+    st.divider()
+    st.markdown("## 💾 Save report")
+
+    st.caption(
+        "HTML contains the calculations, tables, text and interactive Plotly "
+        "visualizations. PDF contains the calculations, tables and rendered images."
+    )
+
+    report_title = "Petrič Stress Analysis Pro — Report"
+
+    html_report = build_report_html(
+        report_title,
+        model_name,
+        classification_mode,
+        sigma_total,
+        W_EU,
+        eta,
+        loss,
+        n_input,
+        res_df,
+        unit_fig if 'unit_fig' in locals() else None,
+        role_tree_fig if 'role_tree_fig' in locals() else None,
+        network_fig,
+        net_df,
+        text_sections=[
+            (
+                "Method",
+                "PF = positive factors; SF = stress-related factors; "
+                "PR = suggestions/opinions. The network is based on co-occurrence "
+                "of classified expressions within the same respondent answer."
+            ),
+            (
+                "Network interpretation",
+                "Node size represents criticality. Stress-related expressions "
+                "receive the highest role weight, followed by suggestions/opinions "
+                "and positive factors. Scientific unit slope weights are also applied."
+            )
+        ]
+    )
+
+    pdf_report = None
+
+    try:
+        pdf_report = build_report_pdf(
+            report_title,
+            model_name,
+            classification_mode,
+            sigma_total,
+            W_EU,
+            eta,
+            loss,
+            n_input,
+            res_df,
+            [
+                (
+                    "Stress intensity by scientific unit",
+                    unit_fig if 'unit_fig' in locals() else None
+                ),
+                (
+                    "All classified phrases by role and unit",
+                    role_tree_fig if 'role_tree_fig' in locals() else None
+                ),
+                (
+                    "Factor and opinion network",
+                    network_fig
+                )
+            ],
+            net_df
+        )
+    except Exception as e:
+        st.warning(
+            f"PDF generation failed: {e}"
+        )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.download_button(
+            "⬇️ Save complete report as HTML",
+            data=html_report.encode("utf-8"),
+            file_name="petric_stress_analysis_report.html",
+            mime="text/html",
+            use_container_width=True
+        )
+
+    with c2:
+        if pdf_report:
+            st.download_button(
+                "⬇️ Save complete report as PDF",
+                data=pdf_report,
+                file_name="petric_stress_analysis_report.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        else:
+            st.button(
+                "⬇️ Save complete report as PDF",
+                disabled=True,
+                use_container_width=True
+            )
 
 
 if __name__ == "__main__":
