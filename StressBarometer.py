@@ -120,7 +120,7 @@ st.markdown(
         border: 1px solid rgba(148, 163, 184, 0.35);
     }
 
-    .action-btn button {
+    .st-key-action_btn_container button {
         background: linear-gradient(145deg, #16a34a, #15803d) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
@@ -130,7 +130,7 @@ st.markdown(
             -2px -2px 6px rgba(255, 255, 255, 0.25) !important;
     }
 
-    .action-btn button:hover {
+    .st-key-action_btn_container button:hover {
         background: linear-gradient(145deg, #15803d, #166534) !important;
         color: #ffffff !important;
     }
@@ -2360,21 +2360,14 @@ def main():
                 "analysis_triggered"
             ] = False
 
-        st.markdown(
-            '<div class="action-btn">',
-            unsafe_allow_html=True
-        )
+        with st.container(key="action_btn_container"):
 
-        run_clicked = st.button(
-            "▶️ Action — Run analysis",
-            use_container_width=True,
-            disabled=(uploaded_file is None)
-        )
-
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
-        )
+            run_clicked = st.button(
+                "▶️ Action — Run analysis",
+                use_container_width=True,
+                type="primary",
+                disabled=(uploaded_file is None)
+            )
 
         if run_clicked:
 
