@@ -145,11 +145,11 @@ SIDEBAR_LOGO_HTML = (
     "html,body{margin:0;padding:0;background:transparent;"
     "font-family:'Segoe UI',Arial,sans-serif;}"
     ".wrap{display:flex;justify-content:center;align-items:center;"
-    "height:176px;}"
+    "height:150px;}"
     ".logo-row{display:flex;align-items:center;justify-content:center;"
-    "gap:12px;}"
+    "gap:8px;}"
     ".badge{position:relative;background:linear-gradient(145deg,#f7faff 0%,#d9e2ec 48%,#bcc9d7 100%);"
-    "border-radius:20px;padding:10px;"
+    "border-radius:16px;padding:7px;"
     "box-shadow:8px 8px 18px rgba(100,116,139,0.42),"
     "-7px -7px 16px rgba(255,255,255,0.95),"
     "inset 2px 2px 4px rgba(255,255,255,0.82),"
@@ -157,16 +157,16 @@ SIDEBAR_LOGO_HTML = (
     "border:1px solid rgba(148,163,184,0.42);"
     "transform:translateY(-1px);}"
     ".badge:before{content:'';position:absolute;left:7px;right:7px;top:5px;"
-    "height:28%;border-radius:15px 15px 9px 9px;"
+    "height:28%;border-radius:12px 12px 8px 8px;"
     "background:linear-gradient(180deg,rgba(255,255,255,0.52),rgba(255,255,255,0));"
     "pointer-events:none;}"
-    "img{display:block;width:132px;height:auto;border-radius:13px;"
+    "img{display:block;width:104px;height:auto;border-radius:11px;"
     "box-shadow:4px 5px 9px rgba(15,23,42,0.42),"
     "-2px -2px 5px rgba(255,255,255,0.78),"
     "inset 0 0 0 1px rgba(255,255,255,0.45);"
     "border:1px solid rgba(100,116,139,0.38);"
     "filter:drop-shadow(0 2px 2px rgba(15,23,42,0.18));}"
-    ".green-square{width:34px;height:34px;border-radius:11px;"
+    ".green-square{width:27px;height:27px;border-radius:9px;"
     "background:linear-gradient(145deg,#4ade80 0%,#16a34a 52%,#15803d 100%);"
     "border:1px solid rgba(22,101,52,0.45);"
     "box-shadow:5px 5px 9px rgba(21,128,61,0.34),"
@@ -174,8 +174,8 @@ SIDEBAR_LOGO_HTML = (
     "inset 2px 2px 3px rgba(255,255,255,0.38),"
     "inset -2px -2px 4px rgba(5,80,35,0.30);"
     "position:relative;transform:translateY(-1px);}"
-    ".green-square:after{content:'';position:absolute;left:7px;top:6px;"
-    "width:11px;height:6px;border-radius:50%;"
+    ".green-square:after{content:'';position:absolute;left:6px;top:5px;"
+    "width:9px;height:5px;border-radius:50%;"
     "background:rgba(255,255,255,0.34);transform:rotate(-28deg);}"
     "</style></head><body>"
     "<div class=\"wrap\"><div class=\"logo-row\"><div class=\"badge\">"
@@ -2102,7 +2102,7 @@ p {{
 
 <div class="footer">
     Petrič Stress Analysis Pro<br>
-    Stress degree and kcal analysis
+    Scientific basis: Karl Petrič, <i>Gaining knowledge through understanding distress and positive factors in social environments</i>, European Review of Applied Sociology, 2025. DOI: 10.2478/eras-2025-0003
 </div>
 
 </body>
@@ -2124,7 +2124,7 @@ def main():
 
         components.html(
             SIDEBAR_LOGO_HTML,
-            height=190,
+            height=158,
             scrolling=False
         )
 
@@ -2406,6 +2406,15 @@ def main():
         st.info(
             "📁 Upload a file to start the analysis.",
             icon="ℹ️"
+        )
+
+        st.markdown(
+            "### 📚 Scientific basis"
+        )
+        st.markdown(
+            "**Petrič, K.** *Gaining knowledge through understanding distress and positive factors in social environments.* "
+            "**European Review of Applied Sociology**, 2025-06-03, Journal article. "
+            "DOI: [10.2478/eras-2025-0003](https://doi.org/10.2478/eras-2025-0003)"
         )
 
         st.markdown(
