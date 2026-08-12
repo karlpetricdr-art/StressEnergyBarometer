@@ -103,6 +103,38 @@ st.markdown(
         font-size: 0.9rem;
     }
 
+    .sidebar-logo-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 6px 0 14px 0;
+    }
+
+    .sidebar-logo-badge {
+        background: linear-gradient(145deg, #eef2f8, #cdd7e3);
+        border-radius: 20px;
+        padding: 10px 14px 8px 14px;
+        box-shadow:
+            6px 6px 14px rgba(148, 163, 184, 0.55),
+            -6px -6px 14px rgba(255, 255, 255, 0.85),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    .action-btn button {
+        background: linear-gradient(145deg, #16a34a, #15803d) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        border: none !important;
+        box-shadow:
+            3px 3px 8px rgba(21, 128, 61, 0.35),
+            -2px -2px 6px rgba(255, 255, 255, 0.25) !important;
+    }
+
+    .action-btn button:hover {
+        background: linear-gradient(145deg, #15803d, #166534) !important;
+        color: #ffffff !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -2047,6 +2079,61 @@ def main():
     with st.sidebar:
 
         st.markdown(
+            """
+            <div class="sidebar-logo-wrap">
+              <div class="sidebar-logo-badge">
+                <svg width="210" height="86" viewBox="0 0 210 86"
+                     xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stop-color="#15803d"/>
+                      <stop offset="45%" stop-color="#f59e0b"/>
+                      <stop offset="100%" stop-color="#dc2626"/>
+                    </linearGradient>
+                    <linearGradient id="sunGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#fde68a"/>
+                      <stop offset="100%" stop-color="#f59e0b"/>
+                    </linearGradient>
+                    <filter id="reliefShadow" x="-40%" y="-40%" width="180%" height="180%">
+                      <feDropShadow dx="0" dy="2" stdDeviation="1.3"
+                                    flood-color="#0f172a" flood-opacity="0.45"/>
+                      <feDropShadow dx="0" dy="-1" stdDeviation="0.8"
+                                    flood-color="#ffffff" flood-opacity="0.65"/>
+                    </filter>
+                  </defs>
+
+                  <g filter="url(#reliefShadow)">
+                    <rect x="18" y="52" width="15" height="22" rx="3" fill="url(#barGrad)"/>
+                    <rect x="40" y="42" width="15" height="32" rx="3" fill="url(#barGrad)"/>
+                    <rect x="62" y="28" width="15" height="46" rx="3" fill="url(#barGrad)"/>
+                    <rect x="84" y="14" width="15" height="60" rx="3" fill="url(#barGrad)"/>
+                  </g>
+
+                  <circle cx="150" cy="26" r="13" fill="url(#sunGrad)" filter="url(#reliefShadow)"/>
+                  <g stroke="#f59e0b" stroke-width="2" stroke-linecap="round">
+                    <line x1="150" y1="6" x2="150" y2="1"/>
+                    <line x1="150" y1="46" x2="150" y2="51"/>
+                    <line x1="130" y1="26" x2="125" y2="26"/>
+                    <line x1="170" y1="26" x2="175" y2="26"/>
+                    <line x1="136" y1="12" x2="132" y2="8"/>
+                    <line x1="164" y1="40" x2="168" y2="44"/>
+                    <line x1="164" y1="12" x2="168" y2="8"/>
+                    <line x1="136" y1="40" x2="132" y2="44"/>
+                  </g>
+
+                  <text x="105" y="80" font-family="Segoe UI, Arial, sans-serif"
+                        font-size="10.5" font-weight="700" fill="#334155"
+                        text-anchor="middle" letter-spacing="0.6">
+                    STRESS ANALYSIS
+                  </text>
+                </svg>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
             "## ⚙️ Settings"
         )
 
@@ -2242,6 +2329,72 @@ def main():
             ]
         )
 
+        # ------------------------------------------------
+        # Reset the "run" trigger whenever a new/changed
+        # file is uploaded, so the user has to press
+        # Action again before the analysis (re)starts.
+        # ------------------------------------------------
+
+        if uploaded_file is not None:
+
+            file_signature = (
+                f"{uploaded_file.name}_"
+                f"{uploaded_file.size}"
+            )
+
+            if st.session_state.get(
+                "uploaded_file_signature"
+            ) != file_signature:
+
+                st.session_state[
+                    "uploaded_file_signature"
+                ] = file_signature
+
+                st.session_state[
+                    "analysis_triggered"
+                ] = False
+
+        else:
+
+            st.session_state[
+                "analysis_triggered"
+            ] = False
+
+        st.markdown(
+            '<div class="action-btn">',
+            unsafe_allow_html=True
+        )
+
+        run_clicked = st.button(
+            "▶️ Action — Run analysis",
+            use_container_width=True,
+            disabled=(uploaded_file is None)
+        )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+        if run_clicked:
+
+            st.session_state[
+                "analysis_triggered"
+            ] = True
+
+        if (
+            uploaded_file is not None
+            and not st.session_state.get(
+                "analysis_triggered",
+                False
+            )
+        ):
+
+            st.caption(
+                "File loaded. Click **Action** to run "
+                "the analysis."
+            )
+
     # --------------------------------------------------------
     # HEADER
     # --------------------------------------------------------
@@ -2265,6 +2418,19 @@ def main():
         st.info(
             "📁 Upload a file to start the analysis.",
             icon="ℹ️"
+        )
+
+        return
+
+    if not st.session_state.get(
+        "analysis_triggered",
+        False
+    ):
+
+        st.info(
+            "▶️ File loaded. Click the **Action** button "
+            "in the sidebar to run the analysis.",
+            icon="▶️"
         )
 
         return
