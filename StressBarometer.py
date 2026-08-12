@@ -2404,7 +2404,7 @@ def main():
     if not uploaded_file:
 
         st.info(
-            "📁 Upload a file to start the analysis.",
+            "📁 Upload a file to start the analysis-Use the Side Bar-.",
             icon="ℹ️"
         )
 
