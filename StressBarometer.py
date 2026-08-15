@@ -145,9 +145,7 @@ st.markdown(
 
 
 # ============================================================
-# 2b. SIDEBAR LOGO (rendered in an isolated iframe via
-#     components.html, fully self-contained so it never
-#     touches Streamlit's own markdown/clipboard handling)
+# 2b. SIDEBAR LOGO
 # ============================================================
 
 SIDEBAR_LOGO_HTML = """
@@ -211,7 +209,7 @@ SIDEBAR_LOGO_HTML = """
 <body>
   <div class="logo-wrap">
     <div class="ornament">◆ ━━━ ◆ ━━━ ◆</div>
-    <div class="title">Petrič Stress Analysis</div>
+    <div class="title">Stress Analysis</div>
     <div class="subtitle">PRO · Scientific Edition</div>
     <div class="line"></div>
     <div class="dots">● ● ●</div>
@@ -226,19 +224,19 @@ SIDEBAR_LOGO_HTML = """
 # ============================================================
 
 CATEGORIES_MAP = {
+    "Physical/attentive": "Physical/attentive",
+    "Performance": "Performance",
+    "Psychological": "Psychological",
     "Social": "Social",
-    "Economic": "Economic",
-    "Political": "Political",
-    "Cultural": "Cultural",
-    "Environmental": "Environmental",
+    "Health": "Health",
 }
 
 CATEGORY_SHORT = {
+    "Physical/attentive": "Physical/attentive",
+    "Performance": "Performance",
+    "Psychological": "Psychological",
     "Social": "Social",
-    "Economic": "Economic",
-    "Political": "Political",
-    "Cultural": "Cultural",
-    "Environmental": "Environmental",
+    "Health": "Health",
 }
 
 SHORT_TO_FULL = {v: k for k, v in CATEGORY_SHORT.items()}
@@ -250,19 +248,19 @@ ROLE_LABELS = {
 }
 
 SLOPE_WEIGHTS = {
-    "Social": 1.15,
-    "Economic": 1.10,
-    "Political": 1.05,
-    "Cultural": 1.00,
-    "Environmental": 0.95,
+    "Physical/attentive": 1.15,
+    "Performance": 1.10,
+    "Psychological": 1.20,
+    "Social": 1.05,
+    "Health": 1.00,
 }
 
 NETWORK_CATEGORY_COLORS = {
-    "Social": "#3b82f6",
-    "Economic": "#f59e0b",
-    "Political": "#8b5cf6",
-    "Cultural": "#ec4899",
-    "Environmental": "#10b981",
+    "Physical/attentive": "#3b82f6",
+    "Performance": "#f59e0b",
+    "Psychological": "#8b5cf6",
+    "Social": "#ec4899",
+    "Health": "#10b981",
 }
 
 AVAILABLE_MODELS = [
@@ -284,42 +282,47 @@ MODEL_NOTES = {
     "gemma-2-27b-it": "Open model, stronger",
 }
 
-# Offline dictionary (simplified keyword sets)
+# Offline dictionary
 OFFLINE_DICT = {
+    "Physical/attentive": [
+        "attention", "focus", "concentration", "fatigue", "tired", "sleep",
+        "energy", "alert", "physical", "body", "movement", "exercise",
+        "rest", "exhaustion", "overload", "workload", "busy",
+        "pozornost", "osredotočenost", "koncentracija", "utrujenost", "spanje",
+        "energija", "telo", "gibanje", "vadba", "počitek", "izčrpanost",
+        "preobremenjenost", "delovna obremenitev",
+    ],
+    "Performance": [
+        "performance", "productivity", "efficiency", "deadline", "task",
+        "achievement", "goal", "success", "failure", "output", "quality",
+        "speed", "competence", "skill", "result",
+        "uspešnost", "produktivnost", "učinkovitost", "rok", "naloga",
+        "dosežek", "cilj", "uspeh", "neuspeh", "kakovost", "hitrost",
+        "kompetenca", "spretnost", "rezultat",
+    ],
+    "Psychological": [
+        "anxiety", "stress", "worry", "fear", "depression", "mood",
+        "emotion", "mental", "pressure", "burnout", "motivation",
+        "confidence", "self-esteem", "frustration", "anger", "sadness",
+        "anksioznost", "stres", "skrb", "strah", "depresija", "razpoloženje",
+        "čustvo", "duševni", "pritisk", "izgorelost", "motivacija",
+        "samozavest", "frustracija", "jeza", "žalost",
+    ],
     "Social": [
         "family", "friend", "community", "relationship", "support", "lonely",
-        "isolation", "society", "social", "neighbour", "colleague", "team",
-        "belonging", "connection", "trust", "respect", "solidarity", "group",
+        "isolation", "society", "social", "colleague", "team", "belonging",
+        "connection", "trust", "respect", "conflict", "communication",
         "družina", "prijatelj", "skupnost", "odnos", "podpora", "osamljen",
-        "izolacija", "družba", "sosed", "sodelavec", "ekipa", "pripadnost",
-        "povezanost", "zaupanje", "spoštovanje", "solidarnost", "skupina",
+        "izolacija", "družba", "sodelavec", "ekipa", "pripadnost",
+        "povezanost", "zaupanje", "spoštovanje", "konflikt", "komunikacija",
     ],
-    "Economic": [
-        "money", "salary", "job", "work", "unemployment", "income", "debt",
-        "finance", "cost", "price", "poverty", "wealth", "economy", "business",
-        "career", "wage", "budget", "expense", "housing", "rent",
-        "denar", "plača", "služba", "delo", "brezposelnost", "dohodek", "dolg",
-        "finance", "strošek", "cena", "revščina", "bogastvo", "gospodarstvo",
-        "posel", "kariera", "proračun", "stanovanje", "najemnina",
-    ],
-    "Political": [
-        "government", "politics", "law", "policy", "election", "rights",
-        "corruption", "democracy", "authority", "regulation", "state",
-        "vlada", "politika", "zakon", "volitve", "pravice", "korupcija",
-        "demokracija", "oblast", "regulacija", "država",
-    ],
-    "Cultural": [
-        "culture", "tradition", "religion", "language", "identity", "value",
-        "education", "art", "media", "belief", "custom", "heritage",
-        "kultura", "tradicija", "vera", "jezik", "identiteta", "vrednota",
-        "izobraževanje", "umetnost", "mediji", "prepričanje", "običaj",
-        "dediščina",
-    ],
-    "Environmental": [
-        "environment", "nature", "climate", "pollution", "green", "ecology",
-        "weather", "air", "water", "noise", "sustainability", "waste",
-        "okolje", "narava", "podnebje", "onesnaževanje", "zeleno", "ekologija",
-        "vreme", "zrak", "voda", "hrup", "trajnost", "odpadki",
+    "Health": [
+        "health", "illness", "pain", "disease", "medical", "doctor",
+        "symptom", "wellbeing", "well-being", "fitness", "nutrition",
+        "diet", "chronic", "recovery", "therapy", "medication",
+        "zdravje", "bolezen", "bolečina", "zdravnik", "simptom",
+        "počutje", "fitnes", "prehrana", "kronično", "okrevanje",
+        "terapija", "zdravilo",
     ],
 }
 
@@ -374,7 +377,7 @@ def classify_offline_phrase(phrase: str, active_shorts: List[str]) -> str:
         if score > 0:
             scores[full] = score
     if not scores:
-        return "Social"
+        return "Psychological"
     return max(scores, key=scores.get)
 
 
@@ -406,11 +409,11 @@ def run_offline_classification(df, col, included_shorts):
 class ClassificationItem(BaseModel):
     phrase: str
     unit: Literal[
+        "Physical/attentive",
+        "Performance",
+        "Psychological",
         "Social",
-        "Economic",
-        "Political",
-        "Cultural",
-        "Environmental",
+        "Health",
     ]
 
 
@@ -421,17 +424,17 @@ class ClassificationBatch(BaseModel):
 def build_classification_prompt(texts: List[str], included_shorts: List[str]) -> str:
     units_str = ", ".join(included_shorts)
     numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(texts))
-    return f"""You are a scientific classifier of qualitative survey answers.
+    return f"""You are a scientific classifier of qualitative survey answers about stress factors, positive factors and suggestions.
 
 Classify each answer (or each distinct phrase inside an answer) into exactly one of these scientific units:
 {units_str}
 
 Definitions:
-- Social: interpersonal relations, family, community, belonging, social support or isolation
-- Economic: money, work, employment, income, housing costs, material conditions
-- Political: government, laws, rights, institutions, public authority
-- Cultural: values, identity, education, tradition, religion, media, language
-- Environmental: nature, climate, pollution, living environment, noise, sustainability
+- Physical/attentive: physical state, attention, concentration, fatigue, sleep, energy, bodily load
+- Performance: work performance, productivity, deadlines, tasks, achievement, efficiency, results
+- Psychological: emotions, anxiety, mental pressure, motivation, self-esteem, burnout, mood
+- Social: interpersonal relations, family, colleagues, support, isolation, communication, belonging
+- Health: physical or mental health, illness, pain, wellbeing, medical issues, recovery
 
 Rules:
 1. Extract meaningful phrases (split by commas, semicolons, slashes if needed).
@@ -488,20 +491,6 @@ def run_ai_classification(
             )
 
             parsed = ClassificationBatch.model_validate_json(response.text)
-
-            # Map back roughly by order; AI returns a flat list of items
-            # We distribute them sequentially into rows
-            items_iter = iter(parsed.items)
-            for _ in batch:
-                row_cats = []
-                row_items = []
-                # Consume items that belong to this answer (heuristic: take until exhausted or reasonable)
-                # Simpler robust approach: split original text and match length
-                # For reliability we re-split and assign by index
-                pass
-
-            # More reliable: re-process each text individually against returned items
-            # Fallback: assign all returned items in order across rows
             all_items = list(parsed.items)
 
         except Exception as e:
@@ -512,10 +501,12 @@ def run_ai_classification(
                 for ph in phrases:
                     cat = classify_offline_phrase(ph, included_shorts)
                     all_items.append(
-                        ClassificationItem(phrase=ph, unit=CATEGORY_SHORT.get(cat, "Social"))
+                        ClassificationItem(
+                            phrase=ph,
+                            unit=CATEGORY_SHORT.get(cat, "Psychological"),
+                        )
                     )
 
-        # Distribute items back to rows by splitting original texts
         item_idx = 0
         for _, text in batch:
             phrases = split_phrases(text)
@@ -526,7 +517,7 @@ def run_ai_classification(
                     item = all_items[item_idx]
                     unit_full = SHORT_TO_FULL.get(item.unit, item.unit)
                     if unit_full not in CATEGORIES_MAP:
-                        unit_full = "Social"
+                        unit_full = "Psychological"
                     classified.append((item.phrase or ph, unit_full))
                     row_cats.append(unit_full)
                     row_items.append((item.phrase or ph, unit_full))
@@ -540,7 +531,10 @@ def run_ai_classification(
             per_row_items.append(row_items)
 
         done += len(batch)
-        progress.progress(min(done / total, 1.0), text=f"{progress_label} ({done}/{total})")
+        progress.progress(
+            min(done / total, 1.0),
+            text=f"{progress_label} ({done}/{total})",
+        )
 
     progress.empty()
     return classified, per_row, per_row_items
@@ -573,7 +567,6 @@ def compute_category_factors(classified, n_input, active_categories, weighting_m
         if weighting_mode == "volume":
             result[cat] = c / n_input
         else:
-            # concentration: higher weight if more repeated within unit
             share = c / total
             result[cat] = (c / n_input) * (1 + share)
     return result
@@ -591,9 +584,8 @@ def sigma_deg(f_sf, f_pr, f_pf):
 
 
 def calculate_energy(sigma):
-    # Simplified energy model derived from the scientific framing
     eta = max(5.0, 100.0 - 0.85 * sigma)
-    total_kcal = 2200.0  # reference daily
+    total_kcal = 2200.0
     W_EU = total_kcal * (eta / 100.0)
     loss = total_kcal - W_EU
     return W_EU, eta, loss
@@ -619,7 +611,6 @@ def compute_category_sigmas(
             f_pr = min(f_pr, f_sf * 1.5)
 
         local_arg = sigma_argument(f_sf, f_pr, f_pf)
-        # blend with global argument to keep consistency
         blended = 0.65 * local_arg + 0.35 * sig_total_arg
         sigma = 90.0 * blended * SLOPE_WEIGHTS.get(cat, 1.0)
         sigma = max(0.0, min(sigma, 90.0))
@@ -643,16 +634,14 @@ def compute_category_sigmas(
 # ============================================================
 
 def build_network_data(analysis, max_nodes=25):
-    # Collect phrase-level items with role & category, preserving co-occurrence by original row
     node_info = defaultdict(lambda: {
         "count": 0,
-        "category": "Social",
+        "category": "Psychological",
         "role": "SF",
         "criticality": 0.0,
     })
 
     cooccur = Counter()
-
     role_weight = {"SF": 1.35, "PR": 1.10, "PF": 0.85}
 
     for role in ["PF", "SF", "PR"]:
@@ -665,13 +654,11 @@ def build_network_data(analysis, max_nodes=25):
                     continue
                 node_info[key]["count"] += 1
                 node_info[key]["category"] = cat
-                # Prefer SF role if conflict
                 if role == "SF" or node_info[key]["role"] != "SF":
                     if role == "SF" or node_info[key]["role"] == "PF":
                         node_info[key]["role"] = role
                 phrases_in_row.append(key)
 
-            # Co-occurrence pairs
             unique = list(dict.fromkeys(phrases_in_row))
             for i in range(len(unique)):
                 for j in range(i + 1, len(unique)):
@@ -681,13 +668,11 @@ def build_network_data(analysis, max_nodes=25):
     if not node_info:
         return None
 
-    # Criticality score
     for key, data in node_info.items():
         rw = role_weight.get(data["role"], 1.0)
         sw = SLOPE_WEIGHTS.get(data["category"], 1.0)
         data["criticality"] = data["count"] * rw * sw
 
-    # Select top nodes
     ranked = sorted(
         node_info.items(),
         key=lambda x: x[1]["criticality"],
@@ -723,10 +708,8 @@ def build_plotly_network(graph):
         return None
 
     pos = nx.spring_layout(graph, k=0.85, iterations=50, seed=42)
-
     fig = go.Figure()
 
-    # Edges by strength
     edge_styles = [
         ("strong", 3, 4, "solid", "Strong co-occurrence"),
         ("moderate", 2, 2, "solid", "Moderate co-occurrence"),
@@ -750,12 +733,9 @@ def build_plotly_network(graph):
         if x:
             fig.add_trace(
                 go.Scatter(
-                    x=x,
-                    y=y,
-                    mode="lines",
+                    x=x, y=y, mode="lines",
                     line=dict(width=width, dash=dash),
-                    hoverinfo="skip",
-                    name=legend_name,
+                    hoverinfo="skip", name=legend_name,
                 )
             )
 
@@ -786,14 +766,10 @@ def build_plotly_network(graph):
 
         fig.add_trace(
             go.Scatter(
-                x=xs,
-                y=ys,
-                mode="markers+text",
-                text=nodes,
-                textposition="top center",
+                x=xs, y=ys, mode="markers+text",
+                text=nodes, textposition="top center",
                 marker=dict(size=sizes, line=dict(width=1)),
-                hovertext=hover,
-                hoverinfo="text",
+                hovertext=hover, hoverinfo="text",
                 name=CATEGORY_SHORT[category],
             )
         )
@@ -808,7 +784,7 @@ def build_plotly_network(graph):
     fig.update_xaxes(showgrid=False, zeroline=False, visible=False)
     fig.update_yaxes(
         showgrid=False, zeroline=False, visible=False,
-        scaleanchor="x", scaleratio=1
+        scaleanchor="x", scaleratio=1,
     )
     return fig
 
@@ -1143,7 +1119,7 @@ p {{ margin: 8px 0 14px; }}
 <body>
 {''.join(parts)}
 <div class="footer">
-    Petrič Stress Analysis Pro<br>
+    Stress Analysis Pro<br>
     Scientific basis: Karl Petrič, <i>Gaining knowledge through understanding distress and positive factors in social environments</i>, European Review of Applied Sociology, 2025. DOI: 10.2478/eras-2025-0003
 </div>
 </body>
@@ -1157,7 +1133,7 @@ p {{ margin: 8px 0 14px; }}
 def main():
 
     # --------------------------------------------------------
-    # SIDEBAR — logo + minimal controls
+    # SIDEBAR — logo + reset
     # --------------------------------------------------------
 
     with st.sidebar:
@@ -1171,7 +1147,6 @@ def main():
         if st.button("🔄 Reset session", use_container_width=True):
             reset_app()
 
-        st.caption("Petrič Stress Analysis PRO")
         st.caption("Scientific · Interactive · Report-ready")
 
     # --------------------------------------------------------
@@ -1181,16 +1156,16 @@ def main():
     st.markdown("# 📊 Stress degree and kcal analysis PRO")
     st.caption(
         "Classification with Google Gemini/Gemma models · "
-        "5 scientific units (Social · Economic · Political · Cultural · Environmental)"
+        "5 scientific units "
+        "(Physical/attentive · Performance · Psychological · Social · Health)"
     )
 
     # --------------------------------------------------------
-    # MAIN SETTINGS PANEL (formerly sidebar content)
+    # MAIN SETTINGS PANEL
     # --------------------------------------------------------
 
     st.markdown("## ⚙️ Analysis settings")
 
-    # --- Row 1: Data upload + N + summary ---
     c1, c2, c3 = st.columns([2.2, 1, 1.2])
 
     with c1:
@@ -1215,7 +1190,6 @@ def main():
             help="If checked, suggestions are capped relative to stress factors.",
         )
 
-    # Reset analysis trigger on new/changed file
     if uploaded_file is not None:
         file_signature = f"{uploaded_file.name}_{uploaded_file.size}"
         if st.session_state.get("uploaded_file_signature") != file_signature:
@@ -1226,7 +1200,6 @@ def main():
 
     st.divider()
 
-    # --- Row 2: Classification mode ---
     st.markdown("### 🤖 Classification")
 
     classification_mode = st.radio(
@@ -1270,7 +1243,6 @@ def main():
 
     st.divider()
 
-    # --- Row 3: Scientific units + weighting + chart + network ---
     st.markdown("### 🧭 Units, weighting & display")
 
     u1, u2, u3, u4 = st.columns(4)
@@ -1314,7 +1286,6 @@ def main():
 
     st.divider()
 
-    # --- Action button ---
     with st.container(key="action_btn_container"):
         run_clicked = st.button(
             "▶️ Action — Run analysis",
@@ -1330,7 +1301,7 @@ def main():
         st.caption("File loaded. Click **Action — Run analysis** to start.")
 
     # --------------------------------------------------------
-    # EMPTY STATE (no file)
+    # EMPTY STATE
     # --------------------------------------------------------
 
     if not uploaded_file:
@@ -1401,7 +1372,7 @@ def main():
     target_cols = df.columns.tolist()
 
     # --------------------------------------------------------
-    # COLUMN SELECTION (on main page)
+    # COLUMN SELECTION
     # --------------------------------------------------------
 
     st.markdown("### 🧩 Column mapping")
