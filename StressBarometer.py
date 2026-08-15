@@ -183,72 +183,63 @@ st.markdown(
 
 
 # ============================================================
-# 2b. ULTRA-IMPACT BRANDING & ENERGY DRAIN ANALYTICS
+# 2b. SIMPLE & COLORFUL SIDEBAR INFOGRAPHIC
 # ============================================================
 
-# Definiramo prazen Base64, da ne bo NameError napake
+# Osnovna definicija, da preprečimo napake
 LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
-    "html,body{margin:0;padding:0;background:#030c1b;font-family:'Arial Black',Gadget,sans-serif;color:white;}"
-    ".sidebar-container{padding:20px 15px;display:flex;flex-direction:column;align-items:center;}"
+    "html,body{margin:0;padding:0;background:#030c1b;font-family:sans-serif;color:white;text-align:center;}"
+    ".container{padding:20px;display:flex;flex-direction:column;align-items:center;}"
     
-    # --- LOGO: BEL KROG S PIRAMIDO ---
-    ".brand-circle{width:100px;height:100px;background:white;border-radius:50%;"
-    "display:flex;justify-content:center;align-items:center;margin-bottom:30px;"
-    "box-shadow:0 0 30px rgba(59,130,246,0.5);border:4px solid #3b82f6;}"
-    ".pyramid-svg{width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;"
-    "border-bottom:50px solid #030c1b;}"
+    # Preprost Barvit Logo
+    ".simple-logo{width:80px;height:80px;background:#4ade80;border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:30px;box-shadow:0 0 15px #4ade80;}"
+    ".simple-logo span{font-size:40px;font-weight:bold;color:#030c1b;} "
     
-    # --- UDARNA INFOGRAFIKA ---
-    ".impact-card{width:100%;background:rgba(255,255,255,0.03);border-radius:20px;padding:25px 20px;"
-    "border:1px solid rgba(255,255,255,0.1);box-shadow:0 20px 50px rgba(0,0,0,0.5);box-sizing:border-box;}"
+    # Barviti bloki infografike
+    ".info-box{width:100%;border-radius:15px;padding:15px;margin-bottom:15px;text-align:left;box-sizing:border-box;}"
+    ".red-box{background:#ff4b4b;color:white;}"
+    ".blue-box{background:#3b82f6;color:white;}"
     
-    ".status-tag{font-size:0.7rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;display:block;}"
-    ".red-text{color:#ff4b4b;} .blue-text{color:#00d2ff;}"
+    ".box-title{font-size:14px;font-weight:bold;text-transform:uppercase;margin-bottom:5px;display:block;}"
+    ".box-value{font-size:22px;font-weight:900;display:block;}"
     
-    # Masivni progress bari
-    ".mega-bar{height:22px;background:#111;border-radius:30px;margin-bottom:30px;padding:3px;border:1px solid #333;overflow:hidden;}"
-    ".fill-stress{height:100%;width:92%;background:linear-gradient(90deg,#ff4b4b,#880000);border-radius:30px;"
-    "box-shadow:0 0 20px rgba(255,75,75,0.6);animation: pulse 1.5s infinite;}"
-    ".fill-energy{height:100%;width:12%;background:linear-gradient(90deg,#00d2ff,#004488);border-radius:30px;"
-    "box-shadow:0 0 10px rgba(0,210,255,0.4);}"
+    # Puščica vmes
+    ".drain-arrow{font-size:40px;color:#ffeb3b;margin:10px 0;font-weight:bold;line-height:1;}"
     
-    # Sredinska formula
-    ".center-math{font-size:1.8rem;font-weight:900;text-align:center;margin:20px 0;letter-spacing:-1px;}"
-    ".drain-arrow{color:#ff4b4b;font-size:1.5rem;display:block;margin:-5px 0;}"
-    
-    # Impact Box
-    ".warning-box{background:#ff4b4b;color:white;padding:15px;border-radius:12px;text-align:center;"
-    "font-size:0.85rem;font-weight:900;box-shadow:0 10px 20px rgba(255,75,75,0.3);}"
-    ".warning-box span{display:block;font-size:0.6rem;text-transform:uppercase;margin-top:5px;opacity:0.8;}"
-
-    "@keyframes pulse { 0% { opacity:1; } 50% { opacity:0.6; } 100% { opacity:1; } }"
+    # Formula spodaj
+    ".final-formula{background:white;color:#030c1b;padding:10px;border-radius:10px;font-weight:bold;font-size:18px;margin-top:10px;width:100%;box-sizing:border-box;}"
     "</style></head><body>"
-    "<div class='sidebar-container'>"
-        # Udaren Logo
-        "<div class='brand-circle'><div class='pyramid-svg'></div></div>"
+    "<div class='container'>"
         
-        # High Stress - Low Energy Infographic
-        "<div class='impact-card'>"
-            "<span class='status-tag red-text'>Stress Intensity (&sigma;)</span>"
-            "<div class='mega-bar'><div class='fill-stress'></div></div>"
-            
-            "<div class='center-math'>&sigma; &uarr; <span class='drain-arrow'>&DoubleDownArrow;</span> W<sub>EU</sub> &darr;</div>"
-            
-            "<span class='status-tag blue-text'>Useful Energy (W_EU)</span>"
-            "<div class='mega-bar'><div class='fill-energy'></div></div>"
-            
-            "<div class='warning-box'>"
-                "KCAL DRAIN: CRITICAL"
-                "<span>Internal friction exceeds output</span>"
-            "</div>"
+        # LOGO
+        "<div class='simple-logo'><span>&Sigma;</span></div>"
+        
+        # INFOGRAFIKA: STRES
+        "<div class='info-box red-box'>"
+            "<span class='box-title'>STRESS LEVEL</span>"
+            "<span class='box-value'>VERY HIGH</span>"
         "</div>"
         
-        "<div style='margin-top:25px; font-size:0.6rem; opacity:0.4; letter-spacing:1px;'>PETRIČ ANALYTICS ENGINE PRO</div>"
-    "</div>"
-    "</body></html>"
+        # PUŠČICA ODTEKANJA
+        "<div class='drain-arrow'>&darr; DRAIN &darr;</div>"
+        
+        # INFOGRAFIKA: ENERGIJA
+        "<div class='info-box blue-box'>"
+            "<span class='box-title'>AVAILABLE ENERGY</span>"
+            "<span class='box-value'>CRITICAL LOW</span>"
+        "</div>"
+        
+        # FORMULA
+        "<div class='final-formula'>"
+            "STRESS &uarr; = ENERGY &darr;"
+        "</div>"
+        
+        "<p style='font-size:10px; margin-top:20px; opacity:0.6;'>PETRIČ BAROMETER ENGINE PRO</p>"
+
+    "</div></body></html>"
 )
 
 
