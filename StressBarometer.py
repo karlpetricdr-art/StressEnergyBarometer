@@ -263,23 +263,29 @@ NETWORK_CATEGORY_COLORS = {
     "Health": "#10b981",
 }
 
+# Current free-tier capable Gemini models (Aug 2026)
+# Deprecated / shut down: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-*
 AVAILABLE_MODELS = [
     "— Select a model —",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemma-2-9b-it",
-    "gemma-2-27b-it",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
 ]
 
 MODEL_NOTES = {
-    "gemini-2.0-flash": "Fast & capable (recommended)",
-    "gemini-2.0-flash-lite": "Very fast, lower cost",
-    "gemini-1.5-flash": "Stable previous generation",
-    "gemini-1.5-pro": "Higher reasoning quality",
-    "gemma-2-9b-it": "Open model, lighter",
-    "gemma-2-27b-it": "Open model, stronger",
+    "gemini-3.7-flash": "Latest & most capable Flash (recommended)",
+    "gemini-3.6-flash": "Previous-gen Flash, strong balance",
+    "gemini-3.5-flash": "High intelligence Flash",
+    "gemini-3.5-flash-lite": "Fast & cost-efficient (great for bulk)",
+    "gemini-3.1-flash-lite": "Lightweight, high volume",
+    "gemini-2.5-flash": "Excellent price/performance",
+    "gemini-2.5-flash-lite": "Fastest & cheapest in 2.5 family",
+    "gemini-2.5-pro": "Higher reasoning (may have tighter free limits)",
 }
 
 # Offline dictionary
@@ -1155,7 +1161,7 @@ def main():
 
     st.markdown("# 📊 Stress degree and kcal analysis PRO")
     st.caption(
-        "Classification with Google Gemini/Gemma models · "
+        "Classification with Google Gemini models · "
         "5 scientific units "
         "(Physical/attentive · Performance · Psychological · Social · Health)"
     )
@@ -1205,7 +1211,7 @@ def main():
     classification_mode = st.radio(
         "Classification mode",
         [
-            "AI model (Gemini / Gemma)",
+            "AI model (Gemini)",
             "Dictionary (offline, no API call)",
         ],
         horizontal=True,
