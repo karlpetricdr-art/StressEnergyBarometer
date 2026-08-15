@@ -120,6 +120,62 @@ st.markdown(
         color: #ffffff !important;
     }
 
+    [data-testid="stSidebar"] {
+        background:
+            radial-gradient(circle at 22% 12%, rgba(74, 222, 128, 0.22), transparent 24%),
+            radial-gradient(circle at 82% 88%, rgba(59, 130, 246, 0.18), transparent 32%),
+            linear-gradient(180deg, #0f172a 0%, #172554 48%, #0f3d2e 100%);
+        border-right: 1px solid rgba(255,255,255,0.12);
+    }
+
+    [data-testid="stSidebar"]::before,
+    [data-testid="stSidebar"]::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        pointer-events: none;
+        opacity: 0.78;
+    }
+
+    [data-testid="stSidebar"]::before {
+        width: 150px;
+        height: 150px;
+        top: 115px;
+        right: -78px;
+        border: 1px solid rgba(255,255,255,0.18);
+        box-shadow:
+            0 0 0 20px rgba(255,255,255,0.035),
+            0 0 0 42px rgba(255,255,255,0.025);
+    }
+
+    [data-testid="stSidebar"]::after {
+        width: 95px;
+        height: 95px;
+        bottom: 64px;
+        left: -48px;
+        background: rgba(74, 222, 128, 0.12);
+        box-shadow: 0 0 40px rgba(74, 222, 128, 0.20);
+    }
+
+    .control-panel-title {
+        margin: 0 0 0.25rem 0;
+        color: #0f172a;
+    }
+
+    .control-panel-subtitle {
+        margin: 0 0 1rem 0;
+        color: #64748b;
+        font-size: 0.92rem;
+    }
+
+    .section-label {
+        display: inline-block;
+        margin-bottom: 0.5rem;
+        color: #0f172a;
+        font-weight: 800;
+        font-size: 1rem;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -2117,7 +2173,7 @@ p {{
 def main():
 
     # --------------------------------------------------------
-    # SIDEBAR
+    # SIDEBAR LOGO
     # --------------------------------------------------------
 
     with st.sidebar:
@@ -2128,263 +2184,8 @@ def main():
             scrolling=False
         )
 
-        st.markdown(
-            "## ⚙️ Settings"
-        )
-
-        if st.button(
-            "🔄 Reset session",
-            use_container_width=True
-        ):
-
-            reset_app()
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # AI
-        # ----------------------------------------------------
-
-        st.markdown(
-            "### 🤖 AI Classification (Google)"
-        )
-
-        classification_mode = st.radio(
-            "Classification mode",
-            [
-                "AI model (Gemini / Gemma)",
-                "Dictionary (offline, no API call)"
-            ]
-        )
-
-        api_key = None
-        model_name = None
-        batch_size = 15
-
-        if classification_mode.startswith("AI"):
-
-            api_key = st.text_input(
-                "Google AI API key",
-                type="password",
-                help=(
-                    "Get a free key at "
-                    "https://aistudio.google.com/apikey"
-                )
-            )
-
-            model_name = st.selectbox(
-                "Model",
-                AVAILABLE_MODELS,
-                index=0
-            )
-
-            if (
-                model_name
-                != AVAILABLE_MODELS[0]
-            ):
-
-                st.caption(
-                    MODEL_NOTES.get(
-                        model_name,
-                        ""
-                    )
-                )
-
-            batch_size = st.slider(
-                "Batch size (rows per call)",
-                0,
-                50,
-                15
-            )
-
-            if batch_size == 0:
-
-                st.warning(
-                    "Batch size 0 is not valid for "
-                    "an API call; it will be treated as 1."
-                )
-
-                batch_size = 1
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # SCIENTIFIC UNITS
-        # ----------------------------------------------------
-
-        st.markdown(
-            "### 🧭 Scientific units"
-        )
-
-        included_shorts = st.multiselect(
-            "Included scientific units",
-            list(CATEGORY_SHORT.values()),
-            default=list(
-                CATEGORY_SHORT.values()
-            )
-        )
-
-        active_categories = [
-            SHORT_TO_FULL[s]
-            for s in included_shorts
-        ]
-
-        if not active_categories:
-
-            active_categories = list(
-                CATEGORIES_MAP.keys()
-            )
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # SAMPLE
-        # ----------------------------------------------------
-
-        n_input = st.number_input(
-            "Number of respondents (N)",
-            min_value=1,
-            value=210
-        )
-
-        is_summary = st.checkbox(
-            "The file contains a SUMMARY",
-            value=True
-        )
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # WEIGHTING
-        # ----------------------------------------------------
-
-        weighting_label = st.radio(
-            "Weighting within the unit",
-            [
-                "Volume (frequency)",
-                "Concentration (repeatability)"
-            ]
-        )
-
-        weighting_mode = (
-            "volume"
-            if "Volume" in weighting_label
-            else "concentration"
-        )
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # CHART MODE
-        # ----------------------------------------------------
-
-        chart_mode = st.radio(
-            "Distribution display",
-            [
-                "Bar chart",
-                "Treemap (colorful)",
-                "Both"
-            ]
-        )
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # NETWORK
-        # ----------------------------------------------------
-
-        st.markdown(
-            "### 🕸️ Factor / Opinion Network"
-        )
-
-        network_nodes = st.slider(
-            "Number of network nodes",
-            min_value=5,
-            max_value=50,
-            value=25,
-            step=1,
-            help=(
-                "The most critical factors/opinions "
-                "become the largest nodes."
-            )
-        )
-
-        st.divider()
-
-        # ----------------------------------------------------
-        # UPLOAD
-        # ----------------------------------------------------
-
-        uploaded_file = st.file_uploader(
-            "📁 Upload data",
-            type=[
-                "txt",
-                "csv",
-                "xlsx"
-            ]
-        )
-
-        # ------------------------------------------------
-        # Reset the "run" trigger whenever a new/changed
-        # file is uploaded, so the user has to press
-        # Action again before the analysis (re)starts.
-        # ------------------------------------------------
-
-        if uploaded_file is not None:
-
-            file_signature = (
-                f"{uploaded_file.name}_"
-                f"{uploaded_file.size}"
-            )
-
-            if st.session_state.get(
-                "uploaded_file_signature"
-            ) != file_signature:
-
-                st.session_state[
-                    "uploaded_file_signature"
-                ] = file_signature
-
-                st.session_state[
-                    "analysis_triggered"
-                ] = False
-
-        else:
-
-            st.session_state[
-                "analysis_triggered"
-            ] = False
-
-        with st.container(key="action_btn_container"):
-
-            run_clicked = st.button(
-                "▶️ Action — Run analysis",
-                use_container_width=True,
-                type="primary",
-                disabled=(uploaded_file is None)
-            )
-
-        if run_clicked:
-
-            st.session_state[
-                "analysis_triggered"
-            ] = True
-
-        if (
-            uploaded_file is not None
-            and not st.session_state.get(
-                "analysis_triggered",
-                False
-            )
-        ):
-
-            st.caption(
-                "File loaded. Click **Action** to run "
-                "the analysis."
-            )
-
     # --------------------------------------------------------
-    # HEADER
+    # HEADER AND CENTRAL CONTROL PANEL
     # --------------------------------------------------------
 
     st.markdown(
@@ -2397,6 +2198,271 @@ def main():
         "(Social = social + partial social)"
     )
 
+    with st.container(border=True):
+
+        header_left, header_right = st.columns(
+            [5, 1],
+            vertical_alignment="center"
+        )
+
+        with header_left:
+
+            st.markdown(
+                "<h3 class='control-panel-title'>⚙️ Analysis control panel</h3>",
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+                "<p class='control-panel-subtitle'>"
+                "Configure classification, analysis scope, visualization "
+                "and data input in one central workspace."
+                "</p>",
+                unsafe_allow_html=True
+            )
+
+        with header_right:
+
+            if st.button(
+                "🔄 Reset session",
+                use_container_width=True
+            ):
+
+                reset_app()
+
+        ai_column, analysis_column, data_column = st.columns(
+            [1.25, 1, 1],
+            gap="large"
+        )
+
+        with ai_column:
+
+            st.markdown(
+                "<span class='section-label'>🤖 AI Classification (Google)</span>",
+                unsafe_allow_html=True
+            )
+
+            classification_mode = st.radio(
+                "Classification mode",
+                [
+                    "AI model (Gemini / Gemma)",
+                    "Dictionary (offline, no API call)"
+                ]
+            )
+
+            api_key = None
+            model_name = None
+            batch_size = 15
+
+            if classification_mode.startswith("AI"):
+
+                api_key = st.text_input(
+                    "Google AI API key",
+                    type="password",
+                    help=(
+                        "Get a free key at "
+                        "https://aistudio.google.com/apikey"
+                    )
+                )
+
+                model_name = st.selectbox(
+                    "Model",
+                    AVAILABLE_MODELS,
+                    index=0
+                )
+
+                if (
+                    model_name
+                    != AVAILABLE_MODELS[0]
+                ):
+
+                    st.caption(
+                        MODEL_NOTES.get(
+                            model_name,
+                            ""
+                        )
+                    )
+
+                batch_size = st.slider(
+                    "Batch size (rows per call)",
+                    0,
+                    50,
+                    15
+                )
+
+                if batch_size == 0:
+
+                    st.warning(
+                        "Batch size 0 is not valid for "
+                        "an API call; it will be treated as 1."
+                    )
+
+                    batch_size = 1
+
+            st.divider()
+
+            st.markdown(
+                "<span class='section-label'>🧭 Scientific units</span>",
+                unsafe_allow_html=True
+            )
+
+            included_shorts = st.multiselect(
+                "Included scientific units",
+                list(CATEGORY_SHORT.values()),
+                default=list(
+                    CATEGORY_SHORT.values()
+                )
+            )
+
+            active_categories = [
+                SHORT_TO_FULL[s]
+                for s in included_shorts
+            ]
+
+            if not active_categories:
+
+                active_categories = list(
+                    CATEGORIES_MAP.keys()
+                )
+
+        with analysis_column:
+
+            st.markdown(
+                "<span class='section-label'>🧪 Sample and calculation</span>",
+                unsafe_allow_html=True
+            )
+
+            n_input = st.number_input(
+                "Number of respondents (N)",
+                min_value=1,
+                value=210
+            )
+
+            is_summary = st.checkbox(
+                "The file contains a SUMMARY",
+                value=True
+            )
+
+            weighting_label = st.radio(
+                "Weighting within the unit",
+                [
+                    "Volume (frequency)",
+                    "Concentration (repeatability)"
+                ]
+            )
+
+            weighting_mode = (
+                "volume"
+                if "Volume" in weighting_label
+                else "concentration"
+            )
+
+            st.divider()
+
+            st.markdown(
+                "<span class='section-label'>📈 Visualization</span>",
+                unsafe_allow_html=True
+            )
+
+            chart_mode = st.radio(
+                "Distribution display",
+                [
+                    "Bar chart",
+                    "Treemap (colorful)",
+                    "Both"
+                ]
+            )
+
+            network_nodes = st.slider(
+                "Number of network nodes",
+                min_value=5,
+                max_value=50,
+                value=25,
+                step=1,
+                help=(
+                    "The most critical factors/opinions "
+                    "become the largest nodes."
+                )
+            )
+
+        with data_column:
+
+            st.markdown(
+                "<span class='section-label'>📁 Data input</span>",
+                unsafe_allow_html=True
+            )
+
+            uploaded_file = st.file_uploader(
+                "Upload data",
+                type=[
+                    "txt",
+                    "csv",
+                    "xlsx"
+                ]
+            )
+
+            # ------------------------------------------------
+            # Reset the "run" trigger whenever a new/changed
+            # file is uploaded, so the user has to press
+            # Action again before the analysis (re)starts.
+            # ------------------------------------------------
+
+            if uploaded_file is not None:
+
+                file_signature = (
+                    f"{uploaded_file.name}_"
+                    f"{uploaded_file.size}"
+                )
+
+                if st.session_state.get(
+                    "uploaded_file_signature"
+                ) != file_signature:
+
+                    st.session_state[
+                        "uploaded_file_signature"
+                    ] = file_signature
+
+                    st.session_state[
+                        "analysis_triggered"
+                    ] = False
+
+                st.success(
+                    f"Loaded: {uploaded_file.name}"
+                )
+
+            else:
+
+                st.session_state[
+                    "analysis_triggered"
+                ] = False
+
+            with st.container(key="action_btn_container"):
+
+                run_clicked = st.button(
+                    "▶️ Action — Run analysis",
+                    use_container_width=True,
+                    type="primary",
+                    disabled=(uploaded_file is None)
+                )
+
+            if run_clicked:
+
+                st.session_state[
+                    "analysis_triggered"
+                ] = True
+
+            if (
+                uploaded_file is not None
+                and not st.session_state.get(
+                    "analysis_triggered",
+                    False
+                )
+            ):
+
+                st.caption(
+                    "File loaded. Click **Action** to run "
+                    "the analysis."
+                )
+
     # --------------------------------------------------------
     # FILE CHECK
     # --------------------------------------------------------
@@ -2404,7 +2470,7 @@ def main():
     if not uploaded_file:
 
         st.info(
-            "📁 Upload a file to start the analysis-Use the Side Bar-.",
+            "📁 Upload a file in the central control panel to start the analysis.",
             icon="ℹ️"
         )
 
@@ -2417,23 +2483,6 @@ def main():
             "DOI: [10.2478/eras-2025-0003](https://doi.org/10.2478/eras-2025-0003)"
         )
 
-        st.markdown(
-            "### 🧭 How to use the system — complete analysis workflow"
-        )
-        st.caption(
-            "The visual guide below explains the complete workflow from data upload "
-            "to stress degree, kcal/energy analysis, aggregation and visual reports."
-        )
-        try:
-            workflow_bytes = base64.b64decode(WORKFLOW_GUIDE_B64)
-            st.image(
-                BytesIO(workflow_bytes),
-                use_container_width=True,
-                caption="Stress degree and kcal analysis PRO — complete workflow"
-            )
-        except Exception as e:
-            st.warning(f"Workflow illustration could not be displayed: {e}")
-
         return
 
     if not st.session_state.get(
@@ -2443,7 +2492,7 @@ def main():
 
         st.info(
             "▶️ File loaded. Click the **Action** button "
-            "in the sidebar to run the analysis.",
+            "in the central control panel to run the analysis.",
             icon="▶️"
         )
 
@@ -2458,7 +2507,7 @@ def main():
         if not api_key:
 
             st.warning(
-                "⚠️ Enter a Google AI API key in the sidebar "
+                "⚠️ Enter a Google AI API key in the central control panel "
                 "to use AI classification."
             )
 
@@ -2467,7 +2516,7 @@ def main():
         if model_name == AVAILABLE_MODELS[0]:
 
             st.warning(
-                "⚠️ Select a model in the sidebar."
+                "⚠️ Select a model in the central control panel."
             )
 
             return
@@ -2539,10 +2588,10 @@ def main():
     # COLUMN SELECTION
     # --------------------------------------------------------
 
-    with st.sidebar:
+    with st.container(border=True):
 
         st.markdown(
-            "### 🧩 Columns"
+            "### 🧩 Column selection"
         )
 
         # IMPORTANT:
@@ -3272,4 +3321,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
