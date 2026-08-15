@@ -121,11 +121,11 @@ st.markdown(
     }
 
     [data-testid="stSidebar"] {
-        background:
-            radial-gradient(circle at 22% 12%, rgba(74, 222, 128, 0.22), transparent 24%),
-            radial-gradient(circle at 82% 88%, rgba(59, 130, 246, 0.18), transparent 32%),
-            linear-gradient(180deg, #0f172a 0%, #172554 48%, #0f3d2e 100%);
-        border-right: 1px solid rgba(255,255,255,0.12);
+        background-color: #030c1b !important; /* Popolnoma temno modra */
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.5) 0, transparent 50%), 
+            radial-gradient(at 50% 100%, rgba(15, 23, 42, 0.3) 0, transparent 50%) !important;
+        border-right: 1px solid rgba(255,255,255,0.1);
     }
 
     [data-testid="stSidebar"]::before,
@@ -183,72 +183,70 @@ st.markdown(
 
 
 # ============================================================
-# 2b. BRANDING & ANALYTICS INFOGRAPHIC (Dark Theme Optimized)
+# 2b. PRO BRANDING & SYSTEM DYNAMICS INFOGRAPHIC
 # ============================================================
 
-# Generiran "Udaren" Barometer Logo za temno podlago
-LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAMAAAAO97vEAAAASFBMVEVHcEx1p7X////V3+X7/v7p7/L3+vvt9Pfs8/f1+Pv0+Pn///+In7V9q7p1p7WIn7V1p7X///+In7V1p7X///+In7X///91p7W8Xp2UAAAAF3RSTlMAI0OAgYKDhIWGh4mKk5SVlpmbnZ6fqa2O0vMAAAG8SURBVGje7ZpZbsMwDESNoiSrtmS/9z9sy00Lp0WCJAicB/mYvFm8YTo6Spsm9p8pU6ZMmTJlypQpU89X06L8G3XId/66mYVfVfD5SjN6Y9IifK+Cz08S0Uf9Lvz0RAs+XktAn5Xv48X6e6qfG62fR+v36X5t9P67v/uN6IeD9Yf0U8B6M/psYf0p/Ryx3oq+WFj/on57rK8WfXuw/pZ+X1h/XvS7Rf990e8W/XnR7xb977G+WfS7Rf8X9OfF+mZhfS7682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+jPi/XNoj8v1jeL/rxY3yz682J9s+j9LPrfU6ZMmTJlypQpU6Y+V98XG/4D38668EAAAAAASUVORK5CYII="
+# Futurističen "Core-Pulse" Logo za temno modro podlago
+LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAMAAAAO97vEAAAAVFBMVEVHcEwAAAAAnQAAmQAApAAAnwAAmwAAmAAAnQAAnwAApAAAmQAAmwAAmAAAnQAAnwAApAAAmQAAmwAAmAAAnQAAnwAApAAAmQAAmwAAmAAAnQAAnwA8Y67UAAAAD3RSTlMAI0OAgYKDhIWGh4mKk5S7xU9iAAAB0klEQVR42u2Z2XLCMAxEk00ghG0uYbe07f//4SStZId0SAnTmc689EizvI68SCLm979IdmP7uV399X9V0f9X3f8Nqj98v6CjX3Vf/1eFp0YlX/9Xhb6vT67+r66W8vWpT6/+r06U7098fS4Y6K568f6O768FA+nOlv8D38eCge96A/qL748FA9/1B/T738eCge/6A3p7/X81fNcf0G+/v79m4Lv+gN5cf0Bvqz+gt9Uf0Nvqz/r9/v6CgX7P/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6D31V/fF838N2XKlClTpkyZMmXKlClTpkyZMn9Vv9V8/Zf5BZ69HjHOnA71AAAAAElFTkSuQmCC"
 
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
-    "html,body{margin:0;padding:0;background:transparent;font-family:'Segoe UI',Roboto,sans-serif;color:white;}"
-    ".sidebar-wrapper{display:flex;flex-direction:column;align-items:center;padding:10px;}"
+    "html,body{margin:0;padding:0;background:transparent;font-family:'Segoe UI',Arial,sans-serif;color:white;}"
+    ".container{padding:15px;display:flex;flex-direction:column;align-items:center;}"
     
-    # LOGO BADGE STYLING
-    ".logo-badge{position:relative;background:rgba(255, 255, 255, 0.05);"
-    "border-radius:24px;padding:15px;box-shadow:0 8px 32px 0 rgba(0, 0, 0, 0.37);"
-    "margin-bottom:25px;border:1px solid rgba(255, 255, 255, 0.1);backdrop-filter: blur(4px);}"
-    ".logo-badge img{display:block;width:90px;height:auto;filter: drop-shadow(0 0 8px #4ade80);}"
+    # LOGO BADGE
+    ".logo-badge{background:rgba(255, 255, 255, 0.05);border-radius:30px;padding:20px;box-shadow:0 0 40px rgba(59, 130, 246, 0.2);margin-bottom:30px;border:1px solid rgba(255, 255, 255, 0.1);backdrop-filter:blur(5px);}"
+    ".logo-badge img{display:block;width:80px;height:auto;filter:drop-shadow(0 0 15px #3b82f6);}"
     
-    # INFOGRAPHIC CARD
-    ".info-card{width:100%;background:linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);"
-    "border-radius:18px;padding:18px;border:1px solid rgba(255,255,255,0.1);box-sizing:border-box;}"
-    ".info-header{font-size:0.75rem;font-weight:800;text-transform:uppercase;color:#4ade80;"
-    "letter-spacing:1.5px;margin-bottom:15px;text-align:center;}"
+    # COMPOUND INFOGRAPHIC CARD
+    ".dashboard{width:100%;background:rgba(15, 23, 42, 0.6);border-radius:20px;padding:20px;border:1px solid rgba(255, 255, 255, 0.1);box-sizing:border-box;box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);}"
+    ".dash-title{font-size:0.75rem;font-weight:900;text-transform:uppercase;color:#94a3b8;letter-spacing:2px;margin-bottom:20px;text-align:center;}"
     
-    # PROGRESS BARS
-    ".metric-box{margin-bottom:15px;}"
-    ".metric-label{display:flex;justify-content:space-between;font-size:0.65rem;font-weight:700;margin-bottom:6px;opacity:0.8;}"
-    ".bar-bg{height:7px;background:rgba(0,0,0,0.4);border-radius:10px;overflow:hidden;}"
-    ".bar-fill-stress{height:100%;width:72%;background:linear-gradient(90deg,#ef4444,#dc2626);box-shadow:0 0 10px rgba(220,38,38,0.4);}"
-    ".bar-fill-energy{height:100%;width:38%;background:linear-gradient(90deg,#3b82f6,#2563eb);box-shadow:0 0 10px rgba(37,99,235,0.4);}"
+    # METRIC COMPONENT
+    ".metric-group{margin-bottom:22px;}"
+    ".metric-header{display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.65rem;font-weight:bold;letter-spacing:0.5px;}"
+    ".stress-text{color:#f43f5e;} .energy-text{color:#3b82f6;}"
     
-    # ANALYTICS BOX
-    ".impact-box{margin-top:12px;padding:12px;background:rgba(239,68,68,0.08);border-radius:10px;text-align:center;border:1px solid rgba(239,68,68,0.2);}"
-    ".impact-title{font-size:0.7rem;font-weight:800;color:#fca5a5;margin-bottom:3px;letter-spacing:0.5px;}"
-    ".impact-text{font-size:0.65rem;color:#cbd5e1;line-height:1.4;}"
+    ".track-bg{height:6px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;}"
+    ".track-fill-stress{height:100%;width:78%;background:linear-gradient(90deg,#f43f5e,#fb7185);box-shadow:0 0 15px rgba(244,63,94,0.4);}"
+    ".track-fill-energy{height:100%;width:32%;background:linear-gradient(90deg,#3b82f6,#60a5fa);box-shadow:0 0 15px rgba(59,130,246,0.4);}"
     
-    ".footer-note{font-size:0.55rem;opacity:0.3;margin-top:15px;text-align:center;letter-spacing:1px;}"
+    # DYNAMICS BOX (CORRELATION)
+    ".dynamics-box{background:rgba(244, 63, 94, 0.1);border:1px solid rgba(244, 63, 94, 0.2);border-radius:12px;padding:12px;text-align:center;margin-top:10px;}"
+    ".dynamics-formula{font-family:monospace;font-size:0.85rem;color:#fca5a5;margin-bottom:5px;font-weight:bold;}"
+    ".dynamics-label{font-size:0.6rem;color:#94a3b8;line-height:1.3;font-style:italic;}"
+    
+    ".footer{font-size:0.5rem;opacity:0.3;margin-top:20px;text-align:center;text-transform:uppercase;letter-spacing:1px;}"
     "</style></head><body>"
-    "<div class='sidebar-wrapper'>"
-        # Udaren Logo
+    "<div class='container'>"
+        # Logo Section
         "<div class='logo-badge'>"
             f"<img src='data:image/jpeg;base64,{LOGO_IMAGE_B64}'/>"
         "</div>"
         
-        # English Infographic
-        "<div class='info-card'>"
-            "<div class='info-header'>System Dynamics</div>"
+        # Sestavljena Infografika
+        "<div class='dashboard'>"
+            "<div class='dash-title'>System Analytics</div>"
             
-            # Row 1: Stress
-            "<div class='metric-box'>"
-                "<div class='metric-label'><span>STRESS INTENSITY (σ)</span><span>72%</span></div>"
-                "<div class='bar-bg'><div class='bar-fill-stress'></div></div>"
+            # Stress Metric
+            "<div class='metric-group'>"
+                "<div class='metric-header'><span class='stress-text'>STRESS LOAD (σ)</span><span>CRITICAL</span></div>"
+                "<div class='track-bg'><div class='track-fill-stress'></div></div>"
             "</div>"
             
-            # Row 2: Energy
-            "<div class='metric-box'>"
-                "<div class='metric-label'><span>REMAINING ENERGY (W_EU)</span><span>38%</span></div>"
-                "<div class='bar-bg'><div class='bar-fill-energy'></div></div>"
+            # Energy Metric
+            "<div class='metric-group'>"
+                "<div class='metric-header'><span class='energy-text'>KCAL EFFICIENCY</span><span>DRAINED</span></div>"
+                "<div class='track-bg'><div class='track-fill-energy'></div></div>"
             "</div>"
             
-            # Correlation Note
-            "<div class='impact-box'>"
-                "<div class='impact-title'>KCAL DRAIN MECHANICS</div>"
-                "<div class='impact-text'>Rising stress levels (σ) act as an internal friction, leading to a direct drop in caloric efficiency.</div>"
+            # Mathematical Correlation (Friction)
+            "<div class='dynamics-box'>"
+                "<div class='dynamics-formula'>σ ↑ → W_EU ↓</div>"
+                "<div class='dynamics-label'>High stress intensity acts as thermal friction, converting useful kinetic energy into systemic waste.</div>"
             "</div>"
             
-            "<div class='footer-note'>PETRIČ METHODOLOGY V3.1</div>"
+            "<div class='footer'>Petrič Barometer PRO v4.0</div>"
         "</div>"
     "</div>"
     "</body></html>"
