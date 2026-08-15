@@ -218,11 +218,24 @@ st.markdown(
 
 
 # ============================================================
-# 2b. SIDEBAR LOGO (rendered in an isolated iframe via
-#     components.html, fully self-contained so it never
-#     touches Streamlit's own markdown/clipboard handling)
+# 2b. SIDEBAR LOGO LOGIC & HTML
 # ============================================================
 
+import base64
+import os
+
+# Ime vaše datoteke z logotipom (mora biti v isti mapi kot ta .py datoteka)
+LOGO_FILE = "logo.jpg" 
+
+# Preverimo, če datoteka obstaja, in jo pretvorimo v Base64
+if os.path.exists(LOGO_FILE):
+    with open(LOGO_FILE, "rb") as f:
+        LOGO_IMAGE_B64 = base64.b64encode(f.read()).decode()
+else:
+    # Če slike ni, uporabi prozoren pixel, da preprečimo NameError in sesutje aplikacije
+    LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+
+# Sedaj definiramo HTML, ki uporabi spremenljivko LOGO_IMAGE_B64
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
     "html,body{margin:0;padding:0;background:transparent;"
