@@ -122,10 +122,10 @@ st.markdown(
 
     [data-testid="stSidebar"] {
         background-color: #030c1b !important;
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.4) 0, transparent 50%), 
-            radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.3) 0, transparent 50%) !important;
-        border-right: 1px solid rgba(255,255,255,0.1);
+        background-image: none !important; /* Odstrani vse nečistoče in prelive */
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        background-color: #030c1b !important;
     }
 
     [data-testid="stSidebar"]::before,
@@ -183,50 +183,49 @@ st.markdown(
 
 
 # ============================================================
-# 2b. MINIMALIST BRANDING & CORE DYNAMICS
+# 2b. NEW BRANDING & CORE ANALYTICS (English)
 # ============================================================
 
-# Ultra-preprost Pulse Logo (bel na prosojni podlagi)
+# Nov, minimalističen bel logo "Analytical Gauge"
 LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4AQMAAAAn8pFeAAAABlBMVEVHcEz///+l2Z/dAAAAAXRSTlMAQObYZgAAADlJREFUeF7ty6ENACAMAMExmIuBYf9SGIIDuAn7pU9TX9NoAtRUKFA06pYCBQpFo24pUKBQNOrWf6YDRpZfVvYVpUoAAAAASUVORK5CYII="
 
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
-    "html,body{margin:0;padding:0;background:#030c1b;font-family:sans-serif;color:white;}"
-    ".wrapper{padding:20px;display:flex;flex-direction:column;align-items:center;}"
+    "html,body{margin:0;padding:0;background:#030c1b;font-family:sans-serif;color:white;text-align:center;}"
+    ".wrapper{padding:25px 15px;display:flex;flex-direction:column;align-items:center;}"
     
-    # Preprost Logo
-    ".logo{width:80px;height:auto;margin-bottom:25px;filter:drop-shadow(0 0 5px #4ade80);}"
+    # Minimalističen bel logo
+    ".logo-img{width:90px;height:auto;margin-bottom:30px;opacity:0.95;filter:drop-shadow(0 0 8px rgba(255,255,255,0.2));}"
     
-    # Minimalistična Infografika
-    ".card{width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.1);}"
-    ".title{font-size:0.8rem;font-weight:bold;margin-bottom:15px;color:#94a3b8;text-align:center;text-transform:uppercase;}"
+    # Čista infografika
+    ".stats-card{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:20px;box-sizing:border-box;}"
+    ".label{font-size:0.7rem;font-weight:bold;display:flex;justify-content:space-between;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}"
     
-    ".bar-wrap{margin-bottom:10px;}"
-    ".bar-label{font-size:0.65rem;margin-bottom:4px;display:flex;justify-content:space-between;}"
-    ".bar-bg{height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;}"
-    ".bar-stress{height:100%;width:70%;background:#ef4444;}"
-    ".bar-energy{height:100%;width:40%;background:#3b82f6;}"
+    # Progress bars
+    ".bar-bg{height:6px;background:rgba(255,255,255,0.1);border-radius:10px;margin-bottom:18px;overflow:hidden;}"
+    ".bar-red{height:100%;width:75%;background:#ff4b4b;box-shadow:0 0 10px #ff4b4b;}"
+    ".bar-blue{height:100%;width:35%;background:#00d2ff;box-shadow:0 0 10px #00d2ff;}"
     
-    # Formula
-    ".formula{margin-top:15px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);text-align:center;}"
-    ".formula-text{font-family:serif;font-size:1rem;color:#fca5a5;font-weight:bold;}"
-    ".formula-sub{font-size:0.6rem;color:#64748b;margin-top:2px;}"
+    # Formula (Bistvo)
+    ".formula-box{margin-top:10px;padding-top:15px;border-top:1px solid rgba(255,255,255,0.1);}"
+    ".math{font-size:1.2rem;font-weight:bold;color:#ff4b4b;font-family:serif;}"
+    ".desc{font-size:0.65rem;color:#94a3b8;margin-top:5px;line-height:1.2;}"
     "</style></head><body>"
     "<div class='wrapper'>"
-        f"<img class='logo' src='data:image/png;base64,{LOGO_IMAGE_B64}'/>"
-        "<div class='card'>"
-            "<div class='title'>System Balance</div>"
-            "<div class='bar-wrap'>"
-                "<div class='bar-label'><span>STRESS (σ)</span><span>HIGH</span></div>"
-                "<div class='bar-bg'><div class='bar-stress'></div></div>"
-            "</div>"
-            "<div class='bar-wrap'>"
-                "<div class='bar-label'><span>ENERGY (W_EU)</span><span>LOW</span></div>"
-                "<div class='bar-bg'><div class='bar-energy'></div></div>"
-            "</div>"
-            "<div class='formula'>"
-                "<div class='formula-text'>σ ↑ ⇒ W_EU ↓</div>"
-                "<div class='formula-sub'>Stress intensity drains useful energy</div>"
+        # Logo
+        f"<img class='logo-img' src='data:image/png;base64,{LOGO_IMAGE_B64}'/>"
+        
+        # Dashboard
+        "<div class='stats-card'>"
+            "<div class='label'><span>Stress Intensity</span><span>MAX</span></div>"
+            "<div class='bar-bg'><div class='bar-red'></div></div>"
+            
+            "<div class='label'><span>Useful Energy</span><span>LOW</span></div>"
+            "<div class='bar-bg'><div class='bar-blue'></div></div>"
+            
+            "<div class='formula-box'>"
+                "<div class='math'>&sigma; &uarr; &rArr; W<sub>EU</sub> &darr;</div>"
+                "<div class='desc'>High stress intensity automatically drains caloric efficiency and useful energy.</div>"
             "</div>"
         "</div>"
     "</div></body></html>"
