@@ -183,72 +183,72 @@ st.markdown(
 
 
 # ============================================================
-# 2b. HIGH-CONTRAST BRANDING & ENERGY DRAIN ANALYTICS
+# 2b. ULTRA-IMPACT BRANDING & ENERGY DRAIN ANALYTICS
 # ============================================================
 
-LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAACXBIWXMAAAsTAAALEwEAmpwYAAADfElEQVR4nO2aS0hUURzGv3un87SZZpYvSklS0SIsIsKipS0CayiitvYAtYtoE9m6SNoE0Y206oNoE9m6SNoE0Y206v/O6DjO6Dj3zp17Z77vB8N07p0737n/75xz7scMUEpJKY7Y6ABM6mCIEBkiREKIEAlChAiRECJEYuU6IE908SREiESRECJEYpU7IE9M8SREhkiREKLSgN7e3unp6fFvU0mSlEql6enpmZkZ/O1pWur7CwsLC3Nzc4ODg8PDw6Ojo5L7W99fX19fXl7evHnz+vXr6+vrmZmZvX9v958Ue7399L30X798fvh+fjh/Tv1n/fn1n9/zc///B8h3q96C3A73u0S5PZp8f8G9710WvK3+z8O23f6/9Zf079t//k+9Lv7f3/yJJkaGjZ7X763mvf69733v9ov9S/L/Xv39X/6/vS/739v9f7v7f/959D/0uSe37v6Xvpu95L997vXv7X9Y+vffmX9X8u/Zf/89f/+ZclSXLv9f/H29u99Hu79G9v9/7v7f/L/vLSXv7X9Y+vffmX9X8u/Zf/89f/+ZclSXLv9f/H29u99Hu79G9v9/7v7f/L/vLSXv7X3v+f978v/ffv99L/9vvSr/R/X/q/u97S/7/r7faXf7v39pS///Xv6///X0vfv99Lv9v9Xv/vrvf60v+99O+99O/9/0mSZGjIz9xzL//LkvS/fW//f7++9H/vL0mSJEnu/X9J8p/P6f6yJP1vP3fPpf/W8/be978kSXLv5X/p9/770u/9937/+f3z/yV97/f3Xnrp3vvvL//+8u8l/6/7u5ff9f+X9L//97P+9H/v+89Kv/eX/r+kv//3s/4keWjIn0Pfpf7vfv9vff//tZ//p+f5n//H5/6e33v6Xvqu99K997uX/3X947tfvtz+uXRf/n9f+r9e/+fSf79e/+8v//S//9+L/1vv7f3/yNJkqGhz9Rzv9v99v6eXe/Z9V5/f/3pP+u5Pz8v9/zcf/lP7f0H7Pe9Xv6f2/Nzz/P+vf+vX/6DJEliHxl+v9v99v6SXe/9Xv+u973Xf/pPvV/+7z79p9+X/rvf+0+///T96f/29729v/T97Pf0/p/+0///H0D/uN9/+r7Xve6X/+f0vfd7L730f73/e9+v/O8vS5Ik9hH38v/vXv757Uv/uV/+f1/6v17/59J/v17/7y//99L//34v/W+/t/f/I0mSqf/89X8vS//f9f+7l/+9JPmv/8m/fv/J9+X/f1/6t57be7t/Xe"
+# Definiramo prazen Base64, da ne bo NameError napake
+LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
-    "html,body{margin:0;padding:0;background:#030c1b;font-family:'Arial Black',Gadget,sans-serif;color:white;text-align:center;}"
-    ".wrapper{padding:20px 10px;display:flex;flex-direction:column;align-items:center;}"
+    "html,body{margin:0;padding:0;background:#030c1b;font-family:'Arial Black',Gadget,sans-serif;color:white;}"
+    ".sidebar-container{padding:20px 15px;display:flex;flex-direction:column;align-items:center;}"
     
-    # LOGO: Močan beli krog s piramido
-    ".logo-outer{width:110px;height:110px;background:white;border-radius:50%;"
+    # --- LOGO: BEL KROG S PIRAMIDO ---
+    ".brand-circle{width:100px;height:100px;background:white;border-radius:50%;"
     "display:flex;justify-content:center;align-items:center;margin-bottom:30px;"
-    "box-shadow:0 0 30px rgba(255,255,255,0.4);border:4px solid #3b82f6;}"
-    ".pyramid-icon{width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;"
-    "border-bottom:55px solid #030c1b;filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.5));}"
+    "box-shadow:0 0 30px rgba(59,130,246,0.5);border:4px solid #3b82f6;}"
+    ".pyramid-svg{width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;"
+    "border-bottom:50px solid #030c1b;}"
     
-    # INFOGRAPHIC CARD
-    ".drain-card{width:100%;background:#0f172a;border-radius:15px;padding:20px;border:2px solid #1e293b;"
-    "box-shadow: 0 20px 40px rgba(0,0,0,0.6);text-align:left;}"
+    # --- UDARNA INFOGRAFIKA ---
+    ".impact-card{width:100%;background:rgba(255,255,255,0.03);border-radius:20px;padding:25px 20px;"
+    "border:1px solid rgba(255,255,255,0.1);box-shadow:0 20px 50px rgba(0,0,0,0.5);box-sizing:border-box;}"
     
-    # Stress Section (NEON RED)
-    ".tag-stress{color:#ff4b4b;font-size:0.75rem;font-weight:900;text-transform:uppercase;margin-bottom:8px;display:block;letter-spacing:1px;}"
-    ".bar-large{height:15px;background:#331111;border-radius:20px;margin-bottom:25px;overflow:hidden;border:1px solid #441111;}"
-    ".fill-stress{height:100%;width:88%;background:linear-gradient(90deg, #ff4b4b, #880000);box-shadow:0 0 15px #ff4b4b;}"
+    ".status-tag{font-size:0.7rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;display:block;}"
+    ".red-text{color:#ff4b4b;} .blue-text{color:#00d2ff;}"
     
-    # Energy Section (NEON BLUE)
-    ".tag-energy{color:#00d2ff;font-size:0.75rem;font-weight:900;text-transform:uppercase;margin-bottom:8px;display:block;letter-spacing:1px;}"
-    ".fill-energy{height:100%;width:18%;background:linear-gradient(90deg, #00d2ff, #004488);box-shadow:0 0 15px #00d2ff;}"
+    # Masivni progress bari
+    ".mega-bar{height:22px;background:#111;border-radius:30px;margin-bottom:30px;padding:3px;border:1px solid #333;overflow:hidden;}"
+    ".fill-stress{height:100%;width:92%;background:linear-gradient(90deg,#ff4b4b,#880000);border-radius:30px;"
+    "box-shadow:0 0 20px rgba(255,75,75,0.6);animation: pulse 1.5s infinite;}"
+    ".fill-energy{height:100%;width:12%;background:linear-gradient(90deg,#00d2ff,#004488);border-radius:30px;"
+    "box-shadow:0 0 10px rgba(0,210,255,0.4);}"
     
-    # Alert Box
-    ".alert-box{background:#ff4b4b;color:white;padding:12px;border-radius:8px;font-size:0.8rem;font-weight:900;"
-    "text-align:center;margin-top:15px;animation: pulse 2s infinite;}"
+    # Sredinska formula
+    ".center-math{font-size:1.8rem;font-weight:900;text-align:center;margin:20px 0;letter-spacing:-1px;}"
+    ".drain-arrow{color:#ff4b4b;font-size:1.5rem;display:block;margin:-5px 0;}"
     
-    # Math Statement
-    ".math-statement{font-size:1.4rem;color:white;margin-top:15px;text-align:center;font-weight:900;}"
-    ".math-sub{font-size:0.6rem;color:#94a3b8;text-transform:uppercase;margin-top:5px;}"
-    
-    "@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }"
+    # Impact Box
+    ".warning-box{background:#ff4b4b;color:white;padding:15px;border-radius:12px;text-align:center;"
+    "font-size:0.85rem;font-weight:900;box-shadow:0 10px 20px rgba(255,75,75,0.3);}"
+    ".warning-box span{display:block;font-size:0.6rem;text-transform:uppercase;margin-top:5px;opacity:0.8;}"
+
+    "@keyframes pulse { 0% { opacity:1; } 50% { opacity:0.6; } 100% { opacity:1; } }"
     "</style></head><body>"
-    "<div class='wrapper'>"
+    "<div class='sidebar-container'>"
         # Udaren Logo
-        "<div class='logo-outer'><div class='pyramid-icon'></div></div>"
+        "<div class='brand-circle'><div class='pyramid-svg'></div></div>"
         
-        # High Stress - Low Energy Dashboard
-        "<div class='drain-card'>"
-            # Stress Row
-            "<span class='tag-stress'>STRESS INTENSITY (σ)</span>"
-            "<div class='bar-large'><div class='fill-stress'></div></div>"
+        # High Stress - Low Energy Infographic
+        "<div class='impact-card'>"
+            "<span class='status-tag red-text'>Stress Intensity (&sigma;)</span>"
+            "<div class='mega-bar'><div class='fill-stress'></div></div>"
             
-            # Energy Row
-            "<span class='tag-energy'>USEFUL ENERGY (W_EU)</span>"
-            "<div class='bar-large' style='background:#111a2e; border:1px solid #112244;'>"
-                "<div class='fill-energy'></div>"
+            "<div class='center-math'>&sigma; &uarr; <span class='drain-arrow'>&DoubleDownArrow;</span> W<sub>EU</sub> &darr;</div>"
+            
+            "<span class='status-tag blue-text'>Useful Energy (W_EU)</span>"
+            "<div class='mega-bar'><div class='fill-energy'></div></div>"
+            
+            "<div class='warning-box'>"
+                "KCAL DRAIN: CRITICAL"
+                "<span>Internal friction exceeds output</span>"
             "</div>"
-            
-            # Big Logic Statement
-            "<div class='math-statement'>σ ↑ → W<sub>EU</sub> ↓</div>"
-            
-            # Warning
-            "<div class='alert-box'>CRITICAL ENERGY DRAIN</div>"
-            "<div class='math-sub'>Systemic friction is consuming your caloric intake.</div>"
         "</div>"
         
-        "<div style='font-size:0.5rem; color:#475569; margin-top:20px; font-weight:bold;'>PETRIČ ANALYTICS ENGINE PRO</div>"
-    "</div></body></html>"
+        "<div style='margin-top:25px; font-size:0.6rem; opacity:0.4; letter-spacing:1px;'>PETRIČ ANALYTICS ENGINE PRO</div>"
+    "</div>"
+    "</body></html>"
 )
 
 
