@@ -183,49 +183,69 @@ st.markdown(
 
 
 # ============================================================
-# 2b. NEW BRANDING & CORE ANALYTICS (English)
+# 2b. BRANDING: PYRAMID CIRCLE & ANALYTICS DASHBOARD
 # ============================================================
 
-# Nov, minimalističen bel logo "Analytical Gauge"
-LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4AQMAAAAn8pFeAAAABlBMVEVHcEz///+l2Z/dAAAAAXRSTlMAQObYZgAAADlJREFUeF7ty6ENACAMAMExmIuBYf9SGIIDuAn7pU9TX9NoAtRUKFA06pYCBQpFo24pUKBQNOrWf6YDRpZfVvYVpUoAAAAASUVORK5CYII="
+# Nova Base64 koda: Bela piramida znotraj belega kroga (3D učinek)
+LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAACXBIWXMAAAsTAAALEwEAmpwYAAADfElEQVR4nO2aS0hUURzGv3un87SZZpYvSklS0SIsIsKipS0CayiitvYAtYtoE9m6SNoE0Y206oNoE9m6SNoE0Y206oNoE9m6SNoE0Y206v/O6DjO6Dj3zp17Z77vB8N07p0737n/75xz7scMUEpJKY7Y6ABM6mCIEBkiREKIEAlChAiRECJEYuU6IE908SREiESRECJEYpU7IE9M8SREhkiREKLSgN7e3unp6fFvU0mSlEql6enpmZkZ/O1pWur7CwsLC3Nzc4ODg8PDw6Ojo5L7W99fX19fXl7evHnz+vXr6+vrmZmZvX9v958Ue7399L30X798fvh+fjh/Tv1n/fn1n9/zc///B8h3q96C3A73u0S5PZp8f8G9710WvK3+z8O23f6/9Zf079t//k+9Lv7f3/yJJkaGjZ7X763mvf69733v9ov9S/L/Xv39X/6/vS/739v9f7v7f/959D/0uSe37v6Xvpu95L997vXv7X9Y+vffmX9X8u/Zf/89f/+ZclSXLv9f/H29u99Hu79G9v9/7v7f/L/vLSXv7X9Y+vffmX9X8u/Zf/89f/+ZclSXLv9f/H29u99Hu79G9v9/7v7f/L/vLSXv7X3v+f978v/ffv99L/9vvSr/R/X/q/u97S/7/r7faXf7v39pS///Xv6///X0vfv99Lv9v9Xv/vrvf60v+99O+99O/9/0mSZGjIz9xzL//LkvS/fW//f7++9H/vL0mSJEnu/X9J8p/P6f6yJP1vP3fPpf/W8/be978kSXLv5X/p9/770u/9937/+f3z/yV97/f3Xnrp3vvvL//+8u8l/6/7u5ff9f+X9L//97P+9H/v+89Kv/eX/r+kv//3s/4keWjIn0Pfpf7vfv9vff//tZ//p+f5n//H5/6e33v6Xvqu99K997uX/3X947tfvtz+uXRf/n9f+r9e/+fSf79e/+8v//S//9+L/1vv7f3/yNJkqGhz9Rzv9v99v6eXe/Z9V5/f/3pP+u5Pz8v9/zcf/lP7f0H7Pe9Xv6f2/Nzz/P+vf+vX/6DJEliHxl+v9v99v6SXe/9Xv+u973Xf/pPvV/+7z79p9+X/rvf+0+///T96f/29729v/T97Pf0/p/+0///H0D/uN9/+r7Xve6X/+f0vfd7L730f73/e9+v/O8vS5Ik9hH38v/vXv757Uv/uV/+f1/6v17/59J/v17/7y//99L//34v/W+/t/f/I0mSqf/89X8vS//f9f+7l/+9JPmv/8m/fv/J9+X/f1/6t57be7t/Xe"
 
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
-    "html,body{margin:0;padding:0;background:#030c1b;font-family:sans-serif;color:white;text-align:center;}"
-    ".wrapper{padding:25px 15px;display:flex;flex-direction:column;align-items:center;}"
+    "html,body{margin:0;padding:0;background:#030c1b;font-family:'Segoe UI',sans-serif;color:white;text-align:center;}"
+    ".wrapper{padding:30px 15px;display:flex;flex-direction:column;align-items:center;}"
     
-    # Minimalističen bel logo
-    ".logo-img{width:90px;height:auto;margin-bottom:30px;opacity:0.95;filter:drop-shadow(0 0 8px rgba(255,255,255,0.2));}"
+    # Stil za Logo piramide v krogu
+    ".logo-container{position:relative;width:100px;height:100px;background:white;border-radius:50%;"
+    "display:flex;justify-content:center;align-items:center;margin-bottom:30px;"
+    "box-shadow:0 0 20px rgba(255,255,255,0.3);border:2px solid rgba(255,255,255,0.1);}"
     
-    # Čista infografika
-    ".stats-card{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:20px;box-sizing:border-box;}"
-    ".label{font-size:0.7rem;font-weight:bold;display:flex;justify-content:space-between;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}"
+    # Sama piramida (narejena s CSS za maksimalno čistost)
+    ".pyramid{width: 0;height: 0;border-left: 30px solid transparent;border-right: 30px solid transparent;"
+    "border-bottom: 50px solid #030c1b;position:relative;}"
+    ".pyramid:after{content:'';position:absolute;left:-30px;top:0;width: 0;height: 0;"
+    "border-left: 30px solid transparent;border-right: 0px solid transparent;"
+    "border-bottom: 50px solid rgba(0,0,0,0.1);}"
     
-    # Progress bars
-    ".bar-bg{height:6px;background:rgba(255,255,255,0.1);border-radius:10px;margin-bottom:18px;overflow:hidden;}"
-    ".bar-red{height:100%;width:75%;background:#ff4b4b;box-shadow:0 0 10px #ff4b4b;}"
-    ".bar-blue{height:100%;width:35%;background:#00d2ff;box-shadow:0 0 10px #00d2ff;}"
+    # Kartica z infografiko
+    ".card{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:15px;padding:20px;box-sizing:border-box;}"
+    ".title{font-size:0.75rem;font-weight:800;color:#4ade80;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:20px;}"
     
-    # Formula (Bistvo)
-    ".formula-box{margin-top:10px;padding-top:15px;border-top:1px solid rgba(255,255,255,0.1);}"
-    ".math{font-size:1.2rem;font-weight:bold;color:#ff4b4b;font-family:serif;}"
-    ".desc{font-size:0.65rem;color:#94a3b8;margin-top:5px;line-height:1.2;}"
+    ".metric{margin-bottom:15px;text-align:left;}"
+    ".metric-label{display:flex;justify-content:space-between;font-size:0.65rem;font-weight:bold;margin-bottom:5px;opacity:0.8;}"
+    
+    ".bar-bg{height:8px;background:rgba(0,0,0,0.3);border-radius:10px;overflow:hidden;}"
+    ".bar-stress{height:100%;width:80%;background:linear-gradient(90deg,#ef4444,#dc2626);}"
+    ".bar-energy{height:100%;width:30%;background:linear-gradient(90deg,#3b82f6,#2563eb);}"
+    
+    # Formula Box
+    ".formula-box{margin-top:15px;padding:12px;background:rgba(239,68,68,0.1);border-radius:10px;border:1px dashed rgba(239,68,68,0.3);}"
+    ".formula-text{font-size:1.1rem;font-weight:bold;color:#fca5a5;font-family:serif;}"
+    ".formula-desc{font-size:0.6rem;color:#94a3b8;margin-top:4px;line-height:1.3;}"
+    
     "</style></head><body>"
     "<div class='wrapper'>"
-        # Logo
-        f"<img class='logo-img' src='data:image/png;base64,{LOGO_IMAGE_B64}'/>"
+        # Udaren Logo: Piramida v krogu
+        "<div class='logo-container'>"
+            "<div class='pyramid'></div>"
+        "</div>"
         
-        # Dashboard
-        "<div class='stats-card'>"
-            "<div class='label'><span>Stress Intensity</span><span>MAX</span></div>"
-            "<div class='bar-bg'><div class='bar-red'></div></div>"
+        # Sestavljena Infografika
+        "<div class='card'>"
+            "<div class='title'>System Dynamics</div>"
             
-            "<div class='label'><span>Useful Energy</span><span>LOW</span></div>"
-            "<div class='bar-bg'><div class='bar-blue'></div></div>"
+            "<div class='metric'>"
+                "<div class='metric-label'><span>STRESS INTENSITY (σ)</span><span>HIGH</span></div>"
+                "<div class='bar-bg'><div class='bar-stress'></div></div>"
+            "</div>"
+            
+            "<div class='metric'>"
+                "<div class='metric-label'><span>USEFUL ENERGY (W_EU)</span><span>DRAINING</span></div>"
+                "<div class='bar-bg'><div class='bar-energy'></div></div>"
+            "</div>"
             
             "<div class='formula-box'>"
-                "<div class='math'>&sigma; &uarr; &rArr; W<sub>EU</sub> &darr;</div>"
-                "<div class='desc'>High stress intensity automatically drains caloric efficiency and useful energy.</div>"
+                "<div class='formula-text'>&sigma; &uarr; &rArr; W<sub>EU</sub> &darr;</div>"
+                "<div class='formula-desc'>Increased stress acts as systemic friction, reducing thermal and caloric efficiency.</div>"
             "</div>"
         "</div>"
     "</div></body></html>"
