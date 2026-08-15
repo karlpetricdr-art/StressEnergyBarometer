@@ -121,10 +121,10 @@ st.markdown(
     }
 
     [data-testid="stSidebar"] {
-        background-color: #030c1b !important; /* Popolnoma temno modra */
+        background-color: #030c1b !important;
         background-image: 
-            radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.5) 0, transparent 50%), 
-            radial-gradient(at 50% 100%, rgba(15, 23, 42, 0.3) 0, transparent 50%) !important;
+            radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.4) 0, transparent 50%), 
+            radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.3) 0, transparent 50%) !important;
         border-right: 1px solid rgba(255,255,255,0.1);
     }
 
@@ -183,73 +183,53 @@ st.markdown(
 
 
 # ============================================================
-# 2b. PRO BRANDING & SYSTEM DYNAMICS INFOGRAPHIC
+# 2b. MINIMALIST BRANDING & CORE DYNAMICS
 # ============================================================
 
-# Futurističen "Core-Pulse" Logo za temno modro podlago
-LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAMAAAAO97vEAAAAVFBMVEVHcEwAAAAAnQAAmQAApAAAnwAAmwAAmAAAnQAAnwAApAAAmQAAmwAAmAAAnQAAnwAApAAAmQAAmwAAmAAAnQAAnwAApAAAmQAAmwAAmAAAnQAAnwA8Y67UAAAAD3RSTlMAI0OAgYKDhIWGh4mKk5S7xU9iAAAB0klEQVR42u2Z2XLCMAxEk00ghG0uYbe07f//4SStZId0SAnTmc689EizvI68SCLm979IdmP7uV399X9V0f9X3f8Nqj98v6CjX3Vf/1eFp0YlX/9Xhb6vT67+r66W8vWpT6/+r06U7098fS4Y6K568f6O768FA+nOlv8D38eCge96A/qL748FA9/1B/T738eCge/6A3p7/X81fNcf0G+/v79m4Lv+gN5cf0Bvqz+gt9Uf0Nvqz/r9/v6CgX7P/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6B/839A/+b/gP7N/wH9m/8D+jf/B/Rv/g/o3/wf0L/5P6D31V/fF838N2XKlClTpkyZMmXKlClTpkyZMn9Vv9V8/Zf5BZ69HjHOnA71AAAAAElFTkSuQmCC"
+# Ultra-preprost Pulse Logo (bel na prosojni podlagi)
+LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4AQMAAAAn8pFeAAAABlBMVEVHcEz///+l2Z/dAAAAAXRSTlMAQObYZgAAADlJREFUeF7ty6ENACAMAMExmIuBYf9SGIIDuAn7pU9TX9NoAtRUKFA06pYCBQpFo24pUKBQNOrWf6YDRpZfVvYVpUoAAAAASUVORK5CYII="
 
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
-    "html,body{margin:0;padding:0;background:transparent;font-family:'Segoe UI',Arial,sans-serif;color:white;}"
-    ".container{padding:15px;display:flex;flex-direction:column;align-items:center;}"
+    "html,body{margin:0;padding:0;background:#030c1b;font-family:sans-serif;color:white;}"
+    ".wrapper{padding:20px;display:flex;flex-direction:column;align-items:center;}"
     
-    # LOGO BADGE
-    ".logo-badge{background:rgba(255, 255, 255, 0.05);border-radius:30px;padding:20px;box-shadow:0 0 40px rgba(59, 130, 246, 0.2);margin-bottom:30px;border:1px solid rgba(255, 255, 255, 0.1);backdrop-filter:blur(5px);}"
-    ".logo-badge img{display:block;width:80px;height:auto;filter:drop-shadow(0 0 15px #3b82f6);}"
+    # Preprost Logo
+    ".logo{width:80px;height:auto;margin-bottom:25px;filter:drop-shadow(0 0 5px #4ade80);}"
     
-    # COMPOUND INFOGRAPHIC CARD
-    ".dashboard{width:100%;background:rgba(15, 23, 42, 0.6);border-radius:20px;padding:20px;border:1px solid rgba(255, 255, 255, 0.1);box-sizing:border-box;box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);}"
-    ".dash-title{font-size:0.75rem;font-weight:900;text-transform:uppercase;color:#94a3b8;letter-spacing:2px;margin-bottom:20px;text-align:center;}"
+    # Minimalistična Infografika
+    ".card{width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:15px;border:1px solid rgba(255,255,255,0.1);}"
+    ".title{font-size:0.8rem;font-weight:bold;margin-bottom:15px;color:#94a3b8;text-align:center;text-transform:uppercase;}"
     
-    # METRIC COMPONENT
-    ".metric-group{margin-bottom:22px;}"
-    ".metric-header{display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.65rem;font-weight:bold;letter-spacing:0.5px;}"
-    ".stress-text{color:#f43f5e;} .energy-text{color:#3b82f6;}"
+    ".bar-wrap{margin-bottom:10px;}"
+    ".bar-label{font-size:0.65rem;margin-bottom:4px;display:flex;justify-content:space-between;}"
+    ".bar-bg{height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;}"
+    ".bar-stress{height:100%;width:70%;background:#ef4444;}"
+    ".bar-energy{height:100%;width:40%;background:#3b82f6;}"
     
-    ".track-bg{height:6px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;}"
-    ".track-fill-stress{height:100%;width:78%;background:linear-gradient(90deg,#f43f5e,#fb7185);box-shadow:0 0 15px rgba(244,63,94,0.4);}"
-    ".track-fill-energy{height:100%;width:32%;background:linear-gradient(90deg,#3b82f6,#60a5fa);box-shadow:0 0 15px rgba(59,130,246,0.4);}"
-    
-    # DYNAMICS BOX (CORRELATION)
-    ".dynamics-box{background:rgba(244, 63, 94, 0.1);border:1px solid rgba(244, 63, 94, 0.2);border-radius:12px;padding:12px;text-align:center;margin-top:10px;}"
-    ".dynamics-formula{font-family:monospace;font-size:0.85rem;color:#fca5a5;margin-bottom:5px;font-weight:bold;}"
-    ".dynamics-label{font-size:0.6rem;color:#94a3b8;line-height:1.3;font-style:italic;}"
-    
-    ".footer{font-size:0.5rem;opacity:0.3;margin-top:20px;text-align:center;text-transform:uppercase;letter-spacing:1px;}"
+    # Formula
+    ".formula{margin-top:15px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);text-align:center;}"
+    ".formula-text{font-family:serif;font-size:1rem;color:#fca5a5;font-weight:bold;}"
+    ".formula-sub{font-size:0.6rem;color:#64748b;margin-top:2px;}"
     "</style></head><body>"
-    "<div class='container'>"
-        # Logo Section
-        "<div class='logo-badge'>"
-            f"<img src='data:image/jpeg;base64,{LOGO_IMAGE_B64}'/>"
+    "<div class='wrapper'>"
+        f"<img class='logo' src='data:image/png;base64,{LOGO_IMAGE_B64}'/>"
+        "<div class='card'>"
+            "<div class='title'>System Balance</div>"
+            "<div class='bar-wrap'>"
+                "<div class='bar-label'><span>STRESS (σ)</span><span>HIGH</span></div>"
+                "<div class='bar-bg'><div class='bar-stress'></div></div>"
+            "</div>"
+            "<div class='bar-wrap'>"
+                "<div class='bar-label'><span>ENERGY (W_EU)</span><span>LOW</span></div>"
+                "<div class='bar-bg'><div class='bar-energy'></div></div>"
+            "</div>"
+            "<div class='formula'>"
+                "<div class='formula-text'>σ ↑ ⇒ W_EU ↓</div>"
+                "<div class='formula-sub'>Stress intensity drains useful energy</div>"
+            "</div>"
         "</div>"
-        
-        # Sestavljena Infografika
-        "<div class='dashboard'>"
-            "<div class='dash-title'>System Analytics</div>"
-            
-            # Stress Metric
-            "<div class='metric-group'>"
-                "<div class='metric-header'><span class='stress-text'>STRESS LOAD (σ)</span><span>CRITICAL</span></div>"
-                "<div class='track-bg'><div class='track-fill-stress'></div></div>"
-            "</div>"
-            
-            # Energy Metric
-            "<div class='metric-group'>"
-                "<div class='metric-header'><span class='energy-text'>KCAL EFFICIENCY</span><span>DRAINED</span></div>"
-                "<div class='track-bg'><div class='track-fill-energy'></div></div>"
-            "</div>"
-            
-            # Mathematical Correlation (Friction)
-            "<div class='dynamics-box'>"
-                "<div class='dynamics-formula'>σ ↑ → W_EU ↓</div>"
-                "<div class='dynamics-label'>High stress intensity acts as thermal friction, converting useful kinetic energy into systemic waste.</div>"
-            "</div>"
-            
-            "<div class='footer'>Petrič Barometer PRO v4.0</div>"
-        "</div>"
-    "</div>"
-    "</body></html>"
+    "</div></body></html>"
 )
 
 
