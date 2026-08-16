@@ -121,11 +121,11 @@ st.markdown(
     }
 
     [data-testid="stSidebar"] {
-        background-color: #000000 !important;
+        background-color: #030c1b !important;
         background-image: none !important;
     }
     [data-testid="stSidebar"] > div:first-child {
-        background-color: #000000 !important;
+        background-color: #030c1b !important;
     }
 
     [data-testid="stSidebar"]::before,
@@ -192,87 +192,62 @@ LOGO_IMAGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYA
 SIDEBAR_LOGO_HTML = (
     "<html><head><style>"
     "html,body{margin:0;padding:0;background:#000000;font-family:'Arial Black',Gadget,sans-serif;color:white;}"
-    ".sidebar-container{padding:20px 15px 28px 15px;display:flex;flex-direction:column;align-items:center;background:#000000;min-height:100vh;}"
-
-    # --- LOGO: BEL KROG S PIRAMIDO — NESPREMENJEN ---
+    ".sidebar-container{padding:20px 15px;display:flex;flex-direction:column;align-items:center;background:#000000;}"
     ".brand-circle{width:100px;height:100px;background:white;border-radius:50%;"
     "display:flex;justify-content:center;align-items:center;margin-bottom:30px;"
     "box-shadow:0 0 30px rgba(59,130,246,0.5);border:4px solid #3b82f6;}"
     ".pyramid-svg{width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;"
     "border-bottom:50px solid #030c1b;}"
-
-    # --- INFOGRAFIKA ---
     ".impact-card{width:100%;background:rgba(255,255,255,0.03);border-radius:20px;padding:25px 20px;"
-    "border:1px solid rgba(255,255,255,0.1);box-shadow:0 20px 50px rgba(0,0,0,0.5);box-sizing:border-box;margin-bottom:24px;}"
+    "border:1px solid rgba(255,255,255,0.1);box-shadow:0 20px 50px rgba(0,0,0,0.5);box-sizing:border-box;}"
     ".status-tag{font-size:0.7rem;font-weight:900;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;display:block;}"
     ".red-text{color:#ff4b4b;} .blue-text{color:#00d2ff;}"
     ".mega-bar{height:22px;background:#111;border-radius:30px;margin-bottom:30px;padding:3px;border:1px solid #333;overflow:hidden;}"
     ".fill-stress{height:100%;width:92%;background:linear-gradient(90deg,#ff4b4b,#880000);border-radius:30px;"
     "box-shadow:0 0 20px rgba(255,75,75,0.6);animation: pulse 1.5s infinite;}"
     ".fill-energy{height:100%;width:12%;background:linear-gradient(90deg,#00d2ff,#004488);border-radius:30px;"
-    "box-shadow:0 0 10px rgba(0,210,255,0.4);}"
-    ".center-math{font-size:1.8rem;font-weight:900;text-align:center;margin:20px 0;letter-spacing:-1px;}"
+    "box-shadow:0 0 10px rgba(0,210,255,0.4);}.center-math{font-size:1.8rem;font-weight:900;text-align:center;margin:20px 0;letter-spacing:-1px;}"
     ".drain-arrow{color:#ff4b4b;font-size:1.5rem;display:block;margin:-5px 0;}"
     ".warning-box{background:#ff4b4b;color:white;padding:15px;border-radius:12px;text-align:center;"
-    "font-size:0.85rem;font-weight:900;box-shadow:0 10px 20px rgba(255,75,75,0.3);}"
-    ".warning-box span{display:block;font-size:0.6rem;text-transform:uppercase;margin-top:5px;opacity:0.8;}"
-
-    # --- POVEZAVE ---
-    ".links-panel{width:100%;margin:0 0 24px 0;}"
-    ".link-group{margin:0 0 18px 0;}"
-    ".link-group-title{font-size:0.68rem;font-weight:900;text-transform:uppercase;letter-spacing:1.8px;"
-    "color:#b8c4d6;margin:0 0 8px 3px;text-align:left;}"
-    ".link-item{display:block;width:100%;box-sizing:border-box;text-decoration:none;"
-    "color:#ffffff !important;background:#000000;border:1px solid #333;border-radius:9px;"
-    "padding:9px 11px;margin:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:0.78rem;"
-    "font-weight:700;transition:all .18s ease;}"
-    ".link-item:hover{background:#151515;border-color:#3b82f6;color:#ffffff !important;transform:translateX(2px);}"
-    ".link-icon{display:inline-block;width:24px;color:#60a5fa;text-align:center;margin-right:5px;}"
-
+    "font-size:0.85rem;font-weight:900;box-shadow:0 10px 20px rgba(255,75,75,0.3);}.warning-box span{display:block;font-size:0.6rem;text-transform:uppercase;margin-top:5px;opacity:0.8;}"
+    ".link-group{width:100%;margin-top:22px;}.group-title{color:#00d2ff;font-size:0.68rem;font-weight:900;letter-spacing:2px;text-transform:uppercase;margin:0 0 9px 4px;}"
+    ".side-link{display:block;color:#ffffff !important;text-decoration:none !important;font-family:Arial,sans-serif;font-size:0.78rem;font-weight:700;"
+    "padding:8px 10px;margin:4px 0;border:1px solid rgba(255,255,255,0.14);border-radius:8px;background:rgba(255,255,255,0.045);transition:all .2s;}"
+    ".side-link:hover{background:rgba(0,210,255,0.12);border-color:#00d2ff;color:#ffffff !important;}"
+    ".side-footer{margin-top:20px;font-size:0.55rem;opacity:0.4;letter-spacing:1px;text-align:center;}"
     "@keyframes pulse { 0% { opacity:1; } 50% { opacity:0.6; } 100% { opacity:1; } }"
     "</style></head><body>"
     "<div class='sidebar-container'>"
-        # Logo ostaja prvi.
-        "<div class='brand-circle'><div class='pyramid-svg'></div></div>"
-
-        # Infografika je neposredno pod logom.
-        "<div class='impact-card'>"
-            "<span class='status-tag red-text'>Stress Intensity (&sigma;)</span>"
-            "<div class='mega-bar'><div class='fill-stress'></div></div>"
-            "<div class='center-math'>&sigma; &uarr; <span class='drain-arrow'>&DoubleDownArrow;</span> W<sub>EU</sub> &darr;</div>"
-            "<span class='status-tag blue-text'>Useful Energy (W_EU)</span>"
-            "<div class='mega-bar'><div class='fill-energy'></div></div>"
-            "<div class='warning-box'>KCAL DRAIN: CRITICAL<span>Internal friction exceeds output</span></div>"
-        "</div>"
-
-        # Skupine povezav.
-        "<div class='links-panel'>"
-            "<div class='link-group'>"
-                "<div class='link-group-title'>Academic identity</div>"
-                "<a class='link-item' href='https://sites.google.com/view/drkarlpetric/domov' target='_blank' rel='noopener noreferrer'><span class='link-icon'>⌂</span>Official website</a>"
-                "<a class='link-item' href='https://orcid.org/0000-0003-0715-710X' target='_blank' rel='noopener noreferrer'><span class='link-icon'>iD</span>ORCID Registry</a>"
-                "<a class='link-item' href='https://www.researchgate.net/scientific-contributions/Karl-Petric-2338161528' target='_blank' rel='noopener noreferrer'><span class='link-icon'>RG</span>ResearchGate</a>"
-                "<a class='link-item' href='https://bib.cobiss.net/bibliographies/si/webBiblio/bib201_20260816_114808_a878947.html' target='_blank' rel='noopener noreferrer'><span class='link-icon'>▣</span>Personal bibliography</a>"
-            "</div>"
-            "<div class='link-group'>"
-                "<div class='link-group-title'>Publications &amp; research</div>"
-                "<a class='link-item' href='https://zenodo.org/records/21885685' target='_blank' rel='noopener noreferrer'><span class='link-icon'>Z</span>Hierarchology/Hierarchography 5th ed.</a>"
-                "<a class='link-item' href='https://works.hcommons.org/search?q=Karl%20Petri%C4%8D&amp;l=list&amp;p=1&amp;s=10&amp;sort=bestmatch' target='_blank' rel='noopener noreferrer'><span class='link-icon'>HC</span>Knowledge Commons</a>"
-                "<a class='link-item' href='https://doi.org/10.2478/eras-2025-0003' target='_blank' rel='noopener noreferrer'><span class='link-icon'>DOI</span>Stress &amp; positive factors — 2025</a>"
-            "</div>"
-            "<div class='link-group'>"
-                "<div class='link-group-title'>Applications</div>"
-                "<a class='link-item' href='https://sisapplicationtriadknowledgeideaspy-vd4xsrhfkfcehnyjyfq7f3.streamlit.app/' target='_blank' rel='noopener noreferrer'><span class='link-icon'>AI</span>SIS Knowledge Synthesizer</a>"
-                "<a class='link-item' href='https://stressenergybarometer-2qlqgyp8y9jj3b8zcz7fba.streamlit.app/' target='_blank' rel='noopener noreferrer'><span class='link-icon'>&sigma;</span>Stress Barometer</a>"
-            "</div>"
-        "</div>"
-
-        "<div style='margin-top:25px; font-size:0.6rem; opacity:0.4; letter-spacing:1px;'>PETRIČ ANALYTICS ENGINE PRO</div>"
+    "<div class='brand-circle'><div class='pyramid-svg'></div></div>"
+    "<div class='impact-card'>"
+    "<span class='status-tag red-text'>Stress Intensity (&sigma;)</span>"
+    "<div class='mega-bar'><div class='fill-stress'></div></div>"
+    "<div class='center-math'>&sigma; &uarr; <span class='drain-arrow'>&DoubleDownArrow;</span> W<sub>EU</sub> &darr;</div>"
+    "<span class='status-tag blue-text'>Useful Energy (W_EU)</span>"
+    "<div class='mega-bar'><div class='fill-energy'></div></div>"
+    "<div class='warning-box'>KCAL DRAIN: CRITICAL<span>Internal friction exceeds output</span></div>"
     "</div>"
-    "</body></html>"
+    "<div class='link-group'>"
+    "<div class='group-title'>Academic identity</div>"
+    "<a class='side-link' href='https://sites.google.com/view/drkarlpetric/domov' target='_blank'>Dr. Karl Petrič — Home</a>"
+    "<a class='side-link' href='https://orcid.org/0000-0003-0715-710X' target='_blank'>ORCID iD</a>"
+    "<a class='side-link' href='https://bib.cobiss.net/bibliographies/si/webBiblio/bib201_20260816_114808_a878947.html' target='_blank'>Personal bibliography</a>"
+    "</div>"
+    "<div class='link-group'>"
+    "<div class='group-title'>Research & publications</div>"
+    "<a class='side-link' href='https://zenodo.org/records/21885685' target='_blank'>Hierarchology/Hierarchography 5th ed.</a>"
+    "<a class='side-link' href='https://www.researchgate.net/scientific-contributions/Karl-Petric-2338161528' target='_blank'>ResearchGate</a>"
+    "<a class='side-link' href='https://works.hcommons.org/search?q=Karl%20Petri%C4%8D&l=list&p=1&s=10&sort=bestmatch' target='_blank'>Knowledge Commons</a>"
+    "</div>"
+    "<div class='link-group'>"
+    "<div class='group-title'>Applications & media</div>"
+    "<a class='side-link' href='https://sisapplicationtriadknowledgeideaspy-vd4xsrhfkfcehnyjyfq7f3.streamlit.app/' target='_blank'>SIS Universal Knowledge Synthesizer</a>"
+    "<a class='side-link' href='https://stressenergybarometer-2qlqgyp8y9jj3b8zcz7fba.streamlit.app/' target='_blank'>Stress Barometer</a>"
+    "<a class='side-link' href='https://x.com/' target='_blank'>X — videos & updates</a>"
+    "</div>"
+    "<div class='side-footer'>PETRIČ ANALYTICS ENGINE PRO</div>"
+    "</div></body></html>"
 )
-
-
 
 # ============================================================
 # 3. STOPWORDS
@@ -3354,4 +3329,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
