@@ -236,7 +236,7 @@ SIDEBAR_LOGO_HTML = (
             "<div class='link-group'>"
                 "<div class='link-group-title'>Publications &amp; research</div>"
                 "<a class='link-item' href='https://zenodo.org/records/21885685' target='_blank'>"
-                    "<span class='link-icon'>Z</span>Hierarchology/Hierarchography 5th ed.</a>"
+                    "<span class='link-icon'>Z</span>Hierarchology/Hierarchography 5th</a>"
                 "<a class='link-item' href='https://works.hcommons.org/search?q=Karl%20Petri%C4%8D&l=list&p=1&s=10&sort=bestmatch' target='_blank'>"
                     "<span class='link-icon'>HC</span>Knowledge Commons</a>"
                 "<a class='link-item' href='https://doi.org/10.2478/eras-2025-0003' target='_blank'>"
